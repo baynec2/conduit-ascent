@@ -1,0 +1,4 @@
+organism_id	organism_type
+818	microbiome
+239935	microbiome
+9606	host

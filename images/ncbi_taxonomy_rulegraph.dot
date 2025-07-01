@@ -1,0 +1,77 @@
+digraph snakemake_dag {
+    graph[bgcolor=white, margin=0];
+    node[shape=box, style=rounded, fontname=sans,                 fontsize=10, penwidth=2];
+    edge[penwidth=2, color=grey];
+	0[label = "all", color = "0.00 0.6 0.85", style="rounded"];
+	1[label = "setup_diann_spectral_library_config", color = "0.64 0.6 0.85", style="rounded"];
+	2[label = "setup_diann_run_config", color = "0.62 0.6 0.85", style="rounded"];
+	3[label = "check_apptainer", color = "0.07 0.6 0.85", style="rounded"];
+	4[label = "build_conduitR_apptainer", color = "0.02 0.6 0.85", style="rounded"];
+	5[label = "build_diann_apptainer", color = "0.05 0.6 0.85", style="rounded"];
+	6[label = "move_database_resources", color = "0.42 0.6 0.85", style="rounded"];
+	7[label = "get_fasta", color = "0.30 0.6 0.85", style="rounded"];
+	8[label = "get_taxonomy", color = "0.37 0.6 0.85", style="rounded"];
+	9[label = "get_protein_info_from_fasta", color = "0.35 0.6 0.85", style="rounded"];
+	10[label = "plot_taxonomic_tree", color = "0.44 0.6 0.85", style="rounded"];
+	11[label = "generate_diann_spectral_library", color = "0.25 0.6 0.85", style="rounded"];
+	12[label = "make_database_resources_readme", color = "0.40 0.6 0.85", style="rounded"];
+	13[label = "extract_detected_proteins", color = "0.15 0.6 0.85", style="rounded"];
+	14[label = "get_annotations_from_uniprot", color = "0.27 0.6 0.85", style="rounded"];
+	15[label = "extract_go_info", color = "0.20 0.6 0.85", style="rounded"];
+	16[label = "extract_cellular_location_info", color = "0.12 0.6 0.85", style="rounded"];
+	17[label = "get_kegg_info", color = "0.32 0.6 0.85", style="rounded"];
+	18[label = "process_taxonomic_matrices", color = "0.57 0.6 0.85", style="rounded"];
+	19[label = "process_go_matrix", color = "0.52 0.6 0.85", style="rounded"];
+	20[label = "process_subcellular_locations_matrix", color = "0.54 0.6 0.85", style="rounded"];
+	21[label = "process_diann_matrices", color = "0.49 0.6 0.85", style="rounded"];
+	22[label = "extract_metrics", color = "0.22 0.6 0.85", style="rounded"];
+	23[label = "prepare_qf", color = "0.47 0.6 0.85", style="rounded"];
+	24[label = "create_conduit", color = "0.10 0.6 0.85", style="rounded"];
+	18 -> 0
+	20 -> 0
+	22 -> 0
+	6 -> 0
+	3 -> 0
+	24 -> 0
+	1 -> 0
+	23 -> 0
+	2 -> 0
+	4 -> 0
+	5 -> 0
+	21 -> 0
+	19 -> 0
+	15 -> 6
+	11 -> 6
+	16 -> 6
+	7 -> 6
+	12 -> 6
+	14 -> 6
+	10 -> 6
+	8 -> 6
+	17 -> 6
+	9 -> 6
+	13 -> 6
+	7 -> 8
+	7 -> 9
+	8 -> 9
+	8 -> 10
+	7 -> 11
+	1 -> 11
+	9 -> 12
+	7 -> 13
+	9 -> 13
+	13 -> 14
+	14 -> 15
+	14 -> 16
+	14 -> 17
+	9 -> 18
+	15 -> 19
+	16 -> 20
+	6 -> 22
+	20 -> 23
+	18 -> 23
+	21 -> 23
+	19 -> 23
+	22 -> 24
+	23 -> 24
+}            

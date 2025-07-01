@@ -1,8 +1,0 @@
-Running 01_get_taxonomy.R script
-Input file:  experiments/example/input/organisms.txt 
-Output file:  experiments/example/input/00_database_resources/01_taxonomy.txt 
-Reading organism IDs from the input file.
-Downloaing Taxonomy Information from NCBI API.
-Finished downloading Taxonomy Information from NCBI API.
-Writing Taxonomy Information to file.
-01_get_taxonomy.R script complete.

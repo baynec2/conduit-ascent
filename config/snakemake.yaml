@@ -1,5 +1,5 @@
 # Define the name of the experiment (this will be used to find the correct experiment directory)
-experiment: example
+experiment: 
 # Config file to generate the spectral library for DIA-NN (relative to main Snakefile)
 generate_diann_spectral_library_config: config/generate_diann_spectral_library.cfg
 # Config file to run DIA-NN search (relative to main Snakefile)

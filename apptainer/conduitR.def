@@ -1,4 +1,4 @@
-BootStrap: docker
+Bootstrap: docker
 From: rocker/r-ver:4.4.3
 
 %labels
@@ -8,33 +8,35 @@ From: rocker/r-ver:4.4.3
 
 %post
     # Install system dependencies
-apt-get update -y && apt-get install -y \
-    libcurl4-openssl-dev \
-    libxml2-dev \
-    libssl-dev \
-    libfontconfig1-dev \
-    libharfbuzz-dev \
-    libfribidi-dev \
-    fonts-dejavu \
-    libbz2-dev \
-    liblzma-dev \
-    libzstd-dev \
-    git \
-    libgit2-dev \
-    libcurl4-openssl-dev \
-    libxml2-dev \
-    libglpk40  # This is the missing dependency
+    apt-get update -y && apt-get install -y --no-install-recommends \
+        libcurl4-openssl-dev \
+        libxml2-dev \
+        libssl-dev \
+        libfontconfig1-dev \
+        libharfbuzz-dev \
+        libfribidi-dev \
+        fonts-dejavu \
+        libbz2-dev \
+        liblzma-dev \
+        libzstd-dev \
+        libglpk40 \
+        git \
+        libgit2-dev \
+        curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-    # Install Bioconductor manager and dependencies
-    R -e "install.packages('BiocManager')"
-    R -e "BiocManager::install('QFeatures')"
-    R -e "BiocManager::install(c('SummarizedExperiment', 'limma', 'Biostrings', 'KEGGREST'))"
+    # Install BiocManager and dependencies
+    R -e "install.packages('BiocManager', repos='https://cloud.r-project.org')"
 
-#    # Verify Bioconductor packages
+    # Install Bioconductor packages all at once
+    R -e "BiocManager::install(c('QFeatures', 'SummarizedExperiment', 'limma', 'Biostrings', 'KEGGREST', 'impute', 'pcaMethods', 'sechm', 'PCAtools'))"
+
+    # Optional: check Bioconductor install
     R -e "BiocManager::valid()"
 
-    # Install remotes for GitHub package installation
-    R -e "install.packages('remotes')"
+    # Install remotes + conduitR
+    R -e "install.packages('remotes', repos='https://cloud.r-project.org')"
     R -e "remotes::install_github('baynec2/conduitR')"
 
 %environment
