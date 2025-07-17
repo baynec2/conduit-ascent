@@ -14,11 +14,13 @@ rule generate_diann_spectral_library:
     log: os.path.join(EXPERIMENT_DIR,"logs/diann/generate_diann_spectral_library.log")
     container:
         "apptainer/diann2.1.0.sif"
+    threads: workflow.cores 
     shell:
         """
         diann --cfg {input.config_file} \
         --fasta {input.fasta} \
-        --out-lib experiments/{config[experiment]}/input/database_resources/database >> {log} 2>&1
+        --out-lib experiments/{config[experiment]}/input/database_resources/database \
+        --threads {threads} >> {log} 2>&1
         """
 ################################################################################
 # Running DIANN
@@ -35,6 +37,7 @@ rule run_diann:
     log: os.path.join(EXPERIMENT_DIR,"logs/diann/run_diann.log")
     container:
         "apptainer/diann2.1.0.sif"
+    threads: workflow.cores 
     shell:
         """
         diann --cfg {input.config_file} \
