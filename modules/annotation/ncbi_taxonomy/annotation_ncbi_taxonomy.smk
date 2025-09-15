@@ -6,7 +6,7 @@ rule get_annotations_from_uniprot:
   output:
     uniprot_annotated_protein_info = os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/uniprot_annotated_protein_info.txt")
   log: os.path.join(EXPERIMENT_DIR,"logs/annotation/ncbi_taxonomy/get_annotations_from_uniprot.log")
-  container: "apptainer/conduitR.sif"
+  container: "docker://baynec2/conduitr:alpha"
   script:
     "scripts/get_annotations_from_uniprot.R"
     
@@ -17,7 +17,7 @@ rule extract_go_info:
     output:
      go_annotations=os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/go_annotations.txt")
     log: os.path.join(EXPERIMENT_DIR,"logs/annotation/ncbi_taxonomy/extract_go_info.log")
-    container: "apptainer/conduitR.sif"
+    container: "docker://baynec2/conduitr:alpha"
     script:
      "scripts/extract_go_info.R" 
 
@@ -28,7 +28,7 @@ rule extract_cellular_location_info:
     output:
       subcellular_locations=os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/subcellular_locations.txt")
     log: os.path.join(EXPERIMENT_DIR,"logs/annotation/ncbi_taxonomy/extract_cellular_location_info.log")
-    container: "apptainer/conduitR.sif"
+    container: "docker://baynec2/conduitr:alpha"
     script:
      "scripts/extract_subcellular_locations.R" 
      
@@ -39,7 +39,7 @@ rule get_kegg_info:
     output:
        kegg_annotations=os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/kegg_annotations.txt")
     log: os.path.join(EXPERIMENT_DIR,"logs/annotation/ncbi_taxonomy/get_kegg_info.log")
-    container: "apptainer/conduitR.sif"
+    container: "docker://baynec2/conduitr:alpha"
     script:
      "scripts/get_kegg_info.R" 
      
@@ -50,7 +50,7 @@ rule extract_detected_taxonomy:
     output:
        detected_taxonomy=os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/detected_taxonomy.txt")
     log: os.path.join(EXPERIMENT_DIR,"logs/annotation/ncbi_taxonomy/extract_detected_taxonomy.log")
-    container: "apptainer/conduitR.sif"
+    container: "docker://baynec2/conduitr:alpha"
     script:
      "scripts/extract_detected_taxonomy.R"      
   

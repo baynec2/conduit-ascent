@@ -135,9 +135,6 @@ rule all:
         # Config files must be created first
         os.path.join(EXPERIMENT_DIR, "config/generate_diann_spectral_library.cfg"),
         os.path.join(EXPERIMENT_DIR, "config/run_diann.cfg"),
-        os.path.join(EXPERIMENT_DIR,"logs/setup/apptainer_checked"),
-        "apptainer/conduitR.sif",
-        "apptainer/diann2.1.0.sif",
         # Rest of the workflow outputs
         expand(os.path.join(EXPERIMENT_DIR, "output/database_resources/{file}"), 
                file=[
