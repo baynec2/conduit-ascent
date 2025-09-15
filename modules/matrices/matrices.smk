@@ -11,7 +11,7 @@ rule process_diann_matrices:
     precursor_matrix = os.path.join(EXPERIMENT_DIR,"output/output_files/precursor_matrix.tsv"),
     peptide_matrix = os.path.join(EXPERIMENT_DIR,"output/output_files/peptide_matrix.tsv")
   log: os.path.join(EXPERIMENT_DIR,"logs/matrices/process_diann_matrices.log")
-  container: "apptainer/conduitR.sif"
+  container: "docker://baynec2/conduitr:alpha"
   script: "scripts/process_diann_matrices.R"
     
 rule process_taxonomic_matrices:
@@ -29,7 +29,7 @@ rule process_taxonomic_matrices:
     genus_matrix=os.path.join(EXPERIMENT_DIR,"output/output_files/genus_matrix.tsv"),
     species_matrix=os.path.join(EXPERIMENT_DIR,"output/output_files/species_matrix.tsv")
   log: os.path.join(EXPERIMENT_DIR,"logs/matrices/process_taxonomic_matrices.log")
-  container: "apptainer/conduitR.sif"
+  container: "docker://baynec2/conduitr:alpha"
   script: "scripts/process_taxonomic_matrices.R"
     
 rule process_go_matrix:
@@ -40,7 +40,7 @@ rule process_go_matrix:
     go_annotations_matrix = os.path.join(EXPERIMENT_DIR,"output/output_files/go_matrix.tsv"),
     go_annotations_taxa_matrix = os.path.join(EXPERIMENT_DIR,"output/output_files/go_taxa_matrix.tsv")
   log: os.path.join(EXPERIMENT_DIR,"logs/matrices/process_go_matrix.log")
-  container: "apptainer/conduitR.sif"
+  container: "docker://baynec2/conduitr:alpha"
   script: "scripts/process_go_matrix.R"
   
 rule process_subcellular_locations_matrix:
@@ -50,7 +50,7 @@ rule process_subcellular_locations_matrix:
   output: 
     subcellular_locations_matrix = os.path.join(EXPERIMENT_DIR,"output/output_files/subcellular_locations_matrix.tsv")
   log: os.path.join(EXPERIMENT_DIR,"logs/matrices/process_subcellular_locations_matrix.log")
-  container: "apptainer/conduitR.sif"
+  container: "docker://baynec2/conduitr:alpha"
   script:"scripts/process_subcellular_locations_matrix.R"
   
 rule process_kegg_matrices:
@@ -61,7 +61,7 @@ rule process_kegg_matrices:
     kegg_pathway_matrix = os.path.join(EXPERIMENT_DIR,"output/output_files/kegg_pathway_matrix.tsv"),
     kegg_ko_matrix = os.path.join(EXPERIMENT_DIR,"output/output_files/kegg_ko_matrix.tsv")
   log: os.path.join(EXPERIMENT_DIR,"logs/matrices/process_kegg_matrices.log")
-  container: "apptainer/conduitR.sif"
+  container: "docker://baynec2/conduitr:alpha"
   script:"scripts/process_kegg_matrices.R"  
  
 

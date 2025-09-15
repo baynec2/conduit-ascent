@@ -25,7 +25,7 @@ rule prepare_qf:
   output:
     qf= os.path.join(EXPERIMENT_DIR,"output/output_files/qf.rds")
   log: os.path.join(EXPERIMENT_DIR,"logs/r_integration/prepare_qf.log")
-  container: "apptainer/conduitR.sif"
+  container: "docker://baynec2/conduitr:alpha"
   script:
     "scripts/prepare_qf.R"
 
@@ -41,7 +41,7 @@ rule extract_metrics:
     detected_protein_metrics = os.path.join(EXPERIMENT_DIR,"output/output_files/detected_protein_metrics.tsv"),
     combined_metrics = os.path.join(EXPERIMENT_DIR,"output/output_files/combined_metrics.tsv")
   log: os.path.join(EXPERIMENT_DIR,"logs/r_integration/extract_metrics.log")
-  container: "apptainer/conduitR.sif"
+  container: "docker://baynec2/conduitr:alpha"
   script:
     "scripts/extract_metrics.R"
     
@@ -60,7 +60,7 @@ rule create_conduit:
   output:
     conduit_obj = os.path.join(EXPERIMENT_DIR,"output/output_files/conduit_output.rds")
   log: os.path.join(EXPERIMENT_DIR,"logs/r_integration/create_conduit.log")
-  container: "apptainer/conduitR.sif"
+  container: "docker://baynec2/conduitr:alpha"
     # From this point- the conduit object contains all the stuff you need. 
     # Load that into Conduit GUI.
   script:
