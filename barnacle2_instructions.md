@@ -32,7 +32,7 @@ pip install datrie
 ```
 
 ## 4. Add in the following lines to the beginning of `conduit/modules/annotation/ncbi_taxonomy/scripts get_annotations_from_uniprot.R`
-Easiest/quickest way to do this is to `vim scripts get_annotations_from_uniprot.R`, make your changes after typing `i`, and then `:x` and press enter to save and quit the file.
+Easiest/quickest way to do this is to `vim get_annotations_from_uniprot.R`, make your changes after typing `i`, and then `:x` and press enter to save and quit the file.
 
 ```
 # Get Detected Proteins Annotation From Uniprot # previous line
