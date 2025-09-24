@@ -4,7 +4,6 @@ FROM rocker/r-ver:4.4.3
 LABEL maintainer="Charlie Bayne <baynec2@gmail.com>"       version="0.0.0.9000"       description="R tools for metaproteomics analysis using conduit and conduit-GUI"
 
 # Install system dependencies
-
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
         libcurl4-openssl-dev \
         libxml2-dev \
