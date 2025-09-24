@@ -1,0 +1,38 @@
+
+DIA-NN 2.1.0 Academia  (Data-Independent Acquisition by Neural Networks)
+Compiled on Mar 23 2025 15:49:03
+Current date and time: Mon Jul 28 13:31:45 2025
+Logical CPU cores: 24
+diann --cfg config/proteotyping_firstpass_diann_spectral_library.cfg --fasta resources/databases/first_pass_database.fasta --threads 24 --out-lib resources/databases/first_pass_database 
+
+Output will be filtered at 0.01 FDR
+Precursor/protein x samples expression level matrices will be saved along with the main report
+A spectral library will be generated
+Deep learning will be used to generate a new in silico spectral library from peptides provided
+DIA-NN will carry out FASTA digest for in silico lib generation
+Min fragment m/z set to 200
+Max fragment m/z set to 1800
+N-terminal methionine excision enabled
+Min peptide length set to 5
+Max peptide length set to 50
+Min precursor m/z set to 300
+Max precursor m/z set to 1800
+Min precursor charge set to 1
+Max precursor charge set to 4
+Maximum number of missed cleavages set to 0
+Cysteine carbamidomethylation enabled as a fixed modification
+Thread number set to 24
+Mass accuracy will be fixed to 1e-05 (MS2) and 4e-06 (MS1)
+
+0 files will be processed
+[0:00] Loading FASTA resources/databases/first_pass_database.fasta
+WARNING: 31 sequences skipped due to duplicate protein ids; use --duplicate-proteins to disable skipping duplicates
+[0:07] Processing FASTA
+[0:09] Assembling elution groups
+[0:24] 9516756 precursors generated
+[0:24] Protein names missing for some isoforms
+[0:24] Gene names missing for some isoforms
+[0:24] Library contains 0 proteins, and 0 genes
+[0:30] [0:38] [12:46] [13:51] [13:55] [13:57] Saving the library to resources/databases/first_pass_database.predicted.speclib
+[14:02] Initialising library
+

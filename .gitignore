@@ -39,4 +39,17 @@ experiments/*
 !experiments/example/
 !experiments/example/**
 
+# Ignore any database resources. Files are too large to be included in the repository.
+resources/databases/
 
+
+*.fasta
+*.speclib
+*.raw
+*.lz4
+*.index
+*.fasta
+*.speclib
+*.raw
+*.lz4
+*.index

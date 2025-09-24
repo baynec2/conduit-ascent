@@ -1,0 +1,45 @@
+Bootstrap: docker
+From: debian:bullseye
+
+%labels
+    Maintainer Charlie Bayne
+    Description "Apptainer container with umgap and dependencies"
+
+%environment
+    export PATH="/root/.cargo/bin:$PATH"
+
+%post
+    # Update package list and install dependencies
+    apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        git \
+        uuid-runtime \
+        lz4 \
+        pigz \
+        pv \
+        build-essential \
+        pkg-config \
+        libssl-dev \
+        ca-certificates \
+        util-linux \
+        unzip \
+        gawk \
+        libxml2-utils
+
+    # Install Rust using rustup
+    curl https://sh.rustup.rs -sSf | sh -s -- -y
+    export PATH="/root/.cargo/bin:$PATH"
+    
+    # Set default Rust toolchain
+    /root/.cargo/bin/rustup default stable
+
+    # Clone and install umgap from source
+    git clone https://github.com/unipept/umgap.git /opt/umgap
+    cd /opt/umgap
+    /root/.cargo/bin/cargo install --path .
+
+    # Clean up
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+%runscript
+    echo "UMGAP is installed. Run with 'umgap --help'"

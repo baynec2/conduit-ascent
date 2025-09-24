@@ -27,9 +27,9 @@ if not config.get("search_space_method"):
     raise ValueError("Please provide 'search_space_method' in config file")
 # Defining the allowed methods. 
 ALLOWED_METHODS = [
-    "ncbi_taxonomy_id" # Will uncomment methods as they become supported,
+    "ncbi_taxonomy_id", # Will uncomment methods as they become supported,
    # "uniprot_proteome_id",
-   # "proteotyping",
+    "proteotyping",
    # "MAG",
    # "metagenomic_profiling",
    # "16S"
@@ -88,13 +88,17 @@ if config["search_space_method"] == "ncbi_taxonomy_id":
   module annotation: 
     snakefile: "modules/annotation/ncbi_taxonomy/annotation_ncbi_taxonomy.smk"
     config: config
+elif config["search_space_method"] == "proteotyping":
+  module proteotyping:
+    snakefile: "modules/search_space/proteotyping/generate_first_pass_proteotyping_db.smk"
+    config: config
+  module search_space:
+    snakefile: "modules/search_space/ncbi_taxonomy/search_space_ncbi_taxonomy.smk"
+    config: config
+  module annotation: 
+    snakefile: "modules/annotation/ncbi_taxonomy/annotation_ncbi_taxonomy.smk"
+    config: config
 # Uncomment methods as they become supported. 
-# elif config["search_space_method"] == "proteotyping":
-#   module search_space:
-#     snakefile: "modules/search_space/proteotyping/Snakefile"
-#   module annotation: 
-#     snakefile: "modules/annotation/proteotyping/Snakefile"
-
 # elif config["search_space_method"] == "metagenomic_profiling":
 #   module search_space:
 #     snakefile: "modules/search_space/metagenomic_profiling/Snakefile"
@@ -174,7 +178,10 @@ rule all:
 
 # Setting up the workflow. Config, apptainer, etc. 
 use rule * from setup
-# Defining the search space/
+# Proteotyping has an additional first pass search module
+if config["search_space_method"] == "proteotyping":
+    use rule * from proteotyping
+
 use rule * from search_space 
 # Generating Spectral Library, Running DIA-NN, Extracting Detected Proteins
 use rule * from diann
