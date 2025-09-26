@@ -1,0 +1,108 @@
+Bootstrap: docker
+From: ubuntu:22.04
+
+%labels
+    base_image ubuntu:22.04
+    version 1
+    software metaphlan
+    software.version 4.0.6
+    about.summary "MetaPhlAn - Metagenomic Phylogenetic Analysis for taxonomic profiling of metagenomic shotgun sequencing data"
+    about.home https://github.com/biobakery/MetaPhlAn
+    about.documentation https://github.com/biobakery/MetaPhlAn/wiki
+    about.license https://github.com/biobakery/MetaPhlAn/blob/master/LICENSE
+    about.tags Metagenomics,Taxonomy,Profiling
+    maintainer Charlie Bayne <baynec2@gmail.com>
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=en_US.UTF-8
+    export LANGUAGE=en_US:en
+    export LC_ALL=en_US.UTF-8
+    export PYTHONUNBUFFERED=1
+    export MPLCONFIGDIR=/tmp
+    export PATH="/opt/bowtie2:$PATH"
+    export BOWTIE2_DB="/opt/metaphlan_databases"
+
+%post
+    echo "Updating packages and installing dependencies..."
+    apt-get update && apt-get install -y --no-install-recommends \
+        python3 \
+        python3-pip \
+        python3-dev \
+        python3-venv \
+        wget \
+        curl \
+        ca-certificates \
+        locales \
+        build-essential \
+        libgomp1 \
+        libbz2-dev \
+        liblzma-dev \
+        libzstd-dev \
+        zlib1g-dev \
+        libncurses5-dev \
+        libncursesw5-dev \
+        libcurl4-openssl-dev \
+        libssl-dev \
+        libxml2-dev \
+        libffi-dev \
+        git \
+        unzip \
+        gzip \
+        tar && \
+        rm -rf /var/lib/apt/lists/*
+
+    echo "Setting up locale..."
+    locale-gen en_US.UTF-8 && \
+    update-locale LANG=en_US.UTF-8
+
+    echo "Installing Python packages..."
+    python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
+    python3 -m pip install --no-cache-dir \
+        metaphlan==4.0.6 \
+        biopython \
+        numpy \
+        scipy \
+        pandas \
+        matplotlib \
+        seaborn \
+        plotly \
+        requests \
+        urllib3
+
+    echo "Installing Bowtie2..."
+    wget https://github.com/BenLangmead/bowtie2/releases/download/v2.5.2/bowtie2-2.5.2-linux-x86_64.zip
+    unzip bowtie2-2.5.2-linux-x86_64.zip
+    mv bowtie2-2.5.2-linux-x86_64 /opt/bowtie2
+    ln -s /opt/bowtie2/bowtie2 /usr/local/bin/bowtie2
+    ln -s /opt/bowtie2/bowtie2-build /usr/local/bin/bowtie2-build
+    ln -s /opt/bowtie2/bowtie2-inspect /usr/local/bin/bowtie2-inspect
+    rm bowtie2-2.5.2-linux-x86_64.zip
+
+    echo "Installing Samtools..."
+    wget https://github.com/samtools/samtools/releases/download/1.19/samtools-1.19.tar.bz2
+    tar -xjf samtools-1.19.tar.bz2
+    cd samtools-1.19
+    ./configure --prefix=/usr/local
+    make
+    make install
+    cd ..
+    rm -rf samtools-1.19 samtools-1.19.tar.bz2
+
+    echo "Creating MetaPhlAn database directory..."
+    mkdir -p /opt/metaphlan_databases
+    chmod 755 /opt/metaphlan_databases
+
+    echo "Cleaning up..."
+    apt-get remove -y wget curl unzip gzip tar build-essential && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+%runscript
+    exec /usr/local/bin/metaphlan "$@"
+
+%test
+    metaphlan --version
+    bowtie2 --version
+    samtools --version
