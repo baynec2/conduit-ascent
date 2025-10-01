@@ -124,11 +124,8 @@ module setup:
 module diann:
   snakefile: "modules/diann/diann.smk"
   config: config
-module matrices:
-  snakefile: "modules/matrices/matrices.smk"
-  config: config
-module integration:
-  snakefile: "modules/r_integration/r_integration.smk"
+module build_conduit:
+  snakefile: "modules/build_conduit/build_conduit.smk"
   config: config
 
 ################################################################################
@@ -154,28 +151,10 @@ rule all:
                file=[
                    "detected_protein_info.txt",
                    "detected_protein.fasta",
-                   "uniprot_annotated_protein_info.txt",
-                   "go_annotations.txt",
-                   "subcellular_locations.txt",
-                   "kegg_annotations.txt"
+                   "uniprot_annotated_protein_info.txt"
                ]),
-        expand(os.path.join(EXPERIMENT_DIR, "input/raw_files/{sample}.raw"), sample=SAMPLES),
-        expand(os.path.join(EXPERIMENT_DIR, "output/diann_output/diann.{suffix}.tsv"), suffix=["pr_matrix", "pg_matrix"]),
-        expand(os.path.join(EXPERIMENT_DIR, "output/output_files/{level}_matrix.tsv"), 
-               level=[
-                   "domain", "kingdom", "phylum", "class", "order", 
-                   "family", "genus", "species", "go", "go_taxa", "subcellular_locations",
-                   "protein_group", "precursor", "peptide","kegg_pathway","kegg_ko"
-               ]),
-        expand(os.path.join(EXPERIMENT_DIR, "output/output_files/{metric}.tsv"),
-               metric=[
-                   "database_taxonomy", "database_metrics",
-                   "detected_protein_taxonomy", "detected_protein_metrics",
-                   "combined_metrics"
-               ]),
-        os.path.join(EXPERIMENT_DIR, "output/output_files/qf.rds"),
-        os.path.join(EXPERIMENT_DIR, "output/output_files/conduit_output.rds")
-
+        expand(os.path.join(EXPERIMENT_DIR, "input/raw_files/{sample}.raw"), sample=SAMPLES),       
+        conduit = os.path.join(EXPERIMENT_DIR,"output","output_files",f"{config['experiment']}_conduit.rds")
 # Setting up the workflow. Config, apptainer, etc. 
 use rule * from setup
 # Proteotyping has an additional first pass search module
@@ -187,7 +166,5 @@ use rule * from search_space
 use rule * from diann
 # Annotating Detected Proteins 
 use rule * from annotation
-# Processing Matrices
-use rule * from matrices
-# Integrating into R
-use rule * from integration
+# Building Conduit Object from processed data.
+use rule * from build_conduit

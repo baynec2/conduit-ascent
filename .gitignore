@@ -38,6 +38,11 @@ apptainer/*.sif
 experiments/*
 !experiments/example/
 !experiments/example/**
+experiments/example/input/database_resources/
+experiments/example/output/
+experiments/example/logs/
+experiments/example/input/raw_files/
+experiments/example/config/
 
 # Ignore any database resources. Files are too large to be included in the repository.
 resources/databases/
@@ -51,5 +56,6 @@ resources/databases/
 *.fasta
 *.speclib
 *.raw
+*.raw.quant
 *.lz4
 *.index
