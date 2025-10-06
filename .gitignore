@@ -1,3 +1,8 @@
+# Ignore all experiments except example
+experiments/*
+!experiments/example/
+!experiments/example/**
+
 # RStudio specific files
 .Rproj.user
 .Rhistory
@@ -9,6 +14,7 @@
 **/.DS_Store
 
 # Ignore raw data 
+experiments/example/input/raw_files/
 experiments/example/input/raw_files/
 
 # Ignore example config files
@@ -23,7 +29,7 @@ output/
 experiments/example/output/
 
 # Ignore logs files
-logs/*
+experiments/example/logs/
 
 # Ignore any of the internal snakemake files
 .snakemake
@@ -34,19 +40,10 @@ apptainer/*.sif
 # Ignore any raw files 
 *.raw
 
-# Ignore all experiments except example
-experiments/*
-!experiments/example/
-!experiments/example/**
-experiments/example/input/database_resources/
-experiments/example/output/
-experiments/example/logs/
-experiments/example/input/raw_files/
-experiments/example/config/
 
 # Ignore any database resources. Files are too large to be included in the repository.
 resources/databases/
-
+resources/metaphlan/
 
 *.fasta
 *.speclib

@@ -31,7 +31,7 @@ ALLOWED_METHODS = [
    # "uniprot_proteome_id",
     "proteotyping",
    # "MAG",
-   # "metagenomic_profiling",
+    "metaphlan",
    # "16S"
 ]
 # Checking that the method is allowed.   
@@ -98,12 +98,13 @@ elif config["search_space_method"] == "proteotyping":
   module annotation: 
     snakefile: "modules/annotation/ncbi_taxonomy/annotation_ncbi_taxonomy.smk"
     config: config
-# Uncomment methods as they become supported. 
-# elif config["search_space_method"] == "metagenomic_profiling":
-#   module search_space:
-#     snakefile: "modules/search_space/metagenomic_profiling/Snakefile"
-#   module annotation: 
-#     snakefile: "modules/annotation/metagenomic_profiling/Snakefile"
+elif config["search_space_method"] == "metaphlan":
+  module search_space:
+    snakefile: "modules/search_space/metaphlan/metaphlan.smk"
+    config: config
+  module annotation: 
+    snakefile: "modules/annotation/ncbi_taxonomy/annotation_ncbi_taxonomy.smk"
+    config: config
   
 # elif config["search_space_method"] == "MAG":
 #   module search_space:
