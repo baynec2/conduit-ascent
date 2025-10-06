@@ -53,5 +53,6 @@ resources/metaphlan/
 *.fasta
 *.speclib
 *.raw
+*.raw.quant
 *.lz4
 *.index

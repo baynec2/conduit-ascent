@@ -32,8 +32,9 @@ rule run_diann:
         fasta = os.path.join(EXPERIMENT_DIR,"input/database_resources/database.fasta"),
         config_file = os.path.join(EXPERIMENT_DIR,"config/run_diann.cfg")
     output:
-        report_pr_matrix = os.path.join(EXPERIMENT_DIR,"output/diann_output/diann.pr_matrix.tsv"),
-        report_pg_matrix = os.path.join(EXPERIMENT_DIR,"output/diann_output/diann.pg_matrix.tsv")
+        diann_stats = os.path.join(EXPERIMENT_DIR,"output/diann_output/diann.stats.tsv"),
+        diann_parquet = os.path.join(EXPERIMENT_DIR,"output/diann_output/diann.parquet"),
+        diann_pg_matrix = os.path.join(EXPERIMENT_DIR,"output/diann_output/diann.pg_matrix.tsv")
     log: os.path.join(EXPERIMENT_DIR,"logs/diann/run_diann.log")
     container:
         "docker://baynec2/diann2.1.0:alpha"
