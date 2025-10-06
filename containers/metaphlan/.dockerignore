@@ -1,0 +1,31 @@
+# VCS
+.git
+.gitignore
+
+# Python
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.mypy_cache
+.pytest_cache
+.ruff_cache
+
+# OS / editor
+.DS_Store
+.idea
+.vscode
+
+# Envs & deps
+.venv
+venv
+node_modules
+
+# Project outputs
+build
+dist
+results
+data
+db
+
+
