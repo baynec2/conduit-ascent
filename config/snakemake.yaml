@@ -12,6 +12,8 @@ run_diann_config: config/run_diann.cfg
 # - "metagenomic_profiling": Use metagenomic profiling to define the search space.
 # - "16S": Use 16S rRNA gene sequences to define the search space.
 search_space_method: ncbi_taxonomy_id
+# If using a sequenceing based method, the relative abundance threshold above which a species is reported. 
+relative_abundance_threshold: 0.01
 # Define the sample annotation filepath relative to the experiment directory
 sample_annotation: input/sample_annotation.txt
 # Define the output directory relative to the experiment directory
