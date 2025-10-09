@@ -30,6 +30,7 @@ experiments/example/output/
 
 # Ignore logs files
 experiments/example/logs/
+experiments/example/config/
 
 # Ignore any of the internal snakemake files
 .snakemake
