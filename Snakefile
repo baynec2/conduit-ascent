@@ -99,8 +99,11 @@ elif config["search_space_method"] == "proteotyping":
     snakefile: "modules/annotation/ncbi_taxonomy/annotation_ncbi_taxonomy.smk"
     config: config
 elif config["search_space_method"] == "metaphlan":
-  module search_space:
+  module metaphlan:
     snakefile: "modules/search_space/metaphlan/metaphlan.smk"
+    config: config
+  module search_space:
+    snakefile: "modules/search_space/ncbi_taxonomy/search_space_ncbi_taxonomy.smk"
     config: config
   module annotation: 
     snakefile: "modules/annotation/ncbi_taxonomy/annotation_ncbi_taxonomy.smk"
@@ -161,7 +164,9 @@ use rule * from setup
 # Proteotyping has an additional first pass search module
 if config["search_space_method"] == "proteotyping":
     use rule * from proteotyping
-
+# Metaphlan has to get ncbi_ids first
+if config["search_space_method"] == "metaphlan":
+    use rule * from metaphlan
 use rule * from search_space 
 # Generating Spectral Library, Running DIA-NN, Extracting Detected Proteins
 use rule * from diann

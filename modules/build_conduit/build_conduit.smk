@@ -5,6 +5,7 @@ EXPERIMENT_DIR = os.path.join("experiments",config["experiment"])
 rule generate_qfeatures_from_diann_parquet:
   input:
     diann_parquet=os.path.join(EXPERIMENT_DIR,"output/diann_output/diann.parquet"),
+    sample_annotation=os.path.join(EXPERIMENT_DIR,"input/sample_annotation.txt")
   output: 
     qf = os.path.join(EXPERIMENT_DIR,"output/output_files/qf.rds")
   log: os.path.join(EXPERIMENT_DIR,"logs/build_conduit/generate_qfeatures_from_diann_parquet.log")

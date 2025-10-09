@@ -11,17 +11,38 @@ start_time <- Sys.time()
 
 conduitR::log_with_timestamp("Running generate_qfeatures_from_diann_parquet.R script")
 conduitR::log_with_timestamp(paste0("Input file: ", snakemake@input[["diann_parquet"]]))
+conduitR::log_with_timestamp(paste0("Input file: ", snakemake@input[["sample_annotation"]]))
+
 conduitR::log_with_timestamp(paste0("Output file: ", snakemake@output[["qf"]]))
 
 # Defining files
 # Inputs
 diann_parquet_fp = snakemake@input[["diann_parquet"]]
+sample_annotation_fp = snakemake@input[["sample_annotation"]]
 # Outputs
 qf_fp = snakemake@output[["qf"]]
 conduitR::log_with_timestamp(paste0("Reading in diann parquet file from ", diann_parquet_fp))
 conduitR::log_with_timestamp("Processing diann parquet file to qfeatures object")
 
 qf <- conduitR::diann_to_qfeatures(diann_parquet_fp)
+
+sample_annotation <- readr::read_delim(sample_annotation_fp)
+
+conduitR::log_with_timestamp("Adding colData to QFeatures")
+
+# Convert to rownames
+sample_annotation <- sample_annotation |>
+  tibble::column_to_rownames("file")
+
+# Make sure colnames are plain character
+qf_samples <- as.character(colnames(qf[["precursors"]]))
+
+# Reorder annotation to match qf
+sample_annotation <- sample_annotation[qf_samples, , drop = FALSE]
+
+# Attach to QFeatures
+SummarizedExperiment::colData(qf) <- S4Vectors::DataFrame(sample_annotation)
+
 conduitR::log_with_timestamp(paste0("Writing Qfeatures object to ", qf_fp))
 saveRDS(qf,qf_fp)
 end_time <- Sys.time()
