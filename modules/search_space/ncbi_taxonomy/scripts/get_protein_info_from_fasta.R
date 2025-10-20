@@ -31,7 +31,7 @@ protein_info <- conduitR::extract_fasta_info(database_fasta)
 conduitR::log_with_timestamp("Adding organism annotation to protein info.")
 
 # Adding organism annotation to protein info
-protein_info <- dplyr::inner_join(protein_info, taxonomy_txt,
+protein_info <- dplyr::left_join(protein_info, taxonomy_txt,
   by = "organism_id"
 )
 
