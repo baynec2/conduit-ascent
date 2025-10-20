@@ -102,10 +102,10 @@ elif config["search_space_method"] == "metaphlan":
   module metaphlan:
     snakefile: "modules/search_space/metaphlan/metaphlan.smk"
     config: config
-  module search_space:
+  module ncbi_search_space:
     snakefile: "modules/search_space/ncbi_taxonomy/search_space_ncbi_taxonomy.smk"
     config: config
-  module annotation: 
+  module ncbi_annotation: 
     snakefile: "modules/annotation/ncbi_taxonomy/annotation_ncbi_taxonomy.smk"
     config: config
   
@@ -137,10 +137,7 @@ module build_conduit:
 ################################################################################
 rule all:
     input:
-        # Config files must be created first
-        os.path.join(EXPERIMENT_DIR, "config/generate_diann_spectral_library.cfg"),
-        os.path.join(EXPERIMENT_DIR, "config/run_diann.cfg"),
-        # Rest of the workflow outputs
+        # Database resources
         expand(os.path.join(EXPERIMENT_DIR, "output/database_resources/{file}"), 
                file=[
                    "database.fasta",
@@ -149,15 +146,17 @@ rule all:
                    "protein_info.txt",
                    "taxonomic_tree_of_database.pdf",
                    "database.predicted.speclib",
-                   "README.md"
+                   "README.md",
+                   "README.html"
                ]),
         expand(os.path.join(EXPERIMENT_DIR, "output/database_resources/detected_protein_resources/{file}"),
                file=[
                    "detected_protein_info.txt",
                    "detected_protein.fasta",
-                   "uniprot_annotated_protein_info.txt"
+                   "uniprot_annotated_protein_info.txt",
+                   "conduit_annotations.tsv"
                ]),
-        expand(os.path.join(EXPERIMENT_DIR, "input/raw_files/{sample}.raw"), sample=SAMPLES),       
+        # Final output file
         conduit = os.path.join(EXPERIMENT_DIR,"output","output_files",f"{config['experiment']}_conduit.rds")
 # Setting up the workflow. Config, apptainer, etc. 
 use rule * from setup
@@ -167,10 +166,10 @@ if config["search_space_method"] == "proteotyping":
 # Metaphlan has to get ncbi_ids first
 if config["search_space_method"] == "metaphlan":
     use rule * from metaphlan
-use rule * from search_space 
+use rule * from ncbi_search_space 
 # Generating Spectral Library, Running DIA-NN, Extracting Detected Proteins
 use rule * from diann
 # Annotating Detected Proteins 
-use rule * from annotation
+use rule * from ncbi_annotation
 # Building Conduit Object from processed data.
 use rule * from build_conduit
