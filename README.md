@@ -382,6 +382,13 @@ Each annotation module must produce the following files. If a particular annotat
 | `subcellular_locations.txt`      | File containing subcellular location predictions.                                           |
 | `kegg_annotations.txt`           | File containing KEGG pathway annotations.                                                   |
 
+## Misc Helpful Things
+
+### DAG plot
+You can use this code to construct a plot of the DAG.
+`snakemake --configfile experiments/example/config/snakemake.yaml --dag | grep -v '^Found samples'   | dot -Tpdf > dag.pdf`
+
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
