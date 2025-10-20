@@ -15,6 +15,7 @@ conduitR::log_with_timestamp(paste0("Input file: ", snakemake@input[["diann_stat
 conduitR::log_with_timestamp(paste0("Input file: ", snakemake@input[["qfeatures"]]))
 conduitR::log_with_timestamp(paste0("Input file: ", snakemake@input[["database"]]))
 conduitR::log_with_timestamp(paste0("Input file: ", snakemake@input[["annotations"]]))
+conduitR::log_with_timestamp(paste0("Input file: ", snakemake@input[["taxonomy"]]))
 
 conduitR::log_with_timestamp(paste0("Output file: ", snakemake@output[["conduit"]]))
 
@@ -24,16 +25,57 @@ diann_stats_fp = snakemake@input[["diann_stats"]]
 QFeatures_fp = snakemake@input[["qfeatures"]]
 database_fp = snakemake@input[["database"]]
 annotations_fp = snakemake@input[["annotations"]]
+taxonomy_fp = snakemake@input[["taxonomy"]]
 # Outputs
 conduit_fp = snakemake@output[["conduit"]]
 
+
+# Reading files
+conduitR::log_with_timestamp("Reading in input files")
+  # Reading in QFeatures Object
+QFeatures <- readRDS(QFeatures_fp)
+  
+  # Reading in Metrics
+diann_stats <- readr::read_tsv(diann_stats_fp) |>
+    dplyr::mutate(File.Name = tools::file_path_sans_ext(basename(File.Name)))
+  
+metrics <- list(diann_stats = diann_stats)
+  
+  # Reading in Database (in tabular format)
+database <- readr::read_tsv(database_fp) |>
+    # Only keeping protein ids and corresponding organism ids
+    dplyr::select(protein_id,organism_id) |>
+    # Saving as factors to reduce memory footprint
+    dplyr::mutate(dplyr::across(where(is.character), as.factor))
+
+  # Reading in Annotation
+annotations <- readr::read_tsv(annotations_fp) |>
+    dplyr::select(Protein.Group, protein_id, species, lca, annotation_type,
+    term,description) |>
+    # Saving as factors to reduce memory footprint
+    dplyr::mutate(dplyr::across(where(is.character), as.factor))
+  
+taxonomy <- readr::read_delim(taxonomy_fp) |>
+    # Saving as factors to reduce memory footprint
+    dplyr::mutate(dplyr::across(where(is.character), as.factor))
+
+# Adding ncbi_organism id to annotations
+ncbi_ids = taxonomy |>
+dplyr::select(organism_id,species)
+  
+annotations <- dplyr::left_join(annotations,ncbi_ids,by = "species")|>
+dplyr::select(Protein.Group,protein_id,organism_id,species,lca, dplyr::everything())
+
 conduitR::log_with_timestamp("Constructing Conduit object from snakemake workflow files")
 
-# Constructing Conduit object with the files that were produced
-conduit <- conduitR::create_conduit_obj(QFeatures_fp,
-                                       diann_stats_fp,
-                                       database_fp,
-                                       annotations_fp)
+  # Create the  conduit object
+conduit <- new("conduit",
+QFeatures = QFeatures,
+metrics = metrics,
+database = database,
+annotations = annotations,
+taxonomy = taxonomy
+)
 
 conduitR::log_with_timestamp("Calculating protein coverage per taxonomy, adding to Conduit metric slot")
 

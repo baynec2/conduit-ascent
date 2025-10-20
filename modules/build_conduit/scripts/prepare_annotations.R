@@ -60,7 +60,8 @@ kegg_long <- sel |>
   dplyr::mutate(xref_kegg = stringr::str_remove(xref_kegg, ";$")) |>
   # separate into long format, keeping IDs and descriptions aligned
   tidyr::separate_rows(xref_kegg, sep = ";")|>
-  dplyr::select(protein_id,xref_kegg)
+  dplyr::select(protein_id,xref_kegg) |>
+  dplyr::filter(!is.na(xref_kegg))
 
 # Getting KEGG pathway information from IDs.
 conduitR::log_with_timestamp("Getting data from Kegg database")  
@@ -74,7 +75,7 @@ kegg_pathway_long = sel |>
 dplyr::select(-xref_kegg)|>
 dplyr::left_join(kegg_combined, by = "protein_id") |>
 dplyr::mutate(annotation_type = "kegg_pathway")|>
-dplyr::select(protein_id,term = kegg_pathway_id, description = kegg_pathway)
+dplyr::select(protein_id,annotation_type,term = kegg_pathway_id, description = kegg_pathway)
 
 conduitR::log_with_timestamp("Combining annotations")
 combined_annotations = dplyr::bind_rows(go_long,kegg_pathway_long)
@@ -92,7 +93,9 @@ taxonomy_columns)] |>
 
 conduit_annotations = protein_groups |>
   dplyr::left_join(combined_annotations,protein_groups, by = "protein_id")|>
-  dplyr::distinct()
+  dplyr::select(Protein.Group,protein_id,species,lca,annotation_type,term,description)|>
+  dplyr::distinct()|>
+  dplyr::filter(!is.na(term))
 
 conduitR::log_with_timestamp("Writing conduit annotations to file")
 readr::write_tsv(conduit_annotations,conduit_annotations_fp)
