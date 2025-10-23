@@ -142,8 +142,10 @@ snakemake --configfile experiments/your_experiment/config/snakemake.yaml --use-a
 
 ## Running Conduit on Barnacle2 (Knight Lab HPC)
 
-These instructions describe how to run the **Conduit** workflow on Barnacle2 using Snakemake and Singularity for Knight lab members only. However, they may be adapted to other HPC systems using SLURM.
-Note that if trying to run Conduit for a tutorial's sake you will also need files within directories of `conduit/experiments/example/input/database_resources` and `conduit/experiments/example/input/raw_files`. These files are a bit hefty, so please contact baynec2 directly for them.
+<span style="font-size:95%">
+These instructions describe how to run the Conduit workflow on Barnacle2 using Snakemake and Singularity for Knight lab members only. However, they may be adapted to other HPC systems using SLURM.  
+Note that if trying to run Conduit for tutorial purposes you will also need files within directories of `conduit/experiments/example/input/database_resources` and `conduit/experiments/example/input/raw_files`. These files are a bit hefty, so please contact baynec2 directly for them.
+</span>
 ---
 
 ## 1. Login to Barnacle2
