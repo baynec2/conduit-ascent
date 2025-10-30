@@ -82,20 +82,20 @@ if missing_in_raw:
 # Module Setup and Configuration
 ################################################################################
 if config["search_space_method"] == "ncbi_taxonomy_id":
-  module search_space:
+  module ncbi_search_space:
     snakefile: "modules/search_space/ncbi_taxonomy/search_space_ncbi_taxonomy.smk"
     config: config
-  module annotation: 
+  module ncbi_annotation: 
     snakefile: "modules/annotation/ncbi_taxonomy/annotation_ncbi_taxonomy.smk"
     config: config
 elif config["search_space_method"] == "proteotyping":
   module proteotyping:
     snakefile: "modules/search_space/proteotyping/generate_first_pass_proteotyping_db.smk"
     config: config
-  module search_space:
+  module ncbi_search_space:
     snakefile: "modules/search_space/ncbi_taxonomy/search_space_ncbi_taxonomy.smk"
     config: config
-  module annotation: 
+  module ncbi_annotation: 
     snakefile: "modules/annotation/ncbi_taxonomy/annotation_ncbi_taxonomy.smk"
     config: config
 elif config["search_space_method"] == "metaphlan":
