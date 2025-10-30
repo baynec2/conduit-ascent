@@ -22,12 +22,12 @@ rule add_annotations_to_qfeatures:
   container: "docker://baynec2/conduitr:alpha"
   script: "scripts/add_annotations_to_qfeatures.R"
 
-rule prepare_annotations:
+rule prepare_annotations_for_conduit:
   input:
    annotated_qf=os.path.join(EXPERIMENT_DIR,"output/output_files/annotated_qf.rds"),
    uniprot_annotated_protein_info = os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/uniprot_annotated_protein_info.txt")
   output:
-    conduit_annotations =os.path.join(EXPERIMENT_DIR,"output/output_files/conduit_annotations.tsv")
+    conduit_annotations =os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/conduit_annotations.tsv")
   log: os.path.join(EXPERIMENT_DIR,"logs/build_conduit/prepare_annotations.log")
   container: "docker://baynec2/conduitr:alpha"
   script: "scripts/prepare_annotations.R"
@@ -37,7 +37,8 @@ rule build_conduit:
     diann_stats= os.path.join(EXPERIMENT_DIR,"output/diann_output/diann.stats.tsv"),
     qfeatures= os.path.join(EXPERIMENT_DIR,"output/output_files/annotated_qf.rds"),
     database=os.path.join(EXPERIMENT_DIR,"input/database_resources/protein_info.txt"),
-    annotations= os.path.join(EXPERIMENT_DIR,"output/output_files/conduit_annotations.tsv")
+    annotations= os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/conduit_annotations.tsv"),
+    taxonomy = os.path.join(EXPERIMENT_DIR,"input/database_resources/taxonomy.txt")
   output:
     conduit = os.path.join(
     EXPERIMENT_DIR,
@@ -68,9 +69,7 @@ rule move_database_resources:
                    "detected_protein_info.txt",
                    "detected_protein.fasta",
                    "uniprot_annotated_protein_info.txt",
-                   "go_annotations.txt",
-                   "subcellular_locations.txt",
-                   "kegg_annotations.txt"
+                   "conduit_annotations.tsv"
                ]),
     output:
         expand(os.path.join(EXPERIMENT_DIR,"output/database_resources/{filename}"), 
@@ -89,9 +88,7 @@ rule move_database_resources:
                    "detected_protein_info.txt",
                    "detected_protein.fasta",
                    "uniprot_annotated_protein_info.txt",
-                   "go_annotations.txt",
-                   "subcellular_locations.txt",
-                   "kegg_annotations.txt"
+                   "conduit_annotations.tsv"
                ]),
     log: os.path.join(EXPERIMENT_DIR,"logs/matrices/move_database_resources.log")
     shell:

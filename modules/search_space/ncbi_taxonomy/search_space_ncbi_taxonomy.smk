@@ -16,14 +16,27 @@ rule get_fasta:
     script:
         "scripts/get_fasta.R"
 
-# Generating Full Taxonomy Information for each Organism ID
+# Generating Complete Taxonomy Information for Each Organism ID
+#
+# Note: Because of how UniProt organizes proteome identifiers, the exact NCBI strain ID
+# provided by the user may not always correspond to the final proteome selected.
+# For example, a given strain may:
+#   - be marked as redundant with another strain,
+#   - have a low-quality or incomplete proteome, or
+#   - lack a dedicated proteome entirely, while its parent species has one.
+#
+# In addition, some user-supplied taxonomy IDs may not have any corresponding
+# proteome available in UniProtKB. These entries are excluded from further analysis.
+#
+# As a result, the taxonomy associated with the selected proteome may differ slightly
+# from the user-supplied taxonomy at the strain level. However, the species- or
+# subspecies-level taxonomy will always remain consistent with the user input.
 rule get_taxonomy:
     input:
-        os.path.join(EXPERIMENT_DIR,"input/ncbi_taxa_ids.txt"),
         # File containing results of get fasta. Includes info about what taxa ids had cooresponding proteome ids.
-        os.path.join(EXPERIMENT_DIR,"input/database_resources/proteome_ids.txt")
+        proteome_ids = os.path.join(EXPERIMENT_DIR,"input/database_resources/proteome_ids.txt")
     output:
-        os.path.join(EXPERIMENT_DIR,"input/database_resources/taxonomy.txt")
+        taxonomy = os.path.join(EXPERIMENT_DIR,"input/database_resources/taxonomy.txt")
     log: os.path.join(EXPERIMENT_DIR,"logs/search_space/ncbi_taxonomy/get_taxonomy.log")
     container: "docker://baynec2/conduitr:alpha"
     script:

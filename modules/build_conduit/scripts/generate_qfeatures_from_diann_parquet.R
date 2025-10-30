@@ -35,6 +35,7 @@ sample_annotation <- sample_annotation |>
   tibble::column_to_rownames("file")
 
 # Make sure colnames are plain character
+# Taking from precursors, but all of the samples are in the same order for assays
 qf_samples <- as.character(colnames(qf[["precursors"]]))
 
 # Reorder annotation to match qf
@@ -42,6 +43,10 @@ sample_annotation <- sample_annotation[qf_samples, , drop = FALSE]
 
 # Attach to QFeatures
 SummarizedExperiment::colData(qf) <- S4Vectors::DataFrame(sample_annotation)
+# Also add coldata to every Summarized Experiment, since it is the same
+for (assay_name in names(qf)) {
+  SummarizedExperiment::colData(qf[[assay_name]]) <- S4Vectors::DataFrame(sample_annotation)
+}
 
 conduitR::log_with_timestamp(paste0("Writing Qfeatures object to ", qf_fp))
 saveRDS(qf,qf_fp)

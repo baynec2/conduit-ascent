@@ -9,44 +9,43 @@ sink(zz,append = TRUE)       # redirect stdout
 sink(zz, type = "message")  # redirect stderr/messages
 
 # Get input and output files from Snakemake workflow
-input_file <- snakemake@input[[1]]
-proteome_ids_file <- snakemake@input[[2]]
-output_file <- snakemake@output[[1]]
+proteome_ids_fp <- snakemake@input[["proteome_ids"]]
+output_file <- snakemake@output[["taxonomy"]]
 
 start_time <- Sys.time()
 conduitR::log_with_timestamp("Running get_taxonomy.R script")
 conduitR::log_with_timestamp(paste0("Input file: ", snakemake@input[[1]]))
 conduitR::log_with_timestamp(paste0("Output file: ", snakemake@output[[1]]))
 
-conduitR::log_with_timestamp("Reading organism IDs from the input file.")
+conduitR::log_with_timestamp("Reading selected proteome ids from the input file.")
 
 # Read organism IDs from the input file
-organism_txt <- readr::read_delim(input_file,
+proteome_id_df <- readr::read_delim(proteome_ids_fp,
                                   col_types = "cc")
+                                  
+                                  
+proteome_ids <- proteome_id_df |>
+  dplyr::pull(selected_proteome_id) |>
+  unique()
 
-organism_ids = organism_txt |>
-  dplyr::pull(organism_id)
+conduitR::log_with_timestamp("Getting NCBI Taxonomy Ids corresponding to selected proteome from uniprot.")
 
-conduitR::log_with_timestamp("Downloaing Taxonomy Information from NCBI API.")
+organism_ids = conduitR::get_taxonomy_from_proteome_ids(proteome_ids)|>
+  dplyr::pull(organism_id)|>
+  unique()
 
-# Pull all taxonomy information
-taxonomy = conduitR::get_ncbi_taxonomy(organism_ids) |>
-  dplyr::mutate(organism_id = as.character(organism_id))|>
-  dplyr::inner_join(organism_txt,by = "organism_id") |>
-  dplyr::select("organism_type","organism_id","domain","kingdom","phylum",
-                "class","order","family","genus","species"
-    )
+conduitR::log_with_timestamp("Getting Full NCBI Taxonomy corresponding to NCBI ID from NCBI API. ")
+
+# Pull all taxonomy information from NCBI API
+taxonomy = conduitR::get_ncbi_taxonomy(organism_ids)
 
 conduitR::log_with_timestamp("Finished downloading Taxonomy Information from NCBI API.")
 
-# Modify taxonomy file to include proteome ids
-proteome_ids = readr::read_delim(proteome_ids_file) |>
-dplyr::select("Proteome Id","organism_id" = "Organism Id","reference","downloaded_by_conduit","download_info")|>
-dplyr::mutate(organism_id = as.character(organism_id))
-
-
 taxonomy = taxonomy |>
-  dplyr::left_join(proteome_ids,by = c("organism_id"= "organism_id"))
+  dplyr::left_join(proteome_id_df,by = c("organism_id"= "organism_id"))|>
+  # This is probably not the best approach, but I can't think of a better way to do it for now
+  dplyr::mutate(organism_type = dplyr::case_when(organism_id %in% c(9606,10090) ~ "host",
+  TRUE ~ "microbiome"))
 
 conduitR::log_with_timestamp("Writing Taxonomy Information to file.")
 # Writing to file.
