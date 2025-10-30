@@ -20,25 +20,29 @@ conduitR::log_with_timestamp(paste0("Output file: ", snakemake@output[[1]]))
 conduitR::log_with_timestamp("Reading selected proteome ids from the input file.")
 
 # Read organism IDs from the input file
-proteome_ids <- readr::read_delim(proteome_ids_fp,
-                                  col_types = "cc")|>
-                                  dplyr::pull(selected_proteome_id) |>
+proteome_id_df <- readr::read_delim(proteome_ids_fp,
+                                  col_types = "cc")
+                                  
+                                  
+proteome_ids <- proteome_id_df |>
+  dplyr::pull(selected_proteome_id) |>
   unique()
 
 conduitR::log_with_timestamp("Getting NCBI Taxonomy Ids corresponding to selected proteome from uniprot.")
 
 organism_ids = conduitR::get_taxonomy_from_proteome_ids(proteome_ids)|>
-  dplyr::pull(organsim_id)|>
+  dplyr::pull(organism_id)|>
   unique()
 
 conduitR::log_with_timestamp("Getting Full NCBI Taxonomy corresponding to NCBI ID from NCBI API. ")
-# Pull all taxonomy information
+
+# Pull all taxonomy information from NCBI API
 taxonomy = conduitR::get_ncbi_taxonomy(organism_ids)
 
 conduitR::log_with_timestamp("Finished downloading Taxonomy Information from NCBI API.")
 
 taxonomy = taxonomy |>
-  dplyr::left_join(proteome_ids,by = c("organism_id"= "organism_id"))|>
+  dplyr::left_join(proteome_id_df,by = c("organism_id"= "organism_id"))|>
   # This is probably not the best approach, but I can't think of a better way to do it for now
   dplyr::mutate(organism_type = dplyr::case_when(organism_id %in% c(9606,10090) ~ "host",
   TRUE ~ "microbiome"))
