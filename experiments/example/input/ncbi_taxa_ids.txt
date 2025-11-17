@@ -46,4 +46,3 @@ organism_id organism_type
 2320116 microbiome
 2681861 microbiome
 2485925 microbiome
-9606 host
