@@ -1,0 +1,39 @@
+initial_proteome_id organism_id organism protein_count proteome_type redundant_to genome_assembly_id genome_assembly_level annotation_score parent_id child_rank proteome_id
+UP000236075 239935 "Akkermansia muciniphila" 2313 "Other proteome" NA GCA_002885695.1 full 1 239934 species UP000236075
+UP000500882 818 "Bacteroides thetaiotaomicron" 4786 "Other proteome" NA GCA_012151035.1 full 2 816 species UP000500882
+UP000036166 328812 "Parabacteroides goldsteinii" 5253 "Other proteome" NA GCA_001039445.1 full 2 375288 species UP000036166
+UP000324870 214856 "Alistipes finegoldii" 2962 "Representative proteome" NA GCA_008421235.1 full 1 239759 species UP000324870
+UP000309454 747645 "Parvibacter caecicola" 1821 "Representative proteome" NA GCA_005046025.1 full 2 1427376 species UP000309454
+UP000215693 33959 "Lactobacillus johnsonii" 1785 "Other proteome" NA GCA_002253275.1 full 1 1578 species UP000215693
+UP000466980 1898203 "Lachnospiraceae bacterium" 3436 "Redundant proteome" UP000450214 GCA_009911465.1 full NA 186928 species UP000450214
+UP000250143 1622 "Ligilactobacillus murinus" 2019 "Representative proteome" NA GCA_003288135.1 full 2 2767887 species UP000250143
+UP000014150 397290 "Lachnospiraceae bacterium A2" 5159 Excluded NA GCA_000403315.2 full NA 186928 species UP000014150
+UP000472380 446660 "Adlercreutzia equolifaciens" 2198 "Other proteome" NA GCA_009874275.1 full 1 447020 species UP000472380
+UP000195772 328813 "Alistipes onderdonkii" 2758 "Representative proteome" NA GCA_002159215.1 full 2 239759 species UP000195772
+UP000003973 556268 "Oxalobacter paraformigenes" 2258 "Representative proteome" NA GCA_000158475.2 full 2 846 species UP000003973
+UP000724360 1898207 "Clostridiales bacterium" 4139 Excluded NA GCA_018372435.1 full NA 39779 species UP000724360
+UP000032483 1550024 "Ruthenibacterium lactatiformans" 3493 "Representative proteome" NA GCA_000949455.1 full 1 1905344 species UP000032483
+UP000257667 2049045 "Eubacteriaceae bacterium" 2482 Excluded NA GCA_003446375.1 full NA 207769 species UP000257667
+UP001055071 626933 "Odoribacter laneus" 3261 Excluded NA GCA_022835535.1 full NA 283168 species UP001055071
+UP000606499 2763013 "Agathobaculum faecis" 3062 "Representative proteome" NA GCA_014287995.1 full 1 2048137 species UP000606499
+UP001202649 2478483 "Erysipelotrichales bacterium" 1394 Excluded NA GCA_022508535.1 full NA 713467 species UP001202649
+UP001555835 1898204 "Clostridiaceae bacterium" 3961 Excluded NA GCA_040797845.1 full NA 189971 species UP001555835
+UP000266995 2320110 "bacterium 1XD42-54" 3209 Excluded NA GCA_003612585.1 full NA 49928 species UP000266995
+UP000274920 2044587 "Schaedlerella arabinosiphila" 5594 "Representative proteome" NA GCA_003885045.1 full 1 2676048 species UP000274920
+UP000307720 2941517 "Hominisplanchenecus murintestinalis" 3388 "Representative proteome" NA GCA_004793585.1 full NA 2941498 species UP000307720
+UP001358152 2044939 "Clostridia bacterium" 4178 Excluded NA GCA_035627615.1 full NA 348841 species UP001358152
+UP000607645 2763052 "Lawsonibacter faecis" 3451 "Representative proteome" NA GCA_014287675.1 full 1 2172004 species UP000607645
+UP000198558 69824 "Thomasclavelia cocleata" 2756 "Representative proteome" NA GCA_900102365.1 full 1 3025755 species UP000198558
+UP000014081 1235793 "Lachnospiraceae bacterium MD335" 4614 Excluded NA GCA_000403335.2 full NA 186928 species UP000014081
+UP000014108 1235797 "Oscillibacter sp. 1-3" 4209 Excluded NA GCA_000403435.2 full NA 2629304 species UP000014108
+UP000077295 158836 "Enterobacter hormaechei" 4930 "Other proteome" NA GCA_900077325.1 full 1 354276 species UP000077295
+UP000272966 2320115 "bacterium 1XD8-76" 3768 Excluded NA GCA_003611955.1 full NA 49928 species UP000272966
+UP000310105 2498093 "Muribaculaceae bacterium" 2721 Excluded NA GCA_004801705.1 full NA 2006847 species UP000310105
+UP000196710 1796620 "Acutalibacter muris" 3601 "Representative proteome" NA GCA_002201475.1 full 2 1918385 species UP000196710
+UP000017395 1378168 "Firmicutes bacterium ASF500" 3455 Excluded NA GCA_000492175.2 full NA 84086 species UP000017395
+UP000628736 2763048 "Flintibacter hominis" 2645 "Representative proteome" NA GCA_014287965.1 full 1 1918454 species UP000628736
+UP000014134 1235800 "Lachnospiraceae bacterium 10-1" 4280 Excluded NA GCA_000403495.2 full NA 186928 species UP000014134
+UP000014118 397291 "Lachnospiraceae bacterium A4" 6440 Excluded NA GCA_000403215.2 full NA 186928 species UP000014118
+UP000269241 2320116 "bacterium 1xD8-6" 4329 Excluded NA GCA_003612355.1 full NA 49928 species UP000269241
+UP000460412 2681861 "Sporofaciens musculi" 5229 "Representative proteome" NA GCA_009830285.1 full 2 2811390 species UP000460412
+UP001320546 2485925 "Oscillospiraceae bacterium" 4083 "Redundant proteome" UP001320581 GCA_022846095.1 full NA 473772 species UP001320581

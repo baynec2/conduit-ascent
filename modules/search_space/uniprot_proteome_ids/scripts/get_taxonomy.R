@@ -17,7 +17,7 @@ conduitR::log_with_timestamp("Running get_taxonomy.R script")
 conduitR::log_with_timestamp(paste0("Input file: ", snakemake@input[[1]]))
 conduitR::log_with_timestamp(paste0("Output file: ", snakemake@output[[1]]))
 
-conduitR::log_with_timestamp("Reading selected proteome ids from the input file.")
+conduitR::log_with_timestamp("Reading proteome ids from the input file.")
 
 # Read organism IDs from the input file
 proteome_id_df <- readr::read_delim(proteome_ids_fp,
@@ -25,7 +25,7 @@ proteome_id_df <- readr::read_delim(proteome_ids_fp,
                                   
                                   
 proteome_ids <- proteome_id_df |>
-  dplyr::pull(selected_proteome_id) |>
+  dplyr::pull(proteome_id) |>
   unique()
 
 conduitR::log_with_timestamp("Getting NCBI Taxonomy Ids corresponding to selected proteome from uniprot.")

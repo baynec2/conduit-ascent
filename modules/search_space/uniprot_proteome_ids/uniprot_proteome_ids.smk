@@ -2,19 +2,19 @@ EXPERIMENT_DIR = os.path.join("experiments",config["experiment"])
 ################################################################################
 # Getting Database Resources (Defining the Search Space)
 ################################################################################        
-rule get_fasta:
+rule get_fasta_from_proteome_ids:
     input:
-        os.path.join(EXPERIMENT_DIR,"input/ncbi_taxa_ids.txt")
+        proteome_id_input = os.path.join(EXPERIMENT_DIR,"input/proteome_ids.txt")
     output:
         # File containing proteome ids. Allows user to see what proteomes for each organism were downloaded.
         # Also contains NA values for NCBI taxon ids that are not in the Uniprot database.
-       os.path.join(EXPERIMENT_DIR,"input/database_resources/proteome_ids.txt"),
-       os.path.join(EXPERIMENT_DIR,"input/database_resources/database.fasta")
-    log: os.path.join(EXPERIMENT_DIR,"logs/search_space/ncbi_taxonomy/get_fasta.log")
+       proteome_id_output = os.path.join(EXPERIMENT_DIR,"input/database_resources/proteome_ids.txt"),
+       fasta_output = os.path.join(EXPERIMENT_DIR,"input/database_resources/database.fasta")
+    log: os.path.join(EXPERIMENT_DIR,"logs/search_space/uniprot_proteome_ids/get_fasta_from_proteome_ids.log")
     container:
         "docker://baynec2/conduitr:alpha"
     script:
-        "scripts/get_fasta.R"
+        "scripts/get_fasta_from_proteome_ids.R"
 
 # Generating Complete Taxonomy Information for Each Organism ID
 #

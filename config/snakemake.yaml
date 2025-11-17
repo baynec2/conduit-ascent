@@ -1,21 +1,34 @@
-# Define the name of the experiment (this will be used to find the correct experiment directory)
+# ===============================
+# Experiment and file configuration
+# ===============================
+# Name of the experiment (used to locate the correct experiment directory)
 experiment: 
-# Config file to generate the spectral library for DIA-NN (relative to main Snakefile)
+# Config file for generating DIA-NN spectral library (relative to main Snakefile)
 generate_diann_spectral_library_config: config/generate_diann_spectral_library.cfg
-# Config file to run DIA-NN search (relative to main Snakefile)
+# Config file for running DIA-NN search (relative to main Snakefile)
 run_diann_config: config/run_diann.cfg
-# Define the method used to define the search space. 
-# Options: 
-# - "ncbi_taxonomy_id": Use NCBI taxonomy IDs to define the search space.
-# - "uniprot_proteome_id": Use UniProt proteome IDs to define the search space.
-# - "MAG": Use MAGs to define the search space.,
-# - "metagenomic_profiling": Use metagenomic profiling to define the search space.
-# - "16S": Use 16S rRNA gene sequences to define the search space.
-search_space_method: ncbi_taxonomy_id
-# If using a sequenceing based method, the relative abundance threshold above which a species is reported. 
-relative_abundance_threshold: 0.01
-# Define the sample annotation filepath relative to the experiment directory
+# Sample annotation file path (relative to experiment directory)
 sample_annotation: input/sample_annotation.txt
-# Define the output directory relative to the experiment directory
+# Output directory path (relative to experiment directory)
 output_dir: output/
-
+# ===============================
+# Search space configuration
+# ===============================
+# Method to define the search space. Options:
+# - "ncbi_taxonomy_id": Use NCBI taxonomy IDs
+# - "uniprot_proteome_id": Use UniProt proteome IDs
+# - "peptidotyping": First-pass search on species-specific peptides
+# - "MAG": Use metagenome-assembled genomes
+# - "metaphlan": Use MetaPhlAn profiling
+# - "16S": Use 16S rRNA sequences
+search_space_method: ncbi_taxonomy_id
+# If using sequencing-based methods, the minimum relative abundance to include a species
+relative_abundance_threshold: 0.01
+# Optional: add an extra proteome ID (e.g., host reference)
+# FALSE = None
+# Examples: Human = UP000005640, Mouse C57/BL6 = UP000000589
+append_additional_proteome_id: FALSE
+# Optional: add an extra NCBI taxonomic ID (e.g., host species)
+# FALSE = None
+# Examples: Human = 9606, Mouse = 10090
+append_additional_ncbi_taxa_id: FALSE

@@ -25,10 +25,10 @@ expected_config_path = os.path.join(EXPERIMENT_DIR, "config/run_diann.cfg")
 # Extracting the method from the config file
 if not config.get("search_space_method"):
     raise ValueError("Please provide 'search_space_method' in config file")
-# Defining the allowed methods. 
+# Defining the allowed methods. Will uncomment as they become supported.
 ALLOWED_METHODS = [
-    "ncbi_taxonomy_id", # Will uncomment methods as they become supported,
-   # "uniprot_proteome_id",
+    "ncbi_taxonomy_id", 
+    "uniprot_proteome_id",
     "proteotyping",
    # "MAG",
     "metaphlan",
@@ -81,49 +81,24 @@ if missing_in_raw:
 ###############################################################################
 # Module Setup and Configuration
 ################################################################################
-if config["search_space_method"] == "ncbi_taxonomy_id":
-  module ncbi_search_space:
-    snakefile: "modules/search_space/ncbi_taxonomy/search_space_ncbi_taxonomy.smk"
-    config: config
-  module ncbi_annotation: 
-    snakefile: "modules/annotation/ncbi_taxonomy/annotation_ncbi_taxonomy.smk"
-    config: config
-elif config["search_space_method"] == "proteotyping":
-  module proteotyping:
-    snakefile: "modules/search_space/proteotyping/generate_first_pass_proteotyping_db.smk"
-    config: config
-  module ncbi_search_space:
-    snakefile: "modules/search_space/ncbi_taxonomy/search_space_ncbi_taxonomy.smk"
-    config: config
-  module ncbi_annotation: 
-    snakefile: "modules/annotation/ncbi_taxonomy/annotation_ncbi_taxonomy.smk"
-    config: config
-elif config["search_space_method"] == "metaphlan":
-  module metaphlan:
-    snakefile: "modules/search_space/metaphlan/metaphlan.smk"
-    config: config
-  module ncbi_search_space:
-    snakefile: "modules/search_space/ncbi_taxonomy/search_space_ncbi_taxonomy.smk"
-    config: config
-  module ncbi_annotation: 
-    snakefile: "modules/annotation/ncbi_taxonomy/annotation_ncbi_taxonomy.smk"
-    config: config
-  
-# elif config["search_space_method"] == "MAG":
-#   module search_space:
-#     snakefile: "modules/search_space/MAG/Snakefile"
-#   module annotation: 
-#     snakefile: "modules/annotation/MAG/Snakefile"
-
-# elif config["search_space_method"] == "16S":
-#   module search_space:
-#     snakefile: "modules/search_space/16S/Snakefile"
-#   module annotation: 
-#     snakefile: "modules/annotation/16S/Snakefile"
-
-# Shared modules across all methods
+# UniProt proteome ids directly uses uniprot proteome ids 
 module setup:
   snakefile: "modules/setup/setup.smk"
+  config: config
+module metaphlan:
+  snakefile: "modules/search_space/metaphlan/metaphlan.smk"
+  config: config
+module peptidotyping:
+  snakefile: "modules/search_space/peptidotyping/peptidotyping.smk"
+  config: config
+module ncbi_search_space:
+  snakefile: "modules/search_space/ncbi_taxonomy/ncbi_taxonomy.smk"
+  config: config
+module uniprot_proteome_ids_search_space:
+  snakefile: "modules/search_space/uniprot_proteome_ids/uniprot_proteome_ids.smk"
+  config: config
+module uniprot_annotation: 
+  snakefile: "modules/annotation/uniprot/annotation_uniprot.smk"
   config: config
 module diann:
   snakefile: "modules/diann/diann.smk"
@@ -131,7 +106,7 @@ module diann:
 module build_conduit:
   snakefile: "modules/build_conduit/build_conduit.smk"
   config: config
-
+  
 ################################################################################
 # Defining all of the output files
 ################################################################################
@@ -160,16 +135,31 @@ rule all:
         conduit = os.path.join(EXPERIMENT_DIR,"output","output_files",f"{config['experiment']}_conduit.rds")
 # Setting up the workflow. Config, apptainer, etc. 
 use rule * from setup
+
+# Search space specific workflows to generate a search space
+if config["search_space_method"] == "uniprot_proteome_id":
+    use rule * from uniprot_proteome_ids_search_space
+
 # Proteotyping has an additional first pass search module
-if config["search_space_method"] == "proteotyping":
-    use rule * from proteotyping
-# Metaphlan has to get ncbi_ids first
+if config["search_space_method"] == "peptidotyping":
+    use rule * from peptidotyping
+    use rule * from ncbi_search_space 
+    use rule * from uniprot_proteome_ids_search_space
+
+# Metaphlan feeds into the ncbi taxonomy search space
 if config["search_space_method"] == "metaphlan":
     use rule * from metaphlan
-use rule * from ncbi_search_space 
+    use rule * from ncbi_search_space 
+    use rule * from uniprot_proteome_ids_search_space
+
+# NCBI taxa id based workflow uses entire ncbi module. 
+if config["search_space_method"] == "ncbi_taxonomy_id":
+    use rule * from ncbi_search_space 
+    use rule * from uniprot_proteome_ids_search_space
+
 # Generating Spectral Library, Running DIA-NN, Extracting Detected Proteins
 use rule * from diann
 # Annotating Detected Proteins 
-use rule * from ncbi_annotation
+use rule * from uniprot_annotation
 # Building Conduit Object from processed data.
 use rule * from build_conduit
