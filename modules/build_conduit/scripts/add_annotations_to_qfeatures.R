@@ -1,6 +1,12 @@
 ################################################################################
 # Adding Protein Group Annotations to QFeatures object
 ################################################################################
+# These annotations include taxonomy and functional annotations that were 
+# obtained from uniprot or NCBI
+
+# Some annotations rely on external references. These are contained in the 
+# annotaions conduit slot (since multiple annotations can go to a single protein.)
+
 # Open the log file to write both stdout and stderr
 logfile <- snakemake@log[[1]]
 zz <- file(logfile, open = "a")
@@ -19,6 +25,7 @@ conduitR::log_with_timestamp(paste0("Output file: ", snakemake@output[["annotate
 # Inputs
 qf_fp = snakemake@input[["qf"]]
 uniprot_annotated_protein_info_fp = snakemake@input[["uniprot_annotated_protein_info"]]
+conduit_annotations_fp = snakemake@input[["conduit_annotations"]]
 
 # Outputs
 annotated_qf_fp = snakemake@output[["annotated_qf"]]
@@ -27,17 +34,95 @@ annotated_qf_fp = snakemake@output[["annotated_qf"]]
 conduitR::log_with_timestamp("Reading in files")
 uniprot_annotated_protein_info = readr::read_delim(uniprot_annotated_protein_info_fp)
 qf = readRDS(qf_fp)
+
+
+conduitR::log_with_timestamp("Working with annotations contained in the Uniprot_annotated_protein_info_file")
+
 # Adding taxonomy annotations
 conduitR::log_with_timestamp("Adding taxonomy information to QFeatures, handling assay links, and summarizing")
 qf = conduitR::add_taxonomy_to_qf(qf,uniprot_annotated_protein_info)
-# Adding go annotations
-conduitR::log_with_timestamp("Adding GO information to QFeatures, handling assay links, and summarizing")
-qf = conduitR::add_annotation_to_qf(qf,uniprot_annotated_protein_info)
-# Adding kegg annotations
-conduitR::log_with_timestamp("Adding KEGG information to QFeatures, handling assay links, and summarizing")
-qf = conduitR::add_annotation_to_qf(qf,uniprot_annotated_protein_info,xref_kegg,"[^;]+(?=;)")
 
-conduitR::log_with_timestamp(paste0("Writing Qfeatures object to ", annotated_qf_fp))
+# Adding all of the annotations that we have extracted. 
+# First, we need to pivot these to wide format. 
+conduitR::log_with_timestamp("Transforming annotations contained in conduit_annotations.txt file into wide format")
+
+# Pivoting to the proper format.
+conduit_annotations_wide = readr::read_delim(conduit_annotations_fp) |>
+  dplyr::select(Protein.Group, annotation_type, term) |>  # keep columns of interest
+  # pivot so each annotation_type becomes a column
+  tidyr::pivot_wider(
+    names_from = annotation_type,
+    values_from = term,
+    values_fn = \(x) paste(unique(x), collapse = ";")  # collapse multiple terms per protein
+  )
+
+  # Adding go annotations
+conduitR::log_with_timestamp("Adding GO annotations to QFeatures, handling assay links, and summarizing")
+qf = conduitR::add_annotation_to_qf(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = go)
+
+# Adding pfam annotations
+conduitR::log_with_timestamp("Adding pfam annotations to QFeatures, handling assay links, and summarizing")
+
+qf = conduitR::add_annotation_to_qf(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = pfam)
+
+conduitR::log_with_timestamp("Adding eggnog annotations to QFeatures, handling assay links, and summarizing")
+
+qf = conduitR::add_annotation_to_qf(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = eggnog)
+
+
+conduitR::log_with_timestamp("Adding eggnog code annotations to QFeatures, handling assay links, and summarizing")
+
+qf = conduitR::add_annotation_to_qf(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = eggnog_code)
+
+conduitR::log_with_timestamp("Adding kegg pathway annotations to QFeatures, handling assay links, and summarizing")
+
+qf = conduitR::add_annotation_to_qf(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = kegg_pathway)
+
+conduitR::log_with_timestamp("Adding kegg map pathway annotations to QFeatures, handling assay links, and summarizing")
+
+qf = conduitR::add_annotation_to_qf(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = kegg_map_pathway)
+
+conduitR::log_with_timestamp("Adding kegg orthology annotations to QFeatures, handling assay links, and summarizing")
+
+qf = conduitR::add_annotation_to_qf(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = kegg_orthology)
+
+
+conduitR::log_with_timestamp("Adding cazyme class annotations to QFeatures, handling assay links, and summarizing")
+
+qf = conduitR::add_annotation_to_qf(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = cazy_class)
+
+conduitR::log_with_timestamp("Adding cazyme family annotations to QFeatures, handling assay links, and summarizing")
+
+qf = conduitR::add_annotation_to_qf(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = cazy_family)
+
+conduitR::log_with_timestamp(paste0("Annotations sucessfully added. Writing Qfeatures object to ", annotated_qf_fp))
 
 saveRDS(qf,annotated_qf_fp)
 end_time <- Sys.time()

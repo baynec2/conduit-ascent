@@ -15,29 +15,20 @@ rule generate_qfeatures_from_diann_parquet:
 rule add_annotations_to_qfeatures:
   input:
     qf = os.path.join(EXPERIMENT_DIR,"output/output_files/qf.rds"),
-    uniprot_annotated_protein_info = os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/uniprot_annotated_protein_info.txt")
+    uniprot_annotated_protein_info = os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/uniprot_annotated_protein_info.txt"),
+    conduit_annotations = os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/conduit_annotations.txt")
   output:
     annotated_qf=os.path.join(EXPERIMENT_DIR,"output/output_files/annotated_qf.rds")
   log: os.path.join(EXPERIMENT_DIR,"logs/build_conduit/add_annotations_to_qfeatures.log")
   container: "docker://baynec2/conduitr:alpha"
   script: "scripts/add_annotations_to_qfeatures.R"
 
-rule prepare_annotations_for_conduit:
-  input:
-   annotated_qf=os.path.join(EXPERIMENT_DIR,"output/output_files/annotated_qf.rds"),
-   uniprot_annotated_protein_info = os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/uniprot_annotated_protein_info.txt")
-  output:
-    conduit_annotations =os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/conduit_annotations.tsv")
-  log: os.path.join(EXPERIMENT_DIR,"logs/build_conduit/prepare_annotations.log")
-  container: "docker://baynec2/conduitr:alpha"
-  script: "scripts/prepare_annotations.R"
-
 rule build_conduit:
   input:
     diann_stats= os.path.join(EXPERIMENT_DIR,"output/diann_output/diann.stats.tsv"),
     qfeatures= os.path.join(EXPERIMENT_DIR,"output/output_files/annotated_qf.rds"),
     database=os.path.join(EXPERIMENT_DIR,"input/database_resources/protein_info.txt"),
-    annotations= os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/conduit_annotations.tsv"),
+    annotations= os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/conduit_annotations.txt"),
     taxonomy = os.path.join(EXPERIMENT_DIR,"input/database_resources/taxonomy.txt")
   output:
     conduit = os.path.join(
