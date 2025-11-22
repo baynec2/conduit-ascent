@@ -32,3 +32,19 @@ append_additional_proteome_id: FALSE
 # FALSE = None
 # Examples: Human = 9606, Mouse = 10090
 append_additional_ncbi_taxa_id: FALSE
+# ===============================
+# Resource configuration. Allows the user to specify paths to any hefty resources if they already exist on system.
+# If not, conduit will handle their download automatically if they are required by workflow user specifies.
+# ===============================
+# Annotation resources. 
+eggnog_database: "resources/annotation/eggnog/e5.og_annotations.tsv" # ~200mb
+# Resources for metaphlan strategy.
+metaphlan_database_dir: "resources/metaphlan" # ~54 Gb
+# Resources for peptidotyping strategy
+unipept_sequences: "resources/databases/sequences.tsv.lz4" # ~ 1.46 Gb
+unipept_taxons: "resources/databases/taxons.tsv.lz4"
+# Resources needed for mags
+bakta_database: "resources/bakta" # ~ 84 GB
+# Might not need this depending on how we want to call MAGs.
+gbtk_database: "resources/gbtk" # ~140 GB
+

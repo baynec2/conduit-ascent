@@ -49,8 +49,8 @@ database <- readr::read_tsv(database_fp) |>
     dplyr::mutate(dplyr::across(where(is.character), as.factor))
 
   # Reading in Annotation
-annotations <- readr::read_tsv(annotations_fp) |>
-    dplyr::select(Protein.Group, protein_id, species, lca, annotation_type,
+annotations <- readr::read_delim(annotations_fp) |>
+    dplyr::select(Protein.Group, annotation_type,
     term,description) |>
     # Saving as factors to reduce memory footprint
     dplyr::mutate(dplyr::across(where(is.character), as.factor))
@@ -58,13 +58,6 @@ annotations <- readr::read_tsv(annotations_fp) |>
 taxonomy <- readr::read_delim(taxonomy_fp) |>
     # Saving as factors to reduce memory footprint
     dplyr::mutate(dplyr::across(where(is.character), as.factor))
-
-# Adding ncbi_organism id to annotations
-ncbi_ids = taxonomy |>
-dplyr::select(organism_id,species)
-  
-annotations <- dplyr::left_join(annotations,ncbi_ids,by = "species")|>
-dplyr::select(Protein.Group,protein_id,organism_id,species,lca, dplyr::everything())
 
 conduitR::log_with_timestamp("Constructing Conduit object from snakemake workflow files")
 
