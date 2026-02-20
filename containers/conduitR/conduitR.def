@@ -30,7 +30,7 @@ From: rocker/r-ver:4.4.3
     R -e "install.packages('BiocManager', repos='https://cloud.r-project.org')"
 
     # Install Bioconductor packages all at once
-    R -e "BiocManager::install(c('QFeatures', 'SummarizedExperiment', 'limma', 'Biostrings', 'KEGGREST', 'impute', 'pcaMethods', 'sechm', 'PCAtools'))"
+    R -e "BiocManager::install(c('QFeatures', 'SummarizedExperiment', 'limma', 'Biostrings', 'KEGGREST', 'impute', 'pcaMethods', 'sechm', 'PCAtools', 'GO.db', 'AnnotationDbi'))"
 
     # Optional: check Bioconductor install
     R -e "BiocManager::valid()"

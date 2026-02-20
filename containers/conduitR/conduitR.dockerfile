@@ -26,7 +26,7 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
 # Install R packages
 # Install R packages
 RUN R -e "install.packages('BiocManager', repos='https://cloud.r-project.org')" && \
-    R -e "BiocManager::install(c('QFeatures', 'SummarizedExperiment', 'limma', 'Biostrings', 'KEGGREST', 'impute', 'pcaMethods', 'sechm', 'PCAtools'))" && \
+    R -e "BiocManager::install(c('QFeatures', 'SummarizedExperiment', 'limma', 'Biostrings', 'KEGGREST', 'impute', 'pcaMethods', 'sechm', 'PCAtools', 'GO.db', 'AnnotationDbi'))" && \
     R -e "install.packages('remotes', repos='https://cloud.r-project.org')" && \
     R -e "remotes::install_github('baynec2/conduitR')"
     
