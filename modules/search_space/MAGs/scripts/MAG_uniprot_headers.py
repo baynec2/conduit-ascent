@@ -9,7 +9,7 @@ import re
 # Snakemake bindings
 # -----------------------------
 BAKTA_DIRS = snakemake.input.bakta_dirs
-MAG_TAXONOMY_PATH = snakemake.params.mag_taxonomy
+MAG_METADATA_PATH = snakemake.params.mag_metadata
 
 FASTA_OUT = snakemake.output.fasta
 GO_OUT = snakemake.output.go
@@ -109,10 +109,10 @@ def format_uniprot_metadata(MAG_dir, MAG, MAG_info):
     df["Gene"] = cds_meta.set_index("Locus Tag")["Gene"].reindex(locus_tags).fillna("NA")
 
     # Species info
-    mag_row = MAG_info[MAG_info["MAG"] == MAG]
+    mag_row = MAG_info[MAG_info["mag"] == MAG]
     if not mag_row.empty:
-        species_name = mag_row["Species_Name"].values[0]
-        org_id = str(mag_row["Organism_Identifier"].values[0])
+        species_name = mag_row["species_name"].values[0]
+        org_id = str(mag_row["organism_id"].values[0])
         parts = species_name.split(" ")
         genus = parts[0]
         species = parts[1] if len(parts) > 1 else ""
@@ -167,12 +167,14 @@ def replace_faa_headers(MAG_dir, MAG, df):
         if r.id in df.index:
             meta = df.loc[r.id]
             header = (
-                f"bakta|{r.id}|{meta['Species_Locus_Tag']} "
+                # Even though the database is not actually tr, DIA-NN can't parse it if bakta is added there
+                # Tricking it into working using tr for simplicity, even though it is not strictly speaking correct. 
+                f"tr|{r.id}|{meta['Species_Locus_Tag']} "
                 f"{meta['Product']} OS={meta['Species_Name']} "
                 f"OX={meta['Organism_Identifier']} GN={meta['Gene']}"
             )
-            r.id = ""
-            r.description = header
+            r.id = header
+            r.description = ""
             updated += 1
 
     SeqIO.write(records, faa_out, "fasta")
@@ -222,8 +224,8 @@ def write_go_kegg_annotation_files(df):
 # MAIN
 # -----------------------------
 def main():
-    MAG_info = pd.read_csv(MAG_TAXONOMY_PATH, sep="\t")
-    MAG_list = MAG_info["MAG"].tolist()
+    MAG_info = pd.read_csv(MAG_METADATA_PATH, sep="\t")
+    MAG_list = MAG_info["mag"].tolist()
 
     all_meta = []
 
