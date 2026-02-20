@@ -1,3 +1,0 @@
-file	condition
-example1	abx
-example2	no_abx
