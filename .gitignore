@@ -1,7 +1,6 @@
 # Ignore all experiments except example
 experiments/*
-!experiments/example/
-!experiments/example/**
+experiments/example/
 
 # RStudio specific files
 .Rproj.user
@@ -14,9 +13,7 @@ experiments/*
 ._.DS_Store
 **/.DS_Store
 
-# Ignore raw data 
-experiments/example/input/raw_files/
-experiments/example/input/fastq_files/
+
 
 # Ignore example config files
 experiments/example/config/generate_diann_spectral_library.cfg
@@ -57,3 +54,10 @@ resources/
 *.raw.quant
 *.lz4
 *.index
+
+# Rust specific files
+.cargo/
+.rustup/
+**/target/
+
+#
