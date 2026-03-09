@@ -21,7 +21,7 @@ output_dir: output/
 # - "MAGs": Use metagenome-assembled genomes
 # - "metaphlan": Use MetaPhlAn profiling
 # - "16S": Use 16S rRNA sequences
-search_space_method: peptidotyping
+search_space_method: ncbi_taxonomy_id
 ## Peptidotyping specific options
 # If using peptidotyping, the number of unique peptides that must be identified to call a species present. 
 presence_min_peptides: 3
@@ -31,6 +31,10 @@ min_taxon_db_peptides: 10
 # If using sequencing-based methods, the minimum relative abundance to include a species
 relative_abundance_threshold: 0.01
 ## Options for all workflows
+# Optional: NCBI organism IDs to classify as 'host' rather than 'microbiome'.
+# Set to FALSE or [] to treat all organisms as microbiome.
+# Examples: Human = 9606, Mouse = 10090
+host_organism_ids: [9606, 10090]
 # Optional: add an extra proteome ID (e.g., host reference)
 # FALSE = None
 # Examples: Human = UP000005640, Mouse C57/BL6 = UP000000589
@@ -57,6 +61,11 @@ exclude_ncbi_taxa_id: FALSE
 peptidotyping_resource_dir: "resources/peptidotyping/"
 # Annotation resources. 
 eggnog_database: "resources/annotation/eggnog/e5.og_annotations.tsv" # ~200mb
+# Download URLs for external annotation databases.
+# Update these if a newer version of a database is available.
+pfam_db_url: "https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/pfamA.txt.gz"
+cazy_db_url: "https://bcb.unl.edu/dbCAN2/download/Databases/CAZyDB.07302020.fam-activities.txt"
+eggnog_db_url: "http://eggnog6.embl.de/download/eggnog_5.0/e5.og_annotations.tsv"
 # Resources for metaphlan strategy.
 metaphlan_database_dir: "resources/metaphlan" # ~54 Gb
 # Resources for peptidotyping strategy

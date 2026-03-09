@@ -44,7 +44,7 @@ taxa_split <- merged_profiles |>
     family  = stringr::str_remove(family, "^f__"),
     genus   = stringr::str_remove(genus, "^g__"),
     species = stringr::str_remove(species, "^s__"),
-    strain = stringr::str_remove(species, "^t__")
+    strain = stringr::str_remove(strain, "^t__")
   )|>
     tidyr::separate(
     NCBI_tax_id,
@@ -63,9 +63,17 @@ taxa_split <- merged_profiles |>
 # Dereplicating organism ids that are beyond theshold in multiple samples.
 organism_id = unique(dplyr::pull(taxa_split,species_ncbi))
 
+# Retrieve configurable host organism IDs (defaults to human and mouse if not set)
+host_organism_ids <- snakemake@config[["host_organism_ids"]]
+if (is.null(host_organism_ids) || isFALSE(host_organism_ids)) {
+  host_organism_ids <- c()
+} else {
+  host_organism_ids <- as.numeric(unlist(host_organism_ids))
+}
+
 # Constructing ncbi_taxonomy_id data frame to use as input to the next part of workflow
 ncbi_taxonomy_ids = tibble::tibble(organism_id)|>
-  dplyr::mutate(organism_type = dplyr::case_when(organism_id %in% c(9606,10090) ~ "host",
+  dplyr::mutate(organism_type = dplyr::case_when(organism_id %in% host_organism_ids ~ "host",
                                                  TRUE ~ "microbiome"))
   
 conduitR::log_with_timestamp(

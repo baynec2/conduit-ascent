@@ -19,7 +19,7 @@ rule generate_diann_spectral_library:
         """
         diann --cfg {input.config_file} \
         --fasta {input.fasta} \
-        --out-lib experiments/{config[experiment]}/input/database_resources/database \
+        --out-lib {EXPERIMENT_DIR}/input/database_resources/database \
         --threads {threads} >> {log} 2>&1
         """
 ################################################################################
@@ -43,7 +43,7 @@ rule run_diann:
         """
         diann --cfg {input.config_file} \
         --fasta {input.fasta} \
-        --out  experiments/{config[experiment]}/output/diann_output/diann \
+        --out  {EXPERIMENT_DIR}/output/diann_output/diann \
         --dir {input.raw_files_dir} \
         --lib {input.spectral_library} \
         --threads {threads} --verbose 1 >> {log} 2>&1

@@ -41,10 +41,17 @@ taxonomy = conduitR::get_ncbi_taxonomy(organism_ids)
 
 conduitR::log_with_timestamp("Finished downloading Taxonomy Information from NCBI API.")
 
+# Retrieve configurable host organism IDs (defaults to human and mouse if not set)
+host_organism_ids <- snakemake@config[["host_organism_ids"]]
+if (is.null(host_organism_ids) || isFALSE(host_organism_ids)) {
+  host_organism_ids <- c()
+} else {
+  host_organism_ids <- as.numeric(unlist(host_organism_ids))
+}
+
 taxonomy = taxonomy |>
   dplyr::left_join(proteome_id_df,by = c("organism_id"= "organism_id"))|>
-  # This is probably not the best approach, but I can't think of a better way to do it for now
-  dplyr::mutate(organism_type = dplyr::case_when(organism_id %in% c(9606,10090) ~ "host",
+  dplyr::mutate(organism_type = dplyr::case_when(organism_id %in% host_organism_ids ~ "host",
   TRUE ~ "microbiome"))
 
 conduitR::log_with_timestamp("Writing Taxonomy Information to file.")

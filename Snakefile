@@ -6,7 +6,6 @@ import os
 import glob
 import pandas as pd
 import shutil
-import pdb  # Add this for debugging
 import logging
 from datetime import datetime
 
@@ -156,6 +155,7 @@ if config["search_space_method"] == "uniprot_proteome_id":
     use rule * from uniprot_proteome_ids_search_space
     use rule * from diann
     use rule * from uniprot_annotation
+    use rule * from external_annotation
 
 # Proteotyping has an additional first pass search module
 if config["search_space_method"] == "peptidotyping":

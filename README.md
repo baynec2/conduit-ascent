@@ -112,9 +112,8 @@ run_diann_config: config/run_diann.cfg
 # Options: 
 # - "ncbi_taxonomy_id": Use NCBI taxonomy IDs to define the search space.
 # - "uniprot_proteome_id": Use UniProt proteome IDs to define the search space.
-# - "MAG": Use MAGs to define the search space.
-# - "metagenomic_profiling": Use metagenomic profiling to define the search space.
-# - "16S": Use 16S rRNA gene sequences to define the search space.
+# - "MAGs": Use MAGs to define the search space.
+# - "metaphlan": Use MetaPhlAn metagenomic profiling to define the search space.
 search_space_method: ncbi_taxonomy_id
 # Define the sample annotation filepath relative to the experiment directory
 sample_annotation: input/sample_annotation.txt
@@ -175,7 +174,7 @@ pip install wheel
 pip install datrie
 ```
 
-## 4. Add in the following lines to the beginning of `conduit/modules/annotation/ncbi_taxonomy/scripts get_annotations_from_uniprot.R`
+## 4. Add in the following lines to the beginning of `conduit/modules/annotation/uniprot/scripts/get_annotations_from_uniprot.R`
 Easiest/quickest way to do this is to `vim get_annotations_from_uniprot.R`, make your changes after typing `i`, and then `:x` and press enter to save and quit the file.
 
 ```
@@ -210,22 +209,20 @@ Below you will find a high level annotated diagram displaying the general struct
 
 ```
 conduit/
-├── modules/                          # Snakemake modules. Each module should have snakefile and associated scripts. 
+├── modules/                          # Snakemake modules. Each module should have snakefile and associated scripts.
+│   ├── setup/                        # Workflow setup (config copying, apptainer image building)
 │   ├── search_space/                 # Defining the search space
-│   │   ├── user_specified            # with ncbi_taxonomy and proteome_id 
-│   │   ├── proteotyping              # with species specific peptides
-│   │   ├── metagenomic_profiling     # with metagenomic profiling (reference based)
-│   │   ├── mags                      # with metagenome assembled genome
-│   │   └── 16s                       # with 16S data
+│   │   ├── ncbi_taxonomy/            # from NCBI taxonomy IDs
+│   │   ├── uniprot_proteome_ids/     # from UniProt proteome IDs
+│   │   ├── metaphlan/                # from MetaPhlAn metagenomic profiling
+│   │   ├── MAGs/                     # from metagenome-assembled genomes
+│   │   └── database_processing/      # shared post-processing for database files
 │   ├── diann/                        # Identification and Quantification with DIA-NN
 │   ├── annotation/                   # Protein / taxonomic annotation
-│   │   ├── user_specified            # with ncbi_taxonomy and proteome_id 
-│   │   ├── proteotyping              # with species specific peptides
-│   │   ├── metagenomic_profiling     # with metagenomic profiling (reference based)
-│   │   ├── mags                      # with metagenome assembled genome
-│   │   └── 16s                       # with 16S data
-│   ├── matrices/                     # Matrix processing
-│   └── r_integration                 # Integration into R
+│   │   ├── uniprot/                  # UniProt-based annotation (ncbi_taxonomy_id, uniprot_proteome_id, metaphlan)
+│   │   ├── MAGs/                     # Bakta + UniProt annotation for MAG-derived proteins
+│   │   └── external_annotations/     # KEGG, Pfam, CAZy, eggNOG, GO annotations
+│   └── build_conduit/                # Builds the final Conduit RDS object
 ├── apptainer/                        # Apptainer configurations. Contains .def files
 ├── config/                           # Default configurations (copied to each experiment config if not altered)
 ├── images/                           # Contains diagrams of the workflow or any other images associated with Conduit.
@@ -259,9 +256,8 @@ run_diann_config: config/run_diann.cfg
 # Options: 
 # - "ncbi_taxonomy_id": Use NCBI taxonomy IDs to define the search space.
 # - "uniprot_proteome_id": Use UniProt proteome IDs to define the search space.
-# - "MAG": Use MAGs to define the search space.,
-# - "metagenomic_profiling": Use metagenomic profiling to define the search space.
-# - "16S": Use 16S rRNA gene sequences to define the search space.
+# - "MAGs": Use MAGs to define the search space.
+# - "metaphlan": Use MetaPhlAn metagenomic profiling to define the search space.
 search_space_method: ncbi_taxonomy_id
 # Define the sample annotation filepath relative to the experiment directory
 sample_annotation: input/sample_annotation.txt

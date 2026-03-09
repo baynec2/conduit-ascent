@@ -23,7 +23,7 @@ start_time <- Sys.time()
 # Logging Inputs and outputs
 conduitR::log_with_timestamp("Running get_supplementary_annotations_from_uniprot.R script")
 conduitR::log_with_timestamp(paste0("Input file: ",bakta_annotated_protein_info_fp))
-conduitR::log_with_timestamp(paste0("Output file: ", bakta_annotated_protein_info_fp))
+conduitR::log_with_timestamp(paste0("Output file: ", uniprot_annotated_protein_info_fp))
 
 bakta_annotated_protein_info <- readr::read_delim(bakta_annotated_protein_info_fp)
 

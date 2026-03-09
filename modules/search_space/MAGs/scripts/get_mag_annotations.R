@@ -47,11 +47,23 @@ long_annotations = combined_annotations |>
                                            grepl("^GO.*",DbXrefs) ~ "xref_go",
                                            grepl("^COG.*",DbXrefs) ~ "xref_cog",
                                            grepl("^EC.*",DbXrefs) ~ "xref_ec",
-                                           TRUE ~ "unsuported_annotation"
+                                           TRUE ~ "unsupported_annotation"
                                            ),
                     DbXrefs = gsub("^UniRef:UniRef[0-9]*_|PFAM:","",DbXrefs))
+
+# Warn if any DbXrefs could not be categorised
+unsupported <- long_annotations |>
+  dplyr::filter(xref_name == "unsupported_annotation") |>
+  dplyr::pull(DbXrefs) |>
+  unique()
+if (length(unsupported) > 0) {
+  warning(paste0(length(unsupported), " unsupported DbXref annotation(s) were found and will be dropped: ",
+                 paste(head(unsupported, 10), collapse = ", ")))
+}
+
 # Step 2: Separate db prefix from value
-mag_annotations <- long_annotations  |> 
+mag_annotations <- long_annotations |>
+  dplyr::filter(xref_name != "unsupported_annotation") |>
 tidyr::pivot_wider(names_from = xref_name,values_from = DbXrefs, values_fn = list(DbXrefs = ~paste(., collapse = ";")))
 
 conduitR::log_with_timestamp("Writing MAG annotations to file.")

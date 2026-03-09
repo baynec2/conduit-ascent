@@ -55,7 +55,7 @@ protein_groups <- SummarizedExperiment::rowData(qf[["protein_groups"]]) |>
 
 #
 conduit_annotations = protein_groups |>
-  dplyr::left_join(combined_annotations,protein_groups, by = "protein_id")|>
+  dplyr::left_join(combined_annotations, by = "protein_id")|>
   dplyr::select(Protein.Group,annotation_type,term,description)|>
   # If the proteinids in a protein group have the same content, they will only be counted once.
   dplyr::distinct()|>

@@ -52,8 +52,13 @@ readr::write_tsv(detected_protein_info,detected_protein_info_df)
 conduitR::log_with_timestamp("Filtering fasta file to only include detected proteins")
 # Reading in fasta file
 sequences <- Biostrings::readAAStringSet(protein_info_fasta)
-# Extract UniProt IDs from FASTA headers
+# Extract UniProt IDs from FASTA headers (expects sp|ID|... or tr|ID|... format)
 uniprot_ids <- names(sequences) |> stringr::str_extract("(?<=\\|)[A-Z0-9]+(?=\\|)")
+n_failed <- sum(is.na(uniprot_ids))
+if (n_failed > 0) {
+  warning(paste0(n_failed, " FASTA headers did not match the expected UniProt format ",
+                 "(e.g. 'sp|ID|...' or 'tr|ID|...'). These sequences will be excluded."))
+}
 # Create a named vector mapping UniProt IDs to full headers
 header_map <- setNames(names(sequences), uniprot_ids)
 

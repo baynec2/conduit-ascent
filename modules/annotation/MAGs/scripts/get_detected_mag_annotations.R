@@ -15,11 +15,6 @@ mag_annotations_fp <- snakemake@input[["mag_annotations"]]
 # Output
 bakta_annotated_protein_info_fp <- snakemake@output[["bakta_annotated_protein_info"]]
 
-# Testing
-#detected_protein_info_fp = "/home/nanopore-catalyst/conduit/experiments/example/input/database_resources/protein_info.txt"
-#mag_annotations_fp = "/home/nanopore-catalyst/conduit/experiments/example/input/database_resources/bakta/mag_annotations.txt"
-#bakta_annotated_protein_info_fp = "/home/nanopore-catalyst/conduit/experiments/example/input/database_resources/bakta_annotated_protein_info.txt"
-
 start_time <- Sys.time()
 # Logging Inputs and outputs
 conduitR::log_with_timestamp("Running get_detected_mag_annotations.R script")
