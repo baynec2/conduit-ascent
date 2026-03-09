@@ -2,7 +2,7 @@
 # Experiment and file configuration
 # ===============================
 # Name of the experiment (used to locate the correct experiment directory)
-experiment: 
+experiment: CB020
 # Config file for generating DIA-NN spectral library (relative to main Snakefile)
 generate_diann_spectral_library_config: config/generate_diann_spectral_library.cfg
 # Config file for running DIA-NN search (relative to main Snakefile)
@@ -18,24 +18,43 @@ output_dir: output/
 # - "ncbi_taxonomy_id": Use NCBI taxonomy IDs
 # - "uniprot_proteome_id": Use UniProt proteome IDs
 # - "peptidotyping": First-pass search on species-specific peptides
-# - "MAG": Use metagenome-assembled genomes
+# - "MAGs": Use metagenome-assembled genomes
 # - "metaphlan": Use MetaPhlAn profiling
 # - "16S": Use 16S rRNA sequences
-search_space_method: ncbi_taxonomy_id
+search_space_method: peptidotyping
+## Peptidotyping specific options
+# If using peptidotyping, the number of unique peptides that must be identified to call a species present. 
+presence_min_peptides: 3
+presence_min_coverage: 0
+min_taxon_db_peptides: 10
+## Metaphlan specific options 
 # If using sequencing-based methods, the minimum relative abundance to include a species
 relative_abundance_threshold: 0.01
+## Options for all workflows
 # Optional: add an extra proteome ID (e.g., host reference)
 # FALSE = None
 # Examples: Human = UP000005640, Mouse C57/BL6 = UP000000589
-append_additional_proteome_id: FALSE
+append_additional_proteome_id: UP000000589
 # Optional: add an extra NCBI taxonomic ID (e.g., host species)
 # FALSE = None
 # Examples: Human = 9606, Mouse = 10090
 append_additional_ncbi_taxa_id: FALSE
+## Exclude from database
+# This may be useful especially for peptidotyping. If it detects
+# Optional: exclude proteome id from database
+# FALSE = Mone
+# Examples: Human = UP000005640, Mouse C57/BL6 = UP000000589
+exclude_proteome_id: FALSE
+# Optional: exclude ncbi_taxa_id from database
+# FALSE = Mone
+# Examples: Human = UP000005640, Mouse C57/BL6 = UP000000589
+exclude_ncbi_taxa_id: FALSE
 # ===============================
 # Resource configuration. Allows the user to specify paths to any hefty resources if they already exist on system.
 # If not, conduit will handle their download automatically if they are required by workflow user specifies.
 # ===============================
+# Peptidotyping resources
+peptidotyping_resource_dir: "resources/peptidotyping/"
 # Annotation resources. 
 eggnog_database: "resources/annotation/eggnog/e5.og_annotations.tsv" # ~200mb
 # Resources for metaphlan strategy.
@@ -44,7 +63,9 @@ metaphlan_database_dir: "resources/metaphlan" # ~54 Gb
 unipept_sequences: "resources/databases/sequences.tsv.lz4" # ~ 1.46 Gb
 unipept_taxons: "resources/databases/taxons.tsv.lz4"
 # Resources needed for mags
-bakta_database: "resources/bakta" # ~ 84 GB
+bakta_db_dir: "resources/bakta/db" # ~ 84 GB
+# Specify the type of bakta database to use "full" (~84 Gb) or "light (~2Gb)"
+bakta_db_type: "light" # ~ 84 GB
 # Might not need this depending on how we want to call MAGs.
 gbtk_database: "resources/gbtk" # ~140 GB
 

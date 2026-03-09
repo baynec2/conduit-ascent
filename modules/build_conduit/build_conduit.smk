@@ -47,7 +47,7 @@ rule move_database_resources:
         expand(os.path.join(EXPERIMENT_DIR,"input/database_resources/{filename}"),
                filename=[
                    "database.fasta",
-                   "proteome_ids.txt",
+                   #"proteome_ids.txt",
                    "taxonomy.txt",
                    "protein_info.txt",
                    "taxonomic_tree_of_database.pdf",
@@ -60,13 +60,13 @@ rule move_database_resources:
                    "detected_protein_info.txt",
                    "detected_protein.fasta",
                    "uniprot_annotated_protein_info.txt",
-                   "conduit_annotations.tsv"
+                   "conduit_annotations.txt"
                ]),
     output:
         expand(os.path.join(EXPERIMENT_DIR,"output/database_resources/{filename}"), 
                filename=[
                    "database.fasta",
-                   "proteome_ids.txt",
+                   #"proteome_ids.txt",
                    "taxonomy.txt",
                    "protein_info.txt",
                    "taxonomic_tree_of_database.pdf",
@@ -79,7 +79,7 @@ rule move_database_resources:
                    "detected_protein_info.txt",
                    "detected_protein.fasta",
                    "uniprot_annotated_protein_info.txt",
-                   "conduit_annotations.tsv"
+                   "conduit_annotations.txt"
                ]),
     log: os.path.join(EXPERIMENT_DIR,"logs/matrices/move_database_resources.log")
     shell:
