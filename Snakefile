@@ -113,6 +113,9 @@ module mag_annotation:
 module external_annotation:
   snakefile: "modules/annotation/external_annotations/external_annotations.smk"
   config: config
+module eggnogmapper_annotation:
+  snakefile: "modules/annotation/eggnogmapper/eggnogmapper.smk"
+  config: config
 # Diann search
 module diann:
   snakefile: "modules/diann/diann.smk"
@@ -155,33 +158,37 @@ if config["search_space_method"] == "uniprot_proteome_id":
     use rule * from uniprot_proteome_ids_search_space
     use rule * from diann
     use rule * from uniprot_annotation
+    use rule * from eggnogmapper_annotation
     use rule * from external_annotation
 
 # Proteotyping has an additional first pass search module
 if config["search_space_method"] == "peptidotyping":
     use rule * from peptidotyping
-    use rule * from ncbi_search_space 
+    use rule * from ncbi_search_space
     use rule * from uniprot_proteome_ids_search_space
     use rule * from diann
     use rule * from uniprot_annotation
+    use rule * from eggnogmapper_annotation
     use rule * from external_annotation
 
 # Metaphlan feeds into the ncbi taxonomy search space
 if config["search_space_method"] == "metaphlan":
     use rule * from metaphlan
-    use rule * from ncbi_search_space 
+    use rule * from ncbi_search_space
     use rule * from uniprot_proteome_ids_search_space
     use rule * from diann
     use rule * from uniprot_annotation
+    use rule * from eggnogmapper_annotation
     use rule * from external_annotation
 
 
 # NCBI taxa id based workflow uses entire ncbi module. 
 if config["search_space_method"] == "ncbi_taxonomy_id":
-    use rule * from ncbi_search_space 
+    use rule * from ncbi_search_space
     use rule * from uniprot_proteome_ids_search_space
     use rule * from diann
     use rule * from uniprot_annotation
+    use rule * from eggnogmapper_annotation
     use rule * from external_annotation
 
 
@@ -191,6 +198,7 @@ if config["search_space_method"] == "MAGs":
     use rule * from database_processing
     use rule * from diann
     use rule * from mag_annotation
+    use rule * from eggnogmapper_annotation
     use rule * from external_annotation
 
 

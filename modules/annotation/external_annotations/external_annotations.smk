@@ -119,6 +119,7 @@ rule consolidate_annotations:
     cazy_family_info = os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/cazy_family_info.txt"),
     eggnog_info = os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/eggnog_info.txt"),
     eggnog_code_info = os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/eggnog_code_info.txt"),
+    emapper_annotations = os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/emapper_annotations.txt"),
     # QF
     qf = os.path.join(EXPERIMENT_DIR,"output/output_files/qf.rds")
   output:

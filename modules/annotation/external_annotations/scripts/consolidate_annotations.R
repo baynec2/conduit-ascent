@@ -20,6 +20,7 @@ cazy_class_info_fp = snakemake@input[["cazy_class_info"]]
 cazy_family_info_fp = snakemake@input[["cazy_family_info"]]
 eggnog_info_fp = snakemake@input[["eggnog_info"]]
 eggnog_code_info_fp = snakemake@input[["eggnog_code_info"]]
+emapper_annotations_fp = snakemake@input[["emapper_annotations"]]
 
 # qf
 qf_fp = snakemake@input[["qf"]]
@@ -34,7 +35,7 @@ conduitR::log_with_timestamp("Combining all annotations together")
 input_annotations <- c(go_info_fp,kegg_pathway_info_fp,
 kegg_map_pathway_info_fp,kegg_orthology_info_fp,pfam_info_fp,
 cazy_class_info_fp,cazy_family_info_fp,eggnog_info_fp,
-eggnog_code_info_fp)
+eggnog_code_info_fp,emapper_annotations_fp)
 
 # Read each annotation file and combine
 combined_annotations <- purrr::map_dfr(

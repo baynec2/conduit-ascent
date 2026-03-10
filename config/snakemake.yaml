@@ -73,6 +73,8 @@ unipept_sequences: "resources/databases/sequences.tsv.lz4" # ~ 1.46 Gb
 unipept_taxons: "resources/databases/taxons.tsv.lz4"
 # Resources needed for mags
 bakta_db_dir: "resources/bakta/db" # ~ 84 GB
+# Resources needed for eggNOG-mapper (used for sequence-based functional annotation)
+eggnogmapper_db_dir: "resources/eggnogmapper/db" # ~50 GB (full) or ~8 GB (bacteria only)
 # Specify the type of bakta database to use "full" (~84 Gb) or "light (~2Gb)"
 bakta_db_type: "light" # ~ 84 GB
 # Might not need this depending on how we want to call MAGs.

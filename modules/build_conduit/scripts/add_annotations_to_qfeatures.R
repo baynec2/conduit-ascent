@@ -56,67 +56,105 @@ conduit_annotations_wide = readr::read_delim(conduit_annotations_fp) |>
     values_fn = \(x) paste(unique(x), collapse = ";")  # collapse multiple terms per protein
   )
 
-  # Adding go annotations
-conduitR::log_with_timestamp("Adding GO annotations to QFeatures, handling assay links, and summarizing")
+  # --- UniProt-derived annotations ---
+conduitR::log_with_timestamp("Adding uniprot_go annotations to QFeatures")
+qf = conduitR::add_annotation_to_qf(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = uniprot_go)
+
+conduitR::log_with_timestamp("Adding uniprot_pfam annotations to QFeatures")
+qf = conduitR::add_annotation_to_qf(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = uniprot_pfam)
+
+conduitR::log_with_timestamp("Adding uniprot_eggnog annotations to QFeatures")
+qf = conduitR::add_annotation_to_qf(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = uniprot_eggnog)
+
+conduitR::log_with_timestamp("Adding uniprot_eggnog_code annotations to QFeatures")
+qf = conduitR::add_annotation_to_qf(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = uniprot_eggnog_code)
+
+conduitR::log_with_timestamp("Adding uniprot_kegg_pathway annotations to QFeatures")
+qf = conduitR::add_annotation_to_qf(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = uniprot_kegg_pathway)
+
+conduitR::log_with_timestamp("Adding uniprot_kegg_map_pathway annotations to QFeatures")
+qf = conduitR::add_annotation_to_qf(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = uniprot_kegg_map_pathway)
+
+conduitR::log_with_timestamp("Adding uniprot_kegg_orthology annotations to QFeatures")
+qf = conduitR::add_annotation_to_qf(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = uniprot_kegg_orthology)
+
+conduitR::log_with_timestamp("Adding uniprot_cazy_class annotations to QFeatures")
+qf = conduitR::add_annotation_to_qf(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = uniprot_cazy_class)
+
+conduitR::log_with_timestamp("Adding uniprot_cazy_family annotations to QFeatures")
+qf = conduitR::add_annotation_to_qf(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = uniprot_cazy_family)
+
+# --- eggNOG-mapper-derived annotations ---
+conduitR::log_with_timestamp("Adding go annotations to QFeatures")
 qf = conduitR::add_annotation_to_qf(qf,
                                     id_column = Protein.Group,
                                     conduit_annotations = conduit_annotations_wide,
                                     column_name = go)
 
-# Adding pfam annotations
-conduitR::log_with_timestamp("Adding pfam annotations to QFeatures, handling assay links, and summarizing")
-
+conduitR::log_with_timestamp("Adding pfam annotations to QFeatures")
 qf = conduitR::add_annotation_to_qf(qf,
                                     id_column = Protein.Group,
                                     conduit_annotations = conduit_annotations_wide,
                                     column_name = pfam)
 
-conduitR::log_with_timestamp("Adding eggnog annotations to QFeatures, handling assay links, and summarizing")
-
+conduitR::log_with_timestamp("Adding eggnog annotations to QFeatures")
 qf = conduitR::add_annotation_to_qf(qf,
                                     id_column = Protein.Group,
                                     conduit_annotations = conduit_annotations_wide,
                                     column_name = eggnog)
 
-
-conduitR::log_with_timestamp("Adding eggnog code annotations to QFeatures, handling assay links, and summarizing")
-
+conduitR::log_with_timestamp("Adding eggnog_code annotations to QFeatures")
 qf = conduitR::add_annotation_to_qf(qf,
                                     id_column = Protein.Group,
                                     conduit_annotations = conduit_annotations_wide,
                                     column_name = eggnog_code)
 
-conduitR::log_with_timestamp("Adding kegg pathway annotations to QFeatures, handling assay links, and summarizing")
-
-qf = conduitR::add_annotation_to_qf(qf,
-                                    id_column = Protein.Group,
-                                    conduit_annotations = conduit_annotations_wide,
-                                    column_name = kegg_pathway)
-
-conduitR::log_with_timestamp("Adding kegg map pathway annotations to QFeatures, handling assay links, and summarizing")
-
+conduitR::log_with_timestamp("Adding kegg_map_pathway annotations to QFeatures")
 qf = conduitR::add_annotation_to_qf(qf,
                                     id_column = Protein.Group,
                                     conduit_annotations = conduit_annotations_wide,
                                     column_name = kegg_map_pathway)
 
-conduitR::log_with_timestamp("Adding kegg orthology annotations to QFeatures, handling assay links, and summarizing")
-
+conduitR::log_with_timestamp("Adding kegg_orthology annotations to QFeatures")
 qf = conduitR::add_annotation_to_qf(qf,
                                     id_column = Protein.Group,
                                     conduit_annotations = conduit_annotations_wide,
                                     column_name = kegg_orthology)
 
-
-conduitR::log_with_timestamp("Adding cazyme class annotations to QFeatures, handling assay links, and summarizing")
-
+conduitR::log_with_timestamp("Adding cazy_class annotations to QFeatures")
 qf = conduitR::add_annotation_to_qf(qf,
                                     id_column = Protein.Group,
                                     conduit_annotations = conduit_annotations_wide,
                                     column_name = cazy_class)
 
-conduitR::log_with_timestamp("Adding cazyme family annotations to QFeatures, handling assay links, and summarizing")
-
+conduitR::log_with_timestamp("Adding cazy_family annotations to QFeatures")
 qf = conduitR::add_annotation_to_qf(qf,
                                     id_column = Protein.Group,
                                     conduit_annotations = conduit_annotations_wide,

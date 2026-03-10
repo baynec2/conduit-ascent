@@ -57,7 +57,7 @@ conduitR::log_with_timestamp("Extracting Kegg Pathway Info")
 
 kegg_pathway_long = kegg_combined |>
 dplyr::select(protein_id,kegg_pathway_id,kegg_pathway)|>
-dplyr::mutate(annotation_type = "kegg_pathway")|>
+dplyr::mutate(annotation_type = "uniprot_kegg_pathway")|>
 dplyr::select(protein_id,annotation_type,term = kegg_pathway_id, description = kegg_pathway)|>
 dplyr::filter(!is.na(term))
 
@@ -67,7 +67,7 @@ conduitR::log_with_timestamp("Converting Species Specific Kegg Pathways to Gener
 kegg_map_pathway_long = kegg_combined |>
 dplyr::select(protein_id,kegg_pathway_id,kegg_pathway)|>
 dplyr::mutate(kegg_map_pathway_id = gsub("^[a-z]{3}","map",kegg_pathway_id))|>
-dplyr::mutate(annotation_type = "kegg_map_pathway")|>
+dplyr::mutate(annotation_type = "uniprot_kegg_map_pathway")|>
 dplyr::select(protein_id,annotation_type,term = kegg_map_pathway_id, description = kegg_pathway)|>
 dplyr::filter(!is.na(term))
 
@@ -75,7 +75,7 @@ dplyr::filter(!is.na(term))
 conduitR::log_with_timestamp("Extracting Kegg orthology info")  
 
 ko_long = kegg_combined |>
-dplyr::mutate(annotation_type = "kegg_orthology")|>
+dplyr::mutate(annotation_type = "uniprot_kegg_orthology")|>
 dplyr::select(protein_id,annotation_type,term = ko,description =ko_description)|>
 dplyr::distinct()|>
 dplyr::filter(!is.na(term))

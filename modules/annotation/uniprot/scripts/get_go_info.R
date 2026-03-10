@@ -31,7 +31,7 @@ go_long <- uniprot_annotated_protein_info |>
   dplyr::mutate(
     description = stringr::str_trim(matches[,2]),  # remove any leading/trailing whitespace
     go_id = matches[,3],
-    annotation_type ="go"
+    annotation_type ="uniprot_go"
   ) |>
   dplyr::select(protein_id,annotation_type,term = go_id, description)|>
   dplyr::distinct()
