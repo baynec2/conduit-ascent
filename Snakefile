@@ -3,6 +3,7 @@
 ################################################################################
 # Importing necessary packages
 import os
+import sys
 import glob
 import pandas as pd
 import shutil
@@ -49,7 +50,7 @@ for filepath in RAW_FILEPATHS:
     SAMPLES.append(name_without_ext)
 
 # Print found samples for debugging
-print(f"Found samples: {SAMPLES}")
+print(f"Found samples: {SAMPLES}", file=sys.stderr)
 
 # Checking to make sure that the raw file names match those in sample_annotation.txt
 if not config.get("sample_annotation"):
