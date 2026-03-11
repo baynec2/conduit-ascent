@@ -13,15 +13,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Miniconda
-        uses: conda-incubator/setup-miniconda@v3
+      - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-          channels: conda-forge, bioconda
-          channel-priority: strict
-          activate-environment: snakemake
-          environment-file: tests/envs/snakemake.yml
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install "snakemake>=8" pandas
 
       - name: Run dry-run tests
-        shell: bash -el {0}
         run: bash tests/run_dry_runs.sh
