@@ -10,14 +10,3 @@ rule get_annotations_from_uniprot:
   container: "docker://baynec2/conduitr:alpha"
   script:
     "scripts/get_annotations_from_uniprot.R"
-
-# Getting GO Information
-rule get_go_info:
-  input:
-    uniprot_annotated_protein_info = os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/uniprot_annotated_protein_info.txt"),
-  output:
-    go_info = os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/go_info.txt")
-  log: os.path.join(EXPERIMENT_DIR,"logs/annotation/uniprot/get_annotations_from_uniprot.log")
-  container: "docker://baynec2/conduitr:alpha"
-  script:
-    "scripts/get_go_info.R"
