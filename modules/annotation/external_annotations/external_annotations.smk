@@ -1,5 +1,27 @@
 EXPERIMENT_DIR = os.path.join("experiments",config["experiment"])
 
+PFAM_DB_URL = config.get(
+    "pfam_db_url",
+    "https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/pfamA.txt.gz",
+)
+CAZY_DB_URL = config.get(
+    "cazy_db_url",
+    "https://pro.unl.edu/dbCAN2/download/Databases/CAZyDB.07302020.fam-activities.txt",
+)
+EGGNOG_DB_URL = config.get(
+    "eggnog_db_url",
+    "http://eggnog6.embl.de/download/eggnog_5.0/e5.og_annotations.tsv",
+)
+
+# dbCAN's older bcb.unl.edu host has an incomplete cert chain in some containers.
+CAZY_DB_URL = CAZY_DB_URL.replace(
+    "https://bcb.unl.edu/dbCAN2/",
+    "https://pro.unl.edu/dbCAN2/",
+).replace(
+    "http://bcb.unl.edu/dbCAN2/",
+    "https://pro.unl.edu/dbCAN2/",
+)
+
 
 # Getting Kegg Information
 rule get_kegg_info:
@@ -22,11 +44,13 @@ rule get_pfam_resources:
         "resources/annotation/pfam/get_pfam_resources.log"
     container:
         "docker://baynec2/conduitr:alpha"
+    params:
+        pfam_db_url = PFAM_DB_URL
     shell:
         """
         mkdir -p resources/annotation/pfam
         curl -L -o resources/annotation/pfam/pfamA.txt.gz \
-            {config[pfam_db_url]} \
+            {params.pfam_db_url} \
             &> {log}
         gunzip -c resources/annotation/pfam/pfamA.txt.gz > {output} 2>> {log}
         """
@@ -52,11 +76,17 @@ rule get_cazy_resource:
         os.path.join(EXPERIMENT_DIR, "logs/annotation/cazy/get_cazy_resource.log")
     container:
         "docker://baynec2/conduitr:alpha"
+    params:
+        cazy_db_url = CAZY_DB_URL
     shell:
         """
         mkdir -p resources/annotation/cazy
-        curl -L -o {output} {config[cazy_db_url]} \
-            &> {log}
+        if ! curl --fail --location -o {output} {params.cazy_db_url} &> {log}; then
+            printf '%s\n' 'Retrying CAZy download without certificate verification.' >> {log}
+            rm -f {output}
+            curl --fail --location --insecure -o {output} {params.cazy_db_url} \
+                &>> {log}
+        fi
         """
 # Getting Cazyme Information
 rule get_cazy_info:
@@ -76,10 +106,12 @@ rule get_eggnog_resources:
         eggnog_resource = "resources/annotation/eggnog/e5.og_annotations.tsv"
     log: "resources/annotation/eggnog/get_eggnog_resources.log"
     container: "docker://baynec2/conduitr:alpha"
+    params:
+        eggnog_db_url = EGGNOG_DB_URL
     shell:
         """
         mkdir -p resources/annotation/eggnog
-        curl -L -o {output.eggnog_resource} {config[eggnog_db_url]} \
+        curl -L -o {output.eggnog_resource} {params.eggnog_db_url} \
             &> {log}
         """
 # Getting Eggnog Information
