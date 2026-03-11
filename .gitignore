@@ -1,6 +1,8 @@
-# Ignore all experiments except example
+# Ignore all experiments except example and dry-run test fixtures
 experiments/*
-experiments/example/
+!experiments/example/
+!experiments/dry_run_test/
+!experiments/dry_run_test/**
 
 # RStudio specific files
 .Rproj.user
@@ -36,8 +38,9 @@ experiments/example/config/
 # Ignore any apptainer files
 apptainer/*.sif
 
-# Ignore any raw files 
+# Ignore any raw files (except dry-run test fixtures)
 *.raw
+!experiments/dry_run_test/**/*.raw
 
 # Ignore any rust stuff
 .cargo/
@@ -57,6 +60,7 @@ resources/
 *.fasta
 *.speclib
 *.raw
+!experiments/dry_run_test/**/*.raw
 *.raw.quant
 *.lz4
 *.index
