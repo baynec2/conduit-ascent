@@ -24,6 +24,7 @@ run_dry_run() {
         --snakefile "$REPO_ROOT/Snakefile" \
         --configfile "$config_file" \
         --dry-run \
+        --cores 1 \
         --quiet 2>&1; then
         echo "PASS: $method"
         PASSED+=("$method")
