@@ -1,0 +1,2 @@
+proteome_id
+UP000000625

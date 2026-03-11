@@ -2,9 +2,9 @@ name: Snakemake dry-run tests
 
 on:
   push:
-    branches: [main, testing]
+    branches: [main, development, testing]
   pull_request:
-    branches: [main]
+    branches: [main, development]
 
 jobs:
   dry-runs:
