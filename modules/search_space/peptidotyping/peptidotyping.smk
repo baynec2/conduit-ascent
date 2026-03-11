@@ -617,7 +617,7 @@ rule infer_family_presence:
 ################################################################################
 # By mapping these values, we can tell what species there is family level evidence for.
 # This will allow us to subsequently search a reduced strain/species specific peptide database. 
- rule map_families_to_species_strains:
+rule map_families_to_species_strains:
     input:
         ncbi_taxonomy_ids = os.path.join(EXPERIMENT_DIR,"input/database_resources/peptidotyping/detected_family_taxa_ids.txt")
     output:

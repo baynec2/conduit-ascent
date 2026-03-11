@@ -1,0 +1,26 @@
+experiment: dry_run_test
+generate_diann_spectral_library_config: config/generate_diann_spectral_library.cfg
+run_diann_config: config/run_diann.cfg
+sample_annotation: input/sample_annotation.txt
+output_dir: output/
+search_space_method: uniprot_proteome_id
+presence_min_peptides: 3
+presence_min_coverage: 0
+min_taxon_db_peptides: 10
+relative_abundance_threshold: 0.01
+host_organism_ids: [9606, 10090]
+append_additional_proteome_id: FALSE
+append_additional_ncbi_taxa_id: FALSE
+exclude_proteome_id: FALSE
+exclude_ncbi_taxa_id: FALSE
+peptidotyping_resource_dir: "resources/peptidotyping/"
+eggnog_database: "resources/annotation/eggnog/e5.og_annotations.tsv"
+pfam_db_url: "https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/pfamA.txt.gz"
+cazy_db_url: "https://bcb.unl.edu/dbCAN2/download/Databases/CAZyDB.07302020.fam-activities.txt"
+eggnog_db_url: "http://eggnog6.embl.de/download/eggnog_5.0/e5.og_annotations.tsv"
+metaphlan_database_dir: "resources/metaphlan"
+unipept_sequences: "resources/databases/sequences.tsv.lz4"
+unipept_taxons: "resources/databases/taxons.tsv.lz4"
+bakta_db_dir: "resources/bakta/db"
+bakta_db_type: "light"
+gbtk_database: "resources/gbtk"
