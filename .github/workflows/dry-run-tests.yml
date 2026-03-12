@@ -22,6 +22,9 @@ jobs:
           pip install "snakemake>=8" pandas
           sudo apt-get install -y graphviz
 
+      - name: Run lint
+        run: snakemake --lint --configfile tests/configs/integration_test_uniprot_proteome_id.yaml
+
       - name: Run dry-run tests
         run: bash tests/run_dry_runs.sh
 

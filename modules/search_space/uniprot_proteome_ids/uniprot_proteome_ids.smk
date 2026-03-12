@@ -1,5 +1,7 @@
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR = config["run_dir"]
+
+localrules: seed_proteome_ids
 ################################################################################
 # Getting Database Resources (Defining the Search Space)
 ################################################################################
@@ -12,7 +14,9 @@ if config["search_space_method"] == "uniprot_proteome_id":
         input: os.path.join(EXPERIMENT_DIR, "input/proteome_ids.txt")
         output: os.path.join(RUN_DIR, "proteome_ids.txt")
         log: os.path.join(RUN_DIR, "logs/search_space/uniprot_proteome_ids/seed_proteome_ids.log")
-        shell: "cp {input} {output} 2> {log}"
+        run:
+            import shutil
+            shutil.copy(input[0], output[0])
 
 rule get_fasta_from_proteome_ids:
     input:

@@ -12,6 +12,8 @@ rule generate_diann_spectral_library:
         config_file = os.path.join(RUN_DIR,"config/generate_diann_spectral_library.cfg")
     output:
         os.path.join(RUN_DIR,"database_resources/database.predicted.speclib")
+    params:
+        out_lib = lambda w, output: os.path.splitext(os.path.splitext(output[0])[0])[0]
     log: os.path.join(RUN_DIR,"logs/diann/generate_diann_spectral_library.log")
     container:
         "docker://baynec2/diann2.1.0:alpha"
@@ -20,7 +22,7 @@ rule generate_diann_spectral_library:
         """
         diann --cfg {input.config_file} \
         --fasta {input.fasta} \
-        --out-lib {RUN_DIR}/database_resources/database \
+        --out-lib {params.out_lib} \
         --threads {threads} >> {log} 2>&1
         """
 ################################################################################
@@ -36,6 +38,8 @@ rule run_diann:
         diann_stats = os.path.join(RUN_DIR,"diann_output/diann.stats.tsv"),
         diann_parquet = os.path.join(RUN_DIR,"diann_output/diann.parquet"),
         diann_pg_matrix = os.path.join(RUN_DIR,"diann_output/diann.pg_matrix.tsv")
+    params:
+        out = lambda w, output: os.path.join(os.path.dirname(output.diann_stats), "diann")
     log: os.path.join(RUN_DIR,"logs/diann/run_diann.log")
     container:
         "docker://baynec2/diann2.1.0:alpha"
@@ -44,7 +48,7 @@ rule run_diann:
         """
         diann --cfg {input.config_file} \
         --fasta {input.fasta} \
-        --out  {RUN_DIR}/diann_output/diann \
+        --out  {params.out} \
         --dir {input.raw_files_dir} \
         --lib {input.spectral_library} \
         --threads {threads} --verbose 1 >> {log} 2>&1

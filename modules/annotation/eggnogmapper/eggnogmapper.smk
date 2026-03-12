@@ -20,7 +20,7 @@ rule download_eggnogmapper_db:
     container:
         "docker://baynec2/eggnogmapper:2.1.12"
     params:
-        db_dir = EGGNOG_DB_DIR
+        db_dir = lambda w, output: os.path.dirname(output.db_files[0])
     shell:
         """
         mkdir -p {params.db_dir}
@@ -48,8 +48,8 @@ rule run_eggnogmapper:
     container:
         "docker://baynec2/eggnogmapper:2.1.12"
     params:
-        db_dir = EGGNOG_DB_DIR,
-        output_dir = os.path.join(RUN_DIR, "database_resources/detected_protein_resources"),
+        db_dir = lambda w, input: os.path.dirname(input.db_files[0]),
+        output_dir = lambda w, output: os.path.dirname(output.annotations),
         output_prefix = "emapper"
     threads: workflow.cores
     shell:
