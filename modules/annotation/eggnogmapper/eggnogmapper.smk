@@ -1,6 +1,6 @@
 import os
 
-EXPERIMENT_DIR = os.path.join("experiments", config["experiment"])
+RUN_DIR = config["run_dir"]
 EGGNOG_DB_DIR = config["eggnogmapper_db_dir"]
 
 # Required eggNOG-mapper database files
@@ -39,17 +39,17 @@ rule download_eggnogmapper_db:
 ################################################################################
 rule run_eggnogmapper:
     input:
-        fasta = os.path.join(EXPERIMENT_DIR, "input/database_resources/detected_protein_resources/detected_protein.fasta"),
+        fasta = os.path.join(RUN_DIR, "database_resources/detected_protein_resources/detected_protein.fasta"),
         db_files = expand(os.path.join(EGGNOG_DB_DIR, "{file}"), file=REQUIRED_EGGNOG_FILES)
     output:
-        annotations = os.path.join(EXPERIMENT_DIR, "input/database_resources/detected_protein_resources/emapper.annotations")
+        annotations = os.path.join(RUN_DIR, "database_resources/detected_protein_resources/emapper.annotations")
     log:
-        os.path.join(EXPERIMENT_DIR, "logs/annotation/eggnogmapper/run_eggnogmapper.log")
+        os.path.join(RUN_DIR, "logs/annotation/eggnogmapper/run_eggnogmapper.log")
     container:
         "docker://baynec2/eggnogmapper:2.1.12"
     params:
         db_dir = EGGNOG_DB_DIR,
-        output_dir = os.path.join(EXPERIMENT_DIR, "input/database_resources/detected_protein_resources"),
+        output_dir = os.path.join(RUN_DIR, "database_resources/detected_protein_resources"),
         output_prefix = "emapper"
     threads: workflow.cores
     shell:
@@ -74,11 +74,11 @@ rule run_eggnogmapper:
 ################################################################################
 rule parse_eggnogmapper_annotations:
     input:
-        annotations = os.path.join(EXPERIMENT_DIR, "input/database_resources/detected_protein_resources/emapper.annotations")
+        annotations = os.path.join(RUN_DIR, "database_resources/detected_protein_resources/emapper.annotations")
     output:
-        emapper_annotations = os.path.join(EXPERIMENT_DIR, "input/database_resources/detected_protein_resources/emapper_annotations.txt")
+        emapper_annotations = os.path.join(RUN_DIR, "database_resources/detected_protein_resources/emapper_annotations.txt")
     log:
-        os.path.join(EXPERIMENT_DIR, "logs/annotation/eggnogmapper/parse_eggnogmapper_annotations.log")
+        os.path.join(RUN_DIR, "logs/annotation/eggnogmapper/parse_eggnogmapper_annotations.log")
     container:
         "docker://baynec2/conduitr:alpha"
     script:
