@@ -1,6 +1,18 @@
-# Ignore all experiments except example
+# Ignore all experiments except example, dry-run test fixtures, and integration tests
 experiments/*
-experiments/example/
+!experiments/example/
+!experiments/dry_run_test/
+!experiments/dry_run_test/**
+!experiments/integration_test_ncbi_taxonomy_id/
+!experiments/integration_test_ncbi_taxonomy_id/**
+!experiments/integration_test_uniprot_proteome_id/
+!experiments/integration_test_uniprot_proteome_id/**
+!experiments/integration_test_MAGs/
+!experiments/integration_test_MAGs/**
+!experiments/integration_test_metaphlan/
+!experiments/integration_test_metaphlan/**
+!experiments/integration_test_peptidotyping/
+!experiments/integration_test_peptidotyping/**
 
 # RStudio specific files
 .Rproj.user
@@ -25,6 +37,8 @@ experiments/example/input/database_resources/
 # Ignore output files
 output/
 experiments/example/output/
+!experiments/integration_test_metaphlan/output/
+!experiments/integration_test_metaphlan/output/**
 
 # Ignore logs files
 experiments/example/logs/
@@ -36,9 +50,22 @@ experiments/example/config/
 # Ignore any apptainer files
 apptainer/*.sif
 
-# Ignore any raw files 
-*.raw
+# Local credentials — never commit
+tests/.env
 
+
+# Ignore any raw files (except dry-run test fixtures and integration test data)
+*.raw
+!experiments/dry_run_test/**/*.raw
+!tests/data/*.raw
+!experiments/integration_test_*/input/raw_files/sample1.raw
+
+# Ignore any rust stuff
+.cargo/
+.rustup/
+**/target/
+.claude/
+Rplots.pdf
 
 # Ignore any database resources. Files are too large to be included in the repository.
 resources/
@@ -46,11 +73,9 @@ resources/
 *.fasta
 *.speclib
 *.raw
-*.lz4
-*.index
-*.fasta
-*.speclib
-*.raw
+!experiments/dry_run_test/**/*.raw
+!tests/data/*.raw
+!experiments/integration_test_*/input/raw_files/sample1.raw
 *.raw.quant
 *.lz4
 *.index

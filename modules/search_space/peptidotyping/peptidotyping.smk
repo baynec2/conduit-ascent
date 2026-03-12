@@ -1,6 +1,7 @@
 import glob
 import os
-EXPERIMENT_DIR = os.path.join("experiments",config["experiment"])
+EXPERIMENT_DIR = config["experiment_dir"]
+RUN_DIR = config["run_dir"]
 RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/raw_files/*.raw"))
 
 ################################################################################
@@ -56,7 +57,7 @@ rule check_sequence_index_version:
     params:
         outdir = config["peptidotyping_resource_dir"]
     log:
-        os.path.join(EXPERIMENT_DIR,"logs/search_space/check_sequence_index_version.log")
+        os.path.join(RUN_DIR,"logs/search_space/check_sequence_index_version.log")
     shell:
         """
         # Extract version from local relnotes.txt
@@ -581,17 +582,17 @@ rule perform_first_pass_search:
         fasta = os.path.join(config["peptidotyping_resource_dir"],"first_pass_database.fasta"),
         config_file = "config/proteotyping_firstpass_diann.cfg"
     output:
-        first_pass_diann_parquet = os.path.join(EXPERIMENT_DIR,"input/database_resources/peptidotyping/first_pass_diann.parquet"),
-        first_pass_diann_protein_description =  os.path.join(EXPERIMENT_DIR,"input/database_resources/peptidotyping/first_pass_diann.protein_description.tsv")
-    log: os.path.join(EXPERIMENT_DIR,"logs/peptidotyping/perfrom_first_pass_search.log")
+        first_pass_diann_parquet = os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_diann.parquet"),
+        first_pass_diann_protein_description =  os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_diann.protein_description.tsv")
+    log: os.path.join(RUN_DIR,"logs/peptidotyping/perfrom_first_pass_search.log")
     container:
         "docker://baynec2/diann2.1.0:alpha"
-    threads: workflow.cores 
+    threads: workflow.cores
     shell:
         """
         diann --cfg {input.config_file} \
         --fasta {input.fasta} \
-        --out  experiments/{config[experiment]}/input/database_resources/peptidotyping/first_pass_diann \
+        --out  {RUN_DIR}/database_resources/peptidotyping/first_pass_diann \
         --dir {input.raw_files_dir} \
         --lib {input.spectral_library} \
         --threads {threads} --verbose 1 >> {log} 2>&1
@@ -599,30 +600,30 @@ rule perform_first_pass_search:
 ################################################################################
 # Determine what families are present based on the first pass results
 ################################################################################
-# Here we will just use the number of peptides that were detected to infer the presence of families. 
-# If a number of peptides > than the theshold are found, we will infer that the family is present and 
-# only use the species/strain level peptides that belong to the family. 
+# Here we will just use the number of peptides that were detected to infer the presence of families.
+# If a number of peptides > than the theshold are found, we will infer that the family is present and
+# only use the species/strain level peptides that belong to the family.
 rule infer_family_presence:
     input:
-        first_pass_diann = os.path.join(EXPERIMENT_DIR,"input/database_resources/peptidotyping/first_pass_diann.parquet"),
+        first_pass_diann = os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_diann.parquet"),
     output:
-        ncbi_taxonomy_id = os.path.join(EXPERIMENT_DIR,"input/detected_family_taxa_ids.txt")
+        ncbi_taxonomy_id = os.path.join(RUN_DIR,"detected_family_taxa_ids.txt")
     params:
         threshold = 2
-    log: os.path.join(EXPERIMENT_DIR,"logs/peptidotyping/infer_family_presence.log")
+    log: os.path.join(RUN_DIR,"logs/peptidotyping/infer_family_presence.log")
     script: "scripts/infer_family_presence.R"
 
 ################################################################################
-# Determine which species and strains belong to the detected families. 
+# Determine which species and strains belong to the detected families.
 ################################################################################
 # By mapping these values, we can tell what species there is family level evidence for.
-# This will allow us to subsequently search a reduced strain/species specific peptide database. 
- rule map_families_to_species_strains:
+# This will allow us to subsequently search a reduced strain/species specific peptide database.
+rule map_families_to_species_strains:
     input:
-        ncbi_taxonomy_ids = os.path.join(EXPERIMENT_DIR,"input/database_resources/peptidotyping/detected_family_taxa_ids.txt")
+        ncbi_taxonomy_ids = os.path.join(RUN_DIR,"database_resources/peptidotyping/detected_family_taxa_ids.txt")
     output:
-        families_to_species_strains = os.path.join(EXPERIMENT_DIR,"input/database_resources/peptidotyping/families_to_species_strains.txt")
-    log: os.path.join(EXPERIMENT_DIR,"logs/peptidotyping/map_families_to_species_strains.log")
+        families_to_species_strains = os.path.join(RUN_DIR,"database_resources/peptidotyping/families_to_species_strains.txt")
+    log: os.path.join(RUN_DIR,"logs/peptidotyping/map_families_to_species_strains.log")
     container:
         "quay.io/biocontainers/taxonkit:0.20.0--h9ee0642_1"
     shell:

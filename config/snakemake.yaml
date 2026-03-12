@@ -3,6 +3,9 @@
 # ===============================
 # Name of the experiment (used to locate the correct experiment directory)
 experiment: CB020
+# Name of this analysis run (used to namespace all outputs under experiments/{experiment}/runs/{run_name}/)
+# Allows multiple runs with different configs or methods to coexist in the same experiment directory.
+run_name: my_run
 # Config file for generating DIA-NN spectral library (relative to main Snakefile)
 generate_diann_spectral_library_config: config/generate_diann_spectral_library.cfg
 # Config file for running DIA-NN search (relative to main Snakefile)
@@ -64,7 +67,7 @@ eggnog_database: "resources/annotation/eggnog/e5.og_annotations.tsv" # ~200mb
 # Download URLs for external annotation databases.
 # Update these if a newer version of a database is available.
 pfam_db_url: "https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/pfamA.txt.gz"
-cazy_db_url: "https://bcb.unl.edu/dbCAN2/download/Databases/CAZyDB.07302020.fam-activities.txt"
+cazy_db_url: "https://pro.unl.edu/dbCAN2/download/Databases/CAZyDB.07302020.fam-activities.txt"
 eggnog_db_url: "http://eggnog6.embl.de/download/eggnog_5.0/e5.og_annotations.tsv"
 # Resources for metaphlan strategy.
 metaphlan_database_dir: "resources/metaphlan" # ~54 Gb

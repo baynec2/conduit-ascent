@@ -1,0 +1,2 @@
+file	condition
+sample1	control

@@ -19,10 +19,22 @@ input_file <- snakemake@input[["proteome_id_input"]]
 proteome_id_destination_fp <- snakemake@output[["proteome_id_output"]]
 fasta_destination_fp <- snakemake@output[["fasta_output"]]
 
-# Extacting additional uniprot proteome id from the config file.
+# Extract an optional additional proteome ID from config.
+# Support both the current key and the older name used in some configs.
 append_additional_uniprot_proteome_id <- snakemake@config$append_additional_proteome_id
+if (is.null(append_additional_uniprot_proteome_id)) {
+  append_additional_uniprot_proteome_id <- snakemake@config$append_additional_uniprot_proteome_id
+}
+if (is.null(append_additional_uniprot_proteome_id)) {
+  append_additional_uniprot_proteome_id <- FALSE
+}
 
-conduitR::log_with_timestamp(paste0(append_additional_uniprot_proteome_id, " specified as additional uniprot proteome id in config file"))
+conduitR::log_with_timestamp(
+  paste0(
+    append_additional_uniprot_proteome_id,
+    " specified as additional uniprot proteome id in config file"
+  )
+)
 
 conduitR::log_with_timestamp("Making the database_resources_directory if it doesn't exist.")
 
