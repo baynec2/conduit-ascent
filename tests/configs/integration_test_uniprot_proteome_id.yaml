@@ -1,4 +1,5 @@
 experiment: integration_test_uniprot_proteome_id
+run_name: uniprot_proteome_id
 generate_diann_spectral_library_config: config/generate_diann_spectral_library.cfg
 run_diann_config: config/run_diann.cfg
 sample_annotation: input/sample_annotation.txt

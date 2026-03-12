@@ -19,8 +19,17 @@ if not config.get("experiment"):
 # Get experiment directory from config
 EXPERIMENT_DIR = os.path.join("experiments",config["experiment"])
 
+if not config.get("run_name"):
+    raise ValueError("Please provide 'run_name' in config file to identify this analysis run")
+
+RUN_DIR = os.path.join(EXPERIMENT_DIR, "runs", config["run_name"])
+
+# Inject computed paths into config so all modules can read them without recomputing
+config["experiment_dir"] = EXPERIMENT_DIR
+config["run_dir"] = RUN_DIR
+
 # Print the expected config file path
-expected_config_path = os.path.join(EXPERIMENT_DIR, "config/run_diann.cfg")
+expected_config_path = os.path.join(RUN_DIR, "config/run_diann.cfg")
 
 # Extracting the method from the config file
 if not config.get("search_space_method"):
@@ -128,7 +137,7 @@ module build_conduit:
 rule all:
     input:
         # Database resources
-        expand(os.path.join(EXPERIMENT_DIR, "output/database_resources/{file}"), 
+        expand(os.path.join(RUN_DIR, "database_resources/{file}"),
                file=[
                    "database.fasta",
                    #"proteome_ids.txt",
@@ -139,7 +148,7 @@ rule all:
                    "README.md",
                    "README.html"
                ]),
-        expand(os.path.join(EXPERIMENT_DIR, "output/database_resources/detected_protein_resources/{file}"),
+        expand(os.path.join(RUN_DIR, "database_resources/detected_protein_resources/{file}"),
                file=[
                    "detected_protein_info.txt",
                    "detected_protein.fasta",
@@ -147,7 +156,7 @@ rule all:
                    "conduit_annotations.txt"
                ]),
         # Final output file
-        conduit = os.path.join(EXPERIMENT_DIR,"output","output_files",f"{config['experiment']}_conduit.rds")
+        conduit = os.path.join(RUN_DIR, "output_files", f"{config['experiment']}_{config['run_name']}_conduit.rds")
 # Setting up the workflow. Config, apptainer, etc. 
 use rule * from setup
 

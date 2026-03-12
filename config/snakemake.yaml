@@ -3,6 +3,9 @@
 # ===============================
 # Name of the experiment (used to locate the correct experiment directory)
 experiment: CB020
+# Name of this analysis run (used to namespace all outputs under experiments/{experiment}/runs/{run_name}/)
+# Allows multiple runs with different configs or methods to coexist in the same experiment directory.
+run_name: my_run
 # Config file for generating DIA-NN spectral library (relative to main Snakefile)
 generate_diann_spectral_library_config: config/generate_diann_spectral_library.cfg
 # Config file for running DIA-NN search (relative to main Snakefile)
