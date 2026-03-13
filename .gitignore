@@ -1,18 +1,8 @@
-# Ignore all experiments except example, dry-run test fixtures, and integration tests
+# Ignore all experiments except example and integration tests
 experiments/*
 !experiments/example/
-!experiments/dry_run_test/
-!experiments/dry_run_test/**
-!experiments/integration_test_ncbi_taxonomy_id/
-!experiments/integration_test_ncbi_taxonomy_id/**
-!experiments/integration_test_uniprot_proteome_id/
-!experiments/integration_test_uniprot_proteome_id/**
-!experiments/integration_test_MAGs/
-!experiments/integration_test_MAGs/**
-!experiments/integration_test_metaphlan/
-!experiments/integration_test_metaphlan/**
-!experiments/integration_test_peptidotyping/
-!experiments/integration_test_peptidotyping/**
+!experiments/integration_test/
+!experiments/integration_test/**
 
 # RStudio specific files
 .Rproj.user
@@ -37,8 +27,8 @@ experiments/example/input/database_resources/
 # Ignore output files
 output/
 experiments/example/output/
-!experiments/integration_test_metaphlan/output/
-!experiments/integration_test_metaphlan/output/**
+!experiments/integration_test/output/
+!experiments/integration_test/output/**
 
 # Ignore logs files
 experiments/example/logs/
@@ -58,7 +48,7 @@ tests/.env
 *.raw
 !experiments/dry_run_test/**/*.raw
 !tests/data/*.raw
-!experiments/integration_test_*/input/raw_files/sample1.raw
+!experiments/integration_test/input/raw_files/sample1.raw
 
 # Ignore any rust stuff
 .cargo/
@@ -75,7 +65,7 @@ resources/
 *.raw
 !experiments/dry_run_test/**/*.raw
 !tests/data/*.raw
-!experiments/integration_test_*/input/raw_files/sample1.raw
+!experiments/integration_test/input/raw_files/sample1.raw
 *.raw.quant
 *.lz4
 *.index

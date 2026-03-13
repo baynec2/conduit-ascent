@@ -1,0 +1,6 @@
+## mock emapper annotations for testing
+## version: 2.1.12
+#query	seed_ortholog	evalue	score	eggNOG_OGs	max_annot_lvl	COG_category	Description	Preferred_name	GOs	EC	KEGG_ko	KEGG_Pathway	KEGG_Module	KEGG_Reaction	KEGG_rclass	BRITE	KEGG_TC	CAZy	BiGG_Reaction	PFAMs
+tr|P00001|PROT1_ECOLI	9031.ENSGALP00000001	1.2e-50	200.0	COG0001@1|root,COG0001@2|Bacteria	2|Bacteria	C	Energy production	gene1	GO:0005737,GO:0006979	1.1.1.-	ko:K00001	map00010	-	-	-	-	-	GH1	-	PF00001
+tr|P00002|PROT2_HUMAN	9606.ENSP00000000002	5.5e-30	150.0	COG0002@1|root	1|root	M	Cell wall biogenesis	gene2	GO:0005634	-	-	-	-	-	-	-	-	-	-	PF00002,PF00003
+tr|A0A001|PROTA_SOYME	3847.ENSP00000000003	8.1e-10	80.0	-	1|root	S	Function unknown	-	-	-	-	-	-	-	-	-	-	-	-	-

@@ -27,9 +27,13 @@ rule download_eggnogmapper_db:
         mkdir -p $(dirname {log})
         echo "Starting eggNOG-mapper DB download..." > {log}
 
-        download_eggnog_data.py \
-            --data_dir {params.db_dir} \
-            -y >> {log} 2>&1
+        wget -q -O {params.db_dir}/eggnog.db.gz \
+            http://eggnog6.embl.de/download/emapperdb-5.0.2/eggnog.db.gz >> {log} 2>&1 \
+            && gunzip {params.db_dir}/eggnog.db.gz >> {log} 2>&1
+
+        wget -q -O {params.db_dir}/eggnog_proteins.dmnd.gz \
+            http://eggnog6.embl.de/download/emapperdb-5.0.2/eggnog_proteins.dmnd.gz >> {log} 2>&1 \
+            && gunzip {params.db_dir}/eggnog_proteins.dmnd.gz >> {log} 2>&1
 
         echo "eggNOG-mapper DB download finished!" >> {log}
         """
@@ -42,7 +46,7 @@ rule run_eggnogmapper:
         fasta = os.path.join(RUN_DIR, "database_resources/detected_protein_resources/detected_protein.fasta"),
         db_files = expand(os.path.join(EGGNOG_DB_DIR, "{file}"), file=REQUIRED_EGGNOG_FILES)
     output:
-        annotations = os.path.join(RUN_DIR, "database_resources/detected_protein_resources/emapper.annotations")
+        annotations = os.path.join(RUN_DIR, "database_resources/detected_protein_resources/emapper.emapper.annotations")
     log:
         os.path.join(RUN_DIR, "logs/annotation/eggnogmapper/run_eggnogmapper.log")
     container:
@@ -74,7 +78,7 @@ rule run_eggnogmapper:
 ################################################################################
 rule parse_eggnogmapper_annotations:
     input:
-        annotations = os.path.join(RUN_DIR, "database_resources/detected_protein_resources/emapper.annotations")
+        annotations = os.path.join(RUN_DIR, "database_resources/detected_protein_resources/emapper.emapper.annotations")
     output:
         emapper_annotations = os.path.join(RUN_DIR, "database_resources/detected_protein_resources/emapper_annotations.txt")
     log:

@@ -16,7 +16,7 @@
 # using the pre-committed merged_profiles.txt in the experiment input directory.
 #
 # The MAGs method requires a FASTA file at:
-#   experiments/integration_test_MAGs/input/MAG_files/ecoli_mag.fa
+#   experiments/integration_test/input/MAG_files/ecoli_mag.fa
 #
 # The peptidotyping method requires a pre-built sequence index at:
 #   resources/peptidotyping/
@@ -68,7 +68,24 @@ run_integration_test() {
 # ── Method dispatch ───────────────────────────────────────────────────────────
 
 run_ncbi_taxonomy_id()    { run_integration_test ncbi_taxonomy_id; }
-run_uniprot_proteome_id() { run_integration_test uniprot_proteome_id; }
+run_uniprot_proteome_id() {
+    run_integration_test uniprot_proteome_id
+    # Validate that eggnogmapper-derived annotation types are present in the
+    # final conduit_annotations.txt (catches protein-ID format mismatch bugs).
+    local annotations
+    annotations=$(find "$REPO_ROOT/experiments/integration_test/runs/uniprot_proteome_id" \
+        -name "conduit_annotations.txt" | head -1)
+    if [ -n "$annotations" ]; then
+        local emapper_types
+        emapper_types=$(awk '{print $2}' "$annotations" | grep -v "^uniprot_" | grep -v "^annotation_type$" | sort -u | wc -l)
+        if [ "$emapper_types" -gt 0 ]; then
+            echo "PASS: conduit_annotations.txt contains $emapper_types emapper-derived annotation type(s)"
+        else
+            echo "FAIL: conduit_annotations.txt contains no emapper-derived annotation types (protein ID mismatch?)"
+            FAILED+=("uniprot_proteome_id_annotation_validation")
+        fi
+    fi
+}
 run_MAGs()                { run_integration_test MAGs; }
 run_metaphlan() {
     # Skip MetaPhlAn database download and profiling steps; use the

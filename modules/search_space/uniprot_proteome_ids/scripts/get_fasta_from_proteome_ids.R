@@ -46,7 +46,7 @@ if (!dir.exists(dirname(fasta_destination_fp))) {
 conduitR::log_with_timestamp("Reading proteome IDs from the input file.")
 
 # Read proteome IDs from the input file
-proteome_ids <- readr::read_delim(input_file) |>
+proteome_ids <- readr::read_delim(input_file, delim = "\t") |>
 # If there is NA filter them out. Can occassionly happen when the taxa is present in uniprot, but there is no proteome. 
   dplyr::filter(!is.na(proteome_id))|>
   dplyr::pull(proteome_id)

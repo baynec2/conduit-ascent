@@ -9,7 +9,7 @@
 #   kegg_orthology   <- KEGG_ko column (strips "ko:" prefix)
 #   kegg_map_pathway <- KEGG_Pathway column (already "map" prefixed)
 #   eggnog           <- eggNOG_OGs column (OG ID before "@")
-#   eggnog_code      <- COG_cat column (individual letter codes)
+#   eggnog_code      <- COG_category column (individual letter codes)
 #   pfam             <- PFAMs column
 #   cazy_class       <- CAZy column (class prefix, e.g. "GH" from "GH1")
 #   cazy_family      <- CAZy column (full family ID, e.g. "GH1")
@@ -21,7 +21,7 @@
 #   - eggNOG_OGs format: "OG@tax_id|tax_name,..." (e.g. "COG0001@2|Bacteria")
 #   - KEGG_ko format: "ko:K00001,ko:K00002"
 #   - KEGG_Pathway format: "map00010,map00020"
-#   - COG_cat: one or more concatenated letters (e.g. "C", "CE", "GEK")
+#   - COG_category: one or more concatenated letters (e.g. "C", "CE", "GEK")
 ################################################################################
 
 # Open the log file to write both stdout and stderr
@@ -56,9 +56,15 @@ raw <- readr::read_tsv(
 
 colnames(raw)[1] <- "protein_id"
 
+# Normalize protein IDs: strip leading "sp|" / "tr|" and trailing "|NAME_SPECIES"
+# e.g. "tr|A0A1D5NW85|A0A1D5NW85_CHICK" -> "A0A1D5NW85"
+raw <- raw |>
+  dplyr::mutate(protein_id = stringr::str_remove(protein_id, "^[a-z]+\\|") |>
+                               stringr::str_remove("\\|.*$"))
+
 # Replace the "-" sentinel with NA throughout
 raw <- raw |>
-  dplyr::mutate(dplyr::across(dplyr::everything(), ~ dplyr::na_if(.x, "-")))
+  dplyr::mutate(dplyr::across(where(is.character), ~ dplyr::na_if(.x, "-")))
 
 conduitR::log_with_timestamp(paste0("Read ", nrow(raw), " protein entries"))
 
@@ -177,14 +183,14 @@ eggnog_annotations <- expand_col(raw, eggNOG_OGs) |>
 
 ################################################################################
 # 5. COG / eggNOG functional categories
-# COG_cat can be one or more concatenated letters (e.g. "C", "CE", "GEK")
+# COG_category can be one or more concatenated letters (e.g. "C", "CE", "GEK")
 ################################################################################
 conduitR::log_with_timestamp("Extracting eggNOG code annotations")
 
 eggnog_code_annotations <- raw |>
-  dplyr::select(protein_id, COG_cat) |>
-  dplyr::filter(!is.na(COG_cat)) |>
-  dplyr::mutate(code = stringr::str_split(COG_cat, "")) |>
+  dplyr::select(protein_id, COG_category) |>
+  dplyr::filter(!is.na(COG_category)) |>
+  dplyr::mutate(code = stringr::str_split(COG_category, "")) |>
   tidyr::unnest(code) |>
   dplyr::inner_join(eggnog_code_lookup, by = "code") |>
   dplyr::mutate(annotation_type = "eggnog_code") |>
