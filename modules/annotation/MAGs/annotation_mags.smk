@@ -9,7 +9,7 @@ rule get_detected_mag_annotations:
   output:
     bakta_annotated_protein_info = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/bakta_annotated_protein_info.txt")
   log: os.path.join(RUN_DIR,"logs/annotation/MAGs/get_annotations_from_mags.log")
-  container: "docker://baynec2/conduitr:alpha"
+  container: config["containers"]["conduitr"]
   script:
     "scripts/get_detected_mag_annotations.R"
 
@@ -22,6 +22,6 @@ rule get_annotations_from_uniprot:
   output:
     uniprot_annotated_protein_info = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/uniprot_annotated_protein_info.txt")
   log: os.path.join(RUN_DIR,"logs/annotation/MAGs/get_supplementary_annotations_from_uniprot.log")
-  container: "docker://baynec2/conduitr:alpha"
+  container: config["containers"]["conduitr"]
   script:
     "scripts/get_annotations_from_uniprot.R"

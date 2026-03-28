@@ -8,6 +8,6 @@ rule get_annotations_from_uniprot:
   output:
     uniprot_annotated_protein_info = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/uniprot_annotated_protein_info.txt")
   log: os.path.join(RUN_DIR,"logs/annotation/uniprot/get_annotations_from_uniprot.log")
-  container: "docker://baynec2/conduitr:alpha"
+  container: config["containers"]["conduitr"]
   script:
     "scripts/get_annotations_from_uniprot.R"

@@ -18,7 +18,7 @@ rule download_eggnogmapper_db:
     log:
         os.path.join(EGGNOG_DB_DIR, "logs/download_eggnogmapper_db.log")
     container:
-        "docker://baynec2/eggnogmapper:2.1.12"
+        config["containers"]["eggnogmapper"]
     params:
         db_dir = lambda w, output: os.path.dirname(output.db_files[0])
     shell:
@@ -50,7 +50,7 @@ rule run_eggnogmapper:
     log:
         os.path.join(RUN_DIR, "logs/annotation/eggnogmapper/run_eggnogmapper.log")
     container:
-        "docker://baynec2/eggnogmapper:2.1.12"
+        config["containers"]["eggnogmapper"]
     params:
         db_dir = lambda w, input: os.path.dirname(input.db_files[0]),
         output_dir = lambda w, output: os.path.dirname(output.annotations),
@@ -84,6 +84,6 @@ rule parse_eggnogmapper_annotations:
     log:
         os.path.join(RUN_DIR, "logs/annotation/eggnogmapper/parse_eggnogmapper_annotations.log")
     container:
-        "docker://baynec2/conduitr:alpha"
+        config["containers"]["conduitr"]
     script:
         "scripts/parse_eggnogmapper_annotations.R"

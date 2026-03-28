@@ -33,7 +33,7 @@ rule get_kegg_info:
     kegg_map_pathway_info = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/kegg_map_pathway_info.txt"),
     kegg_orthology_info = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/kegg_orthology_info.txt")
   log: os.path.join(RUN_DIR,"logs/annotation/get_kegg_info.log")
-  container: "docker://baynec2/conduitr:alpha"
+  container: config["containers"]["conduitr"]
   script:
     "scripts/get_kegg_info.R"
 
@@ -44,7 +44,7 @@ rule get_pfam_resources:
     log:
         "resources/annotation/pfam/get_pfam_resources.log"
     container:
-        "docker://baynec2/conduitr:alpha"
+        config["containers"]["conduitr"]
     params:
         pfam_db_url = PFAM_DB_URL
     shell:
@@ -66,7 +66,7 @@ rule get_pfam_info:
   log:
     os.path.join(RUN_DIR,"logs/annotation/ncbi_taxonomy/pfam_info.log")
   container:
-    "docker://baynec2/conduitr:alpha"
+    config["containers"]["conduitr"]
   script:
     "scripts/get_pfam_info.R"
 
@@ -76,7 +76,7 @@ rule get_cazy_resource:
     log:
         os.path.join(RUN_DIR, "logs/annotation/cazy/get_cazy_resource.log")
     container:
-        "docker://baynec2/conduitr:alpha"
+        config["containers"]["conduitr"]
     params:
         cazy_db_url = CAZY_DB_URL
     shell:
@@ -98,7 +98,7 @@ rule get_cazy_info:
     cazy_class_info = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/cazy_class_info.txt"),
     cazy_family_info = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/cazy_family_info.txt")
   log: os.path.join(RUN_DIR,"logs/annotation/get_cazy_info.log")
-  container: "docker://baynec2/conduitr:alpha"
+  container: config["containers"]["conduitr"]
   script:
     "scripts/get_cazy_info.R"
 
@@ -106,7 +106,7 @@ rule get_eggnog_resources:
     output:
         eggnog_resource = "resources/annotation/eggnog/e5.og_annotations.tsv"
     log: "resources/annotation/eggnog/get_eggnog_resources.log"
-    container: "docker://baynec2/conduitr:alpha"
+    container: config["containers"]["conduitr"]
     params:
         eggnog_db_url = EGGNOG_DB_URL
     shell:
@@ -124,7 +124,7 @@ rule get_eggnog_info:
     eggnog_info = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/eggnog_info.txt"),
     eggnog_code_info = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/eggnog_code_info.txt")
   log: os.path.join(RUN_DIR,"logs/annotation/get_eggnog_info.log")
-  container: "docker://baynec2/conduitr:alpha"
+  container: config["containers"]["conduitr"]
   script:
     "scripts/get_eggnog_info.R"
 
@@ -135,7 +135,7 @@ rule get_go_info:
   output:
     go_info = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/go_info.txt")
   log: os.path.join(RUN_DIR,"logs/annotation/get_go_info.log")
-  container: "docker://baynec2/conduitr:alpha"
+  container: config["containers"]["conduitr"]
   script:
     "scripts/get_go_info.R"
 
@@ -158,6 +158,6 @@ rule consolidate_annotations:
   output:
     conduit_annotations = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/conduit_annotations.txt")
   log: os.path.join(RUN_DIR,"logs/annotation/consolidate_annotations.log")
-  container: "docker://baynec2/conduitr:alpha"
+  container: config["containers"]["conduitr"]
   script:
     "scripts/consolidate_annotations.R"

@@ -19,7 +19,7 @@ rule build_sequence_index:
     log:
         os.path.join(config["peptidotyping_resource_dir"],"logs/build_sequence_index.log")
     container:
-        "docker://baynec2/umgap:alpha"
+        config["containers"]["umgap"]
     shell:
         r"""
         set -euo pipefail
@@ -87,7 +87,7 @@ rule extract_peptidotyping_resource_metrics:
         taxons = os.path.join(config["peptidotyping_resource_dir"],"taxons.tsv.lz4")
     output:
         peptidotyping_resource_metrics = os.path.join(config["peptidotyping_resource_dir"],"peptidotyping_resource_metrics.tsv")
-    container: "docker://baynec2/conduitr:alpha"
+    container: config["containers"]["conduitr"]
     log:
         os.path.join(config["peptidotyping_resource_dir"],"logs/extract_peptidotyping_resource_metrics.log")
     script:
@@ -126,7 +126,7 @@ rule generate_peptidotyping_db:
         first_pass_fasta = os.path.join(config["peptidotyping_resource_dir"],"{rank}_peptidotyping_db.fasta")
     params:
         taxon_ranks_str = lambda wildcards: PEPTIDOTYPING_RANK_CONFIG[wildcards.rank]
-    container: "docker://baynec2/conduitr:alpha"
+    container: config["containers"]["conduitr"]
     log: os.path.join(config["peptidotyping_resource_dir"],"logs/generate_peptidotyping_db_{rank}.log")
     shell:
         r"""
@@ -259,7 +259,7 @@ rule determine_all_possible_families:
     output:
         possible_family_taxons = os.path.join(config["peptidotyping_resource_dir"],"possible_family_taxons.txt")
     threads: 8
-    container: "docker://baynec2/conduitr:alpha"
+    container: config["containers"]["conduitr"]
     shell: """
         tail -n +2 {input.species_strain_lca_filtered_peptides} | cut -f4 | awk 'NF && $1!=""' | sort -u \
         | taxonkit lineage -j {threads} \
@@ -273,7 +273,7 @@ rule determine_detected_families:
         family_lca_filtered_peptides = os.path.join(config["peptidotyping_resource_dir"],"family_lca_filtered_peptides.tsv"),
     output:
         detected_families = os.path.join(config["peptidotyping_resource_dir"],"detected_families.txt")
-    container: "docker://baynec2/conduitr:alpha"
+    container: config["containers"]["conduitr"]
     shell: """
         tail -n +2 {input.family_lca_filtered_peptides} | cut -f4 | awk 'NF && $1!=""' | sort -u > {output.detected_families}
         """
@@ -284,7 +284,7 @@ rule determine_missing_families:
         detected_families = os.path.join(config["peptidotyping_resource_dir"],"detected_families.txt"),
     output:
         missing_families = os.path.join(config["peptidotyping_resource_dir"],"missing_families.txt")
-    container: "docker://baynec2/conduitr:alpha"
+    container: config["containers"]["conduitr"]
     shell: """
         comm -23 <(sort {input.possible_family_taxons}) <(sort {input.detected_families}) > {output.missing_families}
         """
@@ -296,7 +296,7 @@ rule find_fallback_genus_for_missing_families:
     output:
         missing_families_genus_fallback = os.path.join(config["peptidotyping_resource_dir"],"missing_families_genus_fallback.tsv")
     threads: 8
-    container: "docker://baynec2/conduitr:alpha"
+    container: config["containers"]["conduitr"]
     shell: """
         set -e
         # Build lca_il -> rank,family_taxid,genus_taxid for all unique lca_il in species/strain peptides
@@ -336,7 +336,7 @@ rule generate_first_peptidotyping_spectral_library:
     output: 
         os.path.join(config["peptidotyping_resource_dir"],"phylum_peptidotyping.predicted.speclib")
     # DIANN adds the .predicted.speclib extennsion 
-    container: "docker://baynec2/diann2.1.0:alpha"
+    container: config["containers"]["diann"]
     log: os.path.join(config["peptidotyping_resource_dir"],"logs/generate_phylumn_peptidotyping_spectral_library.log")
     threads: workflow.cores
     shell:
@@ -392,7 +392,7 @@ rule generate_highly_abundant_peptidotyping_database:
     params:
         taxon_ranks_str = "species,strain",  # Comma-separated string of ranks
         go_terms = "GO:0005840,GO:0006412,GO:0003746"  # Comma-separated GO terms
-    container: "docker://baynec2/conduitr:alpha"
+    container: config["containers"]["conduitr"]
     log: os.path.join(config["peptidotyping_resource_dir"],"logs/generate_translation_peptidotyping_database.log")
     shell:
         r"""
@@ -586,7 +586,7 @@ rule perform_first_pass_search:
         first_pass_diann_protein_description =  os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_diann.protein_description.tsv")
     log: os.path.join(RUN_DIR,"logs/peptidotyping/perfrom_first_pass_search.log")
     container:
-        "docker://baynec2/diann2.1.0:alpha"
+        config["containers"]["diann"]
     threads: workflow.cores
     shell:
         """
@@ -625,7 +625,7 @@ rule map_families_to_species_strains:
         families_to_species_strains = os.path.join(RUN_DIR,"database_resources/peptidotyping/families_to_species_strains.txt")
     log: os.path.join(RUN_DIR,"logs/peptidotyping/map_families_to_species_strains.log")
     container:
-        "quay.io/biocontainers/taxonkit:0.20.0--h9ee0642_1"
+        config["containers"]["taxonkit"]
     shell:
         """
         # Make sure Taxonkit knows where the local taxonomy DB (optional)

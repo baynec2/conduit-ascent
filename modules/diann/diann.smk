@@ -16,7 +16,7 @@ rule generate_diann_spectral_library:
         out_lib = lambda w, output: os.path.splitext(os.path.splitext(output[0])[0])[0]
     log: os.path.join(RUN_DIR,"logs/diann/generate_diann_spectral_library.log")
     container:
-        "docker://baynec2/diann2.1.0:alpha"
+        config["containers"]["diann"]
     threads: workflow.cores
     shell:
         """
@@ -42,7 +42,7 @@ rule run_diann:
         out = lambda w, output: os.path.join(os.path.dirname(output.diann_stats), "diann")
     log: os.path.join(RUN_DIR,"logs/diann/run_diann.log")
     container:
-        "docker://baynec2/diann2.1.0:alpha"
+        config["containers"]["diann"]
     threads: workflow.cores
     shell:
         """
@@ -65,6 +65,6 @@ rule extract_detected_proteins:
     detected_protein_info_df = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/detected_protein_info.txt"),
     detected_protein_info_fasta = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/detected_protein.fasta")
   log: os.path.join(RUN_DIR,"logs/diann/extract_detected_proteins.log")
-  container: "docker://baynec2/conduitr:alpha"
+  container: config["containers"]["conduitr"]
   script:
     "scripts/extract_detected_proteins.R"

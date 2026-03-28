@@ -28,7 +28,7 @@ rule get_fasta_from_proteome_ids:
        fasta_output = os.path.join(RUN_DIR,"database_resources/database.fasta")
     log: os.path.join(RUN_DIR,"logs/search_space/uniprot_proteome_ids/get_fasta_from_proteome_ids.log")
     container:
-        "docker://baynec2/conduitr:alpha"
+        config["containers"]["conduitr"]
     script:
         "scripts/get_fasta_from_proteome_ids.R"
 
@@ -54,7 +54,7 @@ rule get_taxonomy:
     output:
         taxonomy = os.path.join(RUN_DIR,"database_resources/taxonomy.txt")
     log: os.path.join(RUN_DIR,"logs/search_space/ncbi_taxonomy/get_taxonomy.log")
-    container: "docker://baynec2/conduitr:alpha"
+    container: config["containers"]["conduitr"]
     script:
       "scripts/get_taxonomy.R"
 
@@ -67,7 +67,7 @@ rule get_protein_info_from_fasta:
       os.path.join(RUN_DIR,"database_resources/protein_info.txt")
     log:
       os.path.join(RUN_DIR,"logs/search_space/ncbi_taxonomy/get_protein_info_from_fasta.log")
-    container: "docker://baynec2/conduitr:alpha"
+    container: config["containers"]["conduitr"]
     script:
       "scripts/get_protein_info_from_fasta.R"
 
@@ -76,7 +76,7 @@ rule plot_taxonomic_tree:
     input: os.path.join(RUN_DIR,"database_resources/taxonomy.txt")
     output: os.path.join(RUN_DIR,"database_resources/taxonomic_tree_of_database.pdf")
     log: os.path.join(RUN_DIR,"logs/search_space/ncbi_taxonomy/plot_taxonomic_tree.log")
-    container:"docker://baynec2/conduitr:alpha"
+    container: config["containers"]["conduitr"]
     script:
       "scripts/plot_taxonomic_tree.R"
 
@@ -87,6 +87,6 @@ rule make_database_resources_readme:
       md = os.path.join(RUN_DIR,"database_resources/README.md"),
       html = os.path.join(RUN_DIR,"database_resources/README.html")
     log: os.path.join(RUN_DIR,"logs/search_space/ncbi_taxonomy/make_database_resources_readme.log")
-    container: "docker://baynec2/conduitr:alpha"
+    container: config["containers"]["conduitr"]
     script:
      "scripts/make_database_resources_readme.R"

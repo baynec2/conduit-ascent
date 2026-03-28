@@ -21,6 +21,6 @@ rule get_uniprot_proteome_ids:
   output:
     proteome_ids = os.path.join(RUN_DIR,"proteome_ids.txt")
   log: os.path.join(RUN_DIR,"logs/search_space/ncbi_taxonomy/get_uniprot_proteome_ids.log")
-  container: "docker://baynec2/conduitr:alpha"
+  container: config["containers"]["conduitr"]
   script:
     "scripts/get_uniprot_proteome_ids.R"

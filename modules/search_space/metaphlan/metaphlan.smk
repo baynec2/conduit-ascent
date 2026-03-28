@@ -9,7 +9,7 @@ RUN_DIR = config["run_dir"]
 rule download_metaphlan_resources:
     output:
         database_dir = directory("resources/metaphlan")
-    container: "docker://baynec2/metaphlan:alpha"
+    container: config["containers"]["metaphlan"]
     log: "resources/metaphlan/logs/download_metaphlan_resources.log"
     shell: "metaphlan --install --db_dir {output.database_dir} 2> {log}"
 
@@ -21,7 +21,7 @@ rule run_metaphlan:
         fastq=os.path.join(EXPERIMENT_DIR, "input/fastq_files/{sample}.fastq.gz")
     output:
         profile=os.path.join(RUN_DIR, "metaphlan/{sample}_profile.txt")
-    container: "docker://baynec2/metaphlan:alpha"
+    container: config["containers"]["metaphlan"]
     log:
         os.path.join(RUN_DIR, "logs/search_space/metaphlan/run_metaphlan_{sample}.log")
     threads: workflow.cores
@@ -43,7 +43,7 @@ rule merge_profiles:
                          sample=glob_wildcards(os.path.join(EXPERIMENT_DIR, "input/fastq_files/{sample}.fastq.gz")).sample)
     output:
         merged_profiles = os.path.join(RUN_DIR, "metaphlan/merged_profiles.txt")
-    container: "docker://baynec2/conduitr:alpha"
+    container: config["containers"]["conduitr"]
     log: os.path.join(RUN_DIR, "logs/search_space/metaphlan/combine_metaphlan_output.log")
     script: "scripts/merge_profiles.R"
 ###############################################################################
@@ -54,7 +54,7 @@ rule call_ncbi_taxa_ids:
         merged_profiles = os.path.join(RUN_DIR, "metaphlan/merged_profiles.txt")
     output:
         ncbi_taxa_ids = os.path.join(RUN_DIR, "ncbi_taxa_ids.txt")
-    container: "docker://baynec2/conduitr:alpha"
+    container: config["containers"]["conduitr"]
     log: os.path.join(RUN_DIR, "logs/search_space/metaphlan/call_ncbi_taxa_ids.log")
     script:
         "scripts/call_ncbi_taxa_ids.R"
