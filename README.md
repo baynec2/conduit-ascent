@@ -2,61 +2,46 @@
 
 Conduit is a scalable and modular workflow management system for metaproteomics data analysis, designed to seamlessly integrate with metagenomic data if available. Built using Snakemake, it provides a robust pipeline for processing Data Independent Acquisition (DIA) mass spectrometry data with particular emphasis on metaproteomics applications.
 
+**Current version:** 0.1.0 (active development — not all features are finalized)
+
 ## Features
 
-*Note: Conduit is currently a work in progress and all features are not yet available.* 
-
-- **Search Space Definition**: Choose the best way to define the search space for *your* experiment.
-    - **User Defined Taxa**: Know what taxa are in your sample? Great! Just give Conduit the NCBI taxa IDs, we will do the rest.
-    **Works in Progress:** 
-    - **User Defined Proteomes**: Know the specific proteome IDs in your sample? Also amazing, we can work with those too. 
-    - **Reference Based Metagenomic**: Don't know what taxa are in your sample, but were able to get metagenomic sequencing data? No problem! We can use it to define the search space.
-    - **MAGs**: Have metagenomic sequencing data, but reference based metagenomic data not specific enough for your microbial community? No problem, you create the MAGs and we will then use those to define the search space.
-    - **16S**: Don't know what is in your sample, can't get your hands on any metagenomic sequencing data, but have 16S sequencing data? Definitely the worst option, but probably better than nothing. We will do our best to use it.
-- **Metadata Handling**: Easily associate your sample data with the information about what each sample actually is. Less time spent on data wrangling means more time to figure out what it all means.
-- **DIA-NN Integration**: Automated, spectral library free processing of DIA data.
-- **Taxonomic Analysis**: Multi-level taxonomic classification of proteins
-- **Functional Analysis**: GO term, KEGG pathway, and subcellular location annotation.
-- **R Integration**: Direct integration with R to enable easy statistical analysis, plotting, and more. 
-- **Integration with a Dedicated GUI**: Want to explore your data quickly without having to write any code? Conduit-GUI has you covered. 
-- **Container Support**: Full containerization via Apptainer. Run it on any reasonable Linux machine with ease.
-- **Scalable**: Conduit runs on a single machine or scales to HPC clusters. Tip: metaproteomics loves compute — the more, the better.
-- **Open Source**: Conduit is open source, allowing users to customize the pipeline to their specific needs.
+- **Search Space Definition**: Multiple strategies to define the protein search space for your experiment:
+    - **NCBI Taxonomy IDs**: Know what taxa are in your sample? Provide NCBI taxon IDs and Conduit handles the rest.
+    - **UniProt Proteome IDs**: Know specific proteome IDs? Conduit can build a search space directly from them.
+    - **Peptidotyping**: A first-pass DIA-NN search using species-specific peptides to identify which taxa are present, then builds a refined search space.
+    - **MetaPhlAn**: Have shotgun metagenomic data? Conduit runs MetaPhlAn profiling and uses the results to define the search space.
+    - **MAGs**: Have metagenome-assembled genomes? Conduit uses Bakta to annotate them and builds the search space from the predicted proteins.
+- **DIA-NN Integration**: Automated, spectral-library-free processing of DIA data.
+- **Taxonomic Annotation**: Multi-level taxonomic classification of detected proteins.
+- **Functional Annotation**: GO term, KEGG pathway, Pfam domain, CAZy, and eggNOG-mapper annotations.
+- **R Integration**: Direct integration with R for statistical analysis and visualization via [conduitR](https://github.com/baynec2/conduitR).
+- **Conduit GUI**: Explore results without writing code using [Conduit-GUI](https://github.com/baynec2/conduit-GUI).
+- **Container Support**: Full containerization via Apptainer. Run on any reasonable Linux machine.
+- **Named Runs**: Multiple analysis runs (e.g., different search space methods) can coexist within the same experiment directory via the `run_name` config parameter.
+- **Scalable**: Runs on a single machine or scales to HPC clusters via SLURM.
+- **Open Source**: MIT licensed. Customize the pipeline to fit your needs.
 
 ## Dependencies
 
 ### Required Software
+
 - Snakemake (≥7.0.0)
-- R
-- conduitR
-- Python libraries
-   * glob
-   * pandas 
-   * shutil
-   * pdb  
-   * logging
-   * datetime
-- DIA-NN (2.1.0)
 - Apptainer/Singularity (≥1.1.0)
 
-Note: All other dependencies (R, Python, DIA-NN, etc.) are automatically handled through Apptainer containers. You only need to ensure that Snakemake and Apptainer are installed on your *Linux* system.
+All other dependencies (R, Python, DIA-NN, MetaPhlAn, Bakta, eggNOG-mapper, etc.) are handled automatically via Apptainer containers. You only need Snakemake and Apptainer installed on your **Linux** system.
 
-If using Windows (not recommended), you can still use Conduit without containers.
-
-Conduit will not run on MACOS.
+> **Note:** Conduit does not run on macOS. Windows is not recommended but may work without containers.
 
 ### Hardware Requirements
-- 64GB+ RAM recommended.
+
+- 64 GB+ RAM recommended
 - Multi-core processor (8+ cores recommended)
-- Sufficient storage space for raw data and results. Raw files from an Astral MS are usually around ~7 GB each, so it gets to TB scale very quickly.
+- Substantial storage for raw data, results, and reference databases (raw Astral MS files are ~7 GB each; reference databases for some methods can reach 50–200 GB)
 
 ## Quick Start
 
-1. Make sure you have the required dependencies:
-
-**If you are using Apptainer (Recommended but only works on Linux):**
-
-You will need to install Snakemake and Apptainer. I recommend using conda to manage your dependencies.
+### 1. Install required dependencies
 
 ```bash
 conda create -n conduit
@@ -65,343 +50,356 @@ conda install -c bioconda snakemake
 conda install -c bioconda apptainer
 ```
 
-**If you are not using Apptainer (Not recommended but will work on Windows or Linux):**  
+### 2. Clone the repository
 
-You will need to install the following dependencies manually:  
-
-- Snakemake (≥7.0.0)
-- R
-- conduitR
-- Python libraries
-   * glob
-   * pandas 
-   * shutil
-   * pdb  
-   * logging
-   * datetime
-- DIA-NN (2.1.0)
-- Apptainer/Singularity (≥1.1.0)
-
-2. Clone the repository:
 ```bash
-git clone https://github.com/baynec2/conduit.git
-cd conduit
+git clone https://github.com/baynec2/conduit-ascent.git
+cd conduit-ascent
 ```
 
-3. Set up an experiment directory following the example structure:
+### 3. Create an experiment directory
 
 ```
 experiments/your_experiment/
 ├── input/
-│   ├── raw_files/        # Your .raw files
-│   ├── ncbi_taxa_ids.txt     # NCBI organism IDs
-│   └── sample_annotation.txt
+│   ├── raw_files/            # Your Thermo .raw files
+│   ├── ncbi_taxa_ids.txt     # NCBI taxon IDs (if using ncbi_taxonomy_id method)
+│   └── sample_annotation.txt # Sample metadata
 └── config/
-    └── snakemake.yaml    # Experiment configuration
-
-Your config file should be a YAML file named `snakemake.yaml` that looks like the following:
-
-```yaml
-# Define the name of the experiment (this will be used to find the correct experiment directory)
-experiment: 
-# Config file to generate the spectral library for DIA-NN (relative to main Snakefile)
-generate_diann_spectral_library_config: config/generate_diann_spectral_library.cfg
-# Config file to run DIA-NN search (relative to main Snakefile)
-run_diann_config: config/run_diann.cfg
-# Define the method used to define the search space. 
-# Options: 
-# - "ncbi_taxonomy_id": Use NCBI taxonomy IDs to define the search space.
-# - "uniprot_proteome_id": Use UniProt proteome IDs to define the search space.
-# - "MAGs": Use MAGs to define the search space.
-# - "metaphlan": Use MetaPhlAn metagenomic profiling to define the search space.
-search_space_method: ncbi_taxonomy_id
-# Define the sample annotation filepath relative to the experiment directory
-sample_annotation: input/sample_annotation.txt
-# Define the output directory relative to the experiment directory
-output_dir: output/
+    └── snakemake.yaml        # Experiment configuration
 ```
 
-Make sure that the experiment in the config file matches the name of the experiment directory. A template is provided in the top level config folder.
+Copy `config/snakemake.yaml` as a template and fill in at minimum `experiment`, `run_name`, and `search_space_method`.
 
-4. If you plan to use Apptainer, you will need to build the diann and conduitR apptainer images. This only needs to be done once, future runs of Conduit will automatically use the images you have built. You can build the images by running the following commands:
+### 4. Run the workflow
 
-```bash
-snakemake build_conduitR_apptainer build_diann_apptainer --configfile experiments/your_experiment/config/snakemake.yaml
-```
-
-5. Run the workflow:
 ```bash
 snakemake --configfile experiments/your_experiment/config/snakemake.yaml --use-apptainer
 ```
 
-6. Use `experiments/your_experiment/output/conduit.rds` as the input to [Conduit-GUI](https://github.com/baynec2/conduit-GUI) to explore your data. Or use [conduitR](https://github.com/baynec2/conduitR) if you prefer a more bespoke data analysis experience.
+Outputs are written to `experiments/your_experiment/runs/{run_name}/`.
 
-7. Repeat steps 3-5 for each experiment you want to run (keeping a reproducible record of your experiments in the experiments subdirectory).
+### 5. Explore your results
 
+Use `experiments/your_experiment/runs/{run_name}/output_files/{experiment}_{run_name}_conduit.rds` as input to [Conduit-GUI](https://github.com/baynec2/conduit-GUI) or [conduitR](https://github.com/baynec2/conduitR).
+
+### 6. Repeat for additional experiments or runs
+
+Each experiment gets its own directory. Multiple analysis runs (e.g., trying different search space methods) are namespaced via `run_name` inside the same experiment directory.
+
+## Configuration Reference (`snakemake.yaml`)
+
+The main configuration file controls all aspects of the workflow. Below is a full description of every parameter.
+
+### Container Images
+
+```yaml
+containers:
+  conduitr:     "docker://baynec2/conduitr:alpha"
+  diann:        "docker://baynec2/diann2.1.0:alpha"
+  bakta:        "docker://baynec2/bakta:alpha"
+  metaphlan:    "docker://baynec2/metaphlan:alpha"
+  eggnogmapper: "docker://baynec2/eggnogmapper:2.1.12"
+  umgap:        "docker://baynec2/umgap:alpha"
+  taxonkit:     "quay.io/biocontainers/taxonkit:0.20.0--h9ee0642_1"
+```
+
+These point to the Docker/Apptainer images used for each tool. You generally do not need to change these unless you are pinning to a specific version or using a private registry.
+
+---
+
+### Experiment and File Configuration
+
+| Parameter | Description |
+|-----------|-------------|
+| `experiment` | **Required.** Name of the experiment. Must match the name of the directory under `experiments/`. Conduit uses this to locate all input files and write all outputs. |
+| `run_name` | **Required.** Name for this specific analysis run. Outputs are written to `experiments/{experiment}/runs/{run_name}/`. Use this to run the same experiment with different methods or settings without overwriting prior results. |
+| `generate_diann_spectral_library_config` | Path (relative to the main Snakefile) to the DIA-NN `.cfg` file used for spectral library generation. Defaults to `config/generate_diann_spectral_library.cfg`. |
+| `run_diann_config` | Path (relative to the main Snakefile) to the DIA-NN `.cfg` file used for the main search. Defaults to `config/run_diann.cfg`. |
+| `sample_annotation` | Path (relative to the experiment directory) to the sample annotation file. Defaults to `input/sample_annotation.txt`. This file maps `.raw` file names to sample metadata. |
+| `output_dir` | Path (relative to the experiment directory) for the final output. Defaults to `output/`. |
+
+---
+
+### Search Space Configuration
+
+| Parameter | Description |
+|-----------|-------------|
+| `search_space_method` | **Required.** Strategy used to define the protein search space. Options: `ncbi_taxonomy_id`, `uniprot_proteome_id`, `peptidotyping`, `MAGs`, `metaphlan`. See details below. |
+
+#### `ncbi_taxonomy_id`
+Builds the database from UniProt proteomes matching the provided NCBI taxon IDs. Requires `experiments/{experiment}/input/ncbi_taxa_ids.txt`.
+
+#### `uniprot_proteome_id`
+Builds the database from a user-supplied list of UniProt proteome IDs. Requires `experiments/{experiment}/input/proteome_ids.txt`.
+
+#### `peptidotyping`
+Performs a first-pass DIA-NN search using species-specific peptides to identify which taxa are present in the sample, then builds a refined database from the detected taxa. See peptidotyping-specific parameters below.
+
+#### `MAGs`
+Uses metagenome-assembled genomes provided by the user. Bakta annotates the MAGs and the predicted proteins form the search space. Requires `experiments/{experiment}/input/MAG_files/`.
+
+#### `metaphlan`
+Runs MetaPhlAn on shotgun metagenomic FASTQ files to profile the community, then builds a database from the detected taxa. Requires `experiments/{experiment}/input/fastq_files/`.
+
+---
+
+#### Peptidotyping-Specific Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `presence_min_peptides` | `3` | Minimum number of unique peptides that must be detected to call a species present. Higher values reduce false positives at the cost of sensitivity. |
+| `presence_min_coverage` | `0` | Minimum protein coverage required to call a species present. Set to `0` to disable coverage filtering. |
+| `min_taxon_db_peptides` | `10` | Minimum number of species-specific peptides a taxon must have in the reference database to be considered in the first-pass search. Taxa with fewer peptides are excluded as too poorly represented. |
+
+#### MetaPhlAn-Specific Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `relative_abundance_threshold` | `0.01` | Minimum relative abundance (as a fraction, e.g., `0.01` = 1%) for a taxon to be included in the database. Increase to restrict the search space to dominant taxa; decrease to capture rarer organisms. |
+
+---
+
+### Universal Search Space Options
+
+These apply to all `search_space_method` choices.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `host_organism_ids` | `[]` | List of NCBI taxon IDs to classify as "host" rather than "microbiome". Common examples: Human = `9606`, Mouse = `10090`. Set to `[]` or `FALSE` to treat all organisms as microbiome. |
+| `append_additional_proteome_id` | `FALSE` | Optionally append a single extra UniProt proteome ID to the database (e.g., a host reference proteome). Common examples: Human = `UP000005640`, Mouse C57/BL6 = `UP000000589`. Set to `FALSE` to skip. |
+| `append_additional_ncbi_taxa_id` | `FALSE` | Optionally append a single extra NCBI taxon ID to the database (e.g., a host species). Common examples: Human = `9606`, Mouse = `10090`. Set to `FALSE` to skip. |
+| `exclude_proteome_id` | `FALSE` | Exclude a specific UniProt proteome ID from the database. Useful in peptidotyping if the first-pass incorrectly calls a contaminant. Set to `FALSE` to skip. |
+| `exclude_ncbi_taxa_id` | `FALSE` | Exclude a specific NCBI taxon ID from the database. Set to `FALSE` to skip. |
+
+---
+
+### Resource Configuration
+
+These parameters point to large reference databases that Conduit needs for certain methods. If the files already exist at the specified paths on your system, Conduit will use them directly. Otherwise, Conduit will download them automatically when required.
+
+| Parameter | Default Path | Approx. Size | Description |
+|-----------|-------------|-------------|-------------|
+| `peptidotyping_resource_dir` | `resources/peptidotyping/` | — | Directory for peptidotyping-specific reference data. |
+| `eggnog_database` | `resources/annotation/eggnog/e5.og_annotations.tsv` | ~200 MB | eggNOG ortholog annotation table used for functional annotation. |
+| `pfam_db_url` | EBI FTP (current release) | — | URL for downloading the Pfam-A database. Update if a newer release is available. |
+| `cazy_db_url` | dbCAN2 | — | URL for downloading the CAZy activity annotation file. |
+| `eggnog_db_url` | eggNOG 5.0 | — | URL for downloading the eggNOG annotations table. |
+| `metaphlan_database_dir` | `resources/metaphlan/` | ~54 GB | Directory for the MetaPhlAn reference database. Required for the `metaphlan` search space method. |
+| `unipept_sequences` | `resources/databases/sequences.tsv.lz4` | ~1.46 GB | Compressed Unipept sequence table. Required for peptidotyping. |
+| `unipept_taxons` | `resources/databases/taxons.tsv.lz4` | — | Compressed Unipept taxon table. Required for peptidotyping. |
+| `bakta_db_dir` | `resources/bakta/db/` | ~84 GB (full) / ~2 GB (light) | Bakta annotation database. Required for the `MAGs` method. Controlled by `bakta_db_type`. |
+| `bakta_db_type` | `"light"` | — | Which Bakta database to use: `"full"` (~84 GB) or `"light"` (~2 GB). The light database is faster to download but less comprehensive. |
+| `eggnogmapper_db_dir` | `resources/eggnogmapper/db/` | ~50 GB (full) / ~8 GB (bacteria) | eggNOG-mapper database directory for sequence-based functional annotation. |
+| `gbtk_database` | `resources/gbtk/` | ~140 GB | GTDB-Tk database. Reserved for future MAG taxonomy use. |
+
+---
+
+## Project Structure
+
+```
+conduit-ascent/
+├── Snakefile                         # Main workflow orchestration
+├── VERSION                           # Current version
+├── config/                           # Default configuration files (templates)
+│   ├── snakemake.yaml                # Main config template
+│   ├── generate_diann_spectral_library.cfg
+│   ├── run_diann.cfg
+│   ├── peptidotyping_firstpass_diann.cfg
+│   └── peptidotyping_firstpass_diann_spectral_library.cfg
+├── modules/                          # Snakemake modules
+│   ├── setup/                        # Workflow setup (config copying, image building)
+│   ├── search_space/                 # Search space definition
+│   │   ├── ncbi_taxonomy/            # From NCBI taxonomy IDs
+│   │   ├── uniprot_proteome_ids/     # From UniProt proteome IDs
+│   │   ├── peptidotyping/            # First-pass species detection
+│   │   ├── metaphlan/                # From MetaPhlAn metagenomic profiling
+│   │   ├── MAGs/                     # From metagenome-assembled genomes
+│   │   └── database_processing/      # Shared post-processing
+│   ├── diann/                        # DIA-NN identification and quantification
+│   ├── annotation/                   # Protein and taxonomic annotation
+│   │   ├── uniprot/                  # UniProt-based annotation
+│   │   ├── MAGs/                     # Bakta + UniProt annotation for MAG proteins
+│   │   ├── eggnogmapper/             # eggNOG-mapper functional annotation
+│   │   └── external_annotations/     # KEGG, Pfam, CAZy annotations
+│   └── build_conduit/                # Builds final Conduit RDS object
+├── containers/                       # Apptainer/Docker container definitions
+│   ├── bakta/
+│   ├── conduitR/
+│   ├── diann/
+│   ├── eggnogmapper/
+│   ├── metaphlan/
+│   └── umgap/
+├── experiments/                      # Experiment directories
+│   └── {experiment_name}/
+│       ├── config/                   # Per-experiment config
+│       ├── input/
+│       │   ├── raw_files/            # Thermo .raw MS files
+│       │   ├── sample_annotation.txt # Sample metadata
+│       │   ├── ncbi_taxa_ids.txt     # Taxon IDs (ncbi_taxonomy_id method)
+│       │   ├── proteome_ids.txt      # Proteome IDs (uniprot_proteome_id method)
+│       │   ├── fastq_files/          # FASTQ files (metaphlan method)
+│       │   └── MAG_files/            # MAG FASTA files (MAGs method)
+│       └── runs/
+│           └── {run_name}/           # All outputs for a given run
+│               ├── config/
+│               ├── database_resources/
+│               ├── logs/
+│               └── output_files/
+├── tests/                            # Test suite
+│   └── configs/                      # Integration test configs
+└── .github/workflows/                # CI (dry-run tests)
+```
+
+## Output Structure
+
+All outputs for a run are written to `experiments/{experiment}/runs/{run_name}/`:
+
+| Output | Description |
+|--------|-------------|
+| `database_resources/database.fasta` | Protein FASTA used as the search space |
+| `database_resources/taxonomy.txt` | Taxonomy information for all organisms in the database |
+| `database_resources/protein_info.txt` | Per-protein metadata |
+| `database_resources/proteome_ids.txt` | UniProt proteome IDs included in the database |
+| `database_resources/database.predicted.speclib` | DIA-NN predicted spectral library |
+| `database_resources/detected_protein_resources/` | Proteins detected by DIA-NN and their annotations |
+| `output_files/{experiment}_{run_name}_conduit.rds` | Final Conduit R object for use with conduitR or Conduit-GUI |
 
 ## Running Conduit on Barnacle2 (Knight Lab HPC)
 
-<span style="font-size:95%">
-These instructions describe how to run the Conduit workflow on Barnacle2 using Snakemake and Singularity for Knight lab members only. However, they may be adapted to other HPC systems using SLURM.  
-Note that if trying to run Conduit for tutorial purposes you will also need files within directories of `conduit/experiments/example/input/database_resources` and `conduit/experiments/example/input/raw_files`. These files are a bit hefty, so please contact baynec2 directly for them.
-</span>
----
+These instructions are for Knight Lab members running Conduit on Barnacle2 via SLURM. They can be adapted to other SLURM-based HPC systems.
 
-## 1. Login to Barnacle2
-Use your UCSD credentials to connect:
+> For tutorial purposes you will also need files in `experiments/example/input/database_resources` and `experiments/example/input/raw_files`. Contact baynec2 directly for these files.
+
+### 1. Login
 
 ```bash
 ssh <username>@barnacle2.ucsd.edu
 ```
 
-## 2. Clone the repository and create a output directory for SLURM files
+### 2. Clone the repository
 
 ```bash
-git clone https://github.com/baynec2/conduit.git
-cd conduit
+git clone https://github.com/baynec2/conduit-ascent.git
+cd conduit-ascent
 mkdir slurm_out
 ```
-## 3. Install Snakemake in your BASE environment
-Barnacle2 currently has Singularity available for all users at a system-wide level. For this reason, we want to use the Singularity within the base environment. In order to run Conduit, we will also need to install Snakemake (and any Snakemake-related dependencies, likely datrie and wheel which can be pip installed). Do NOT create and install this within a separate conda environment (as listed in the README). This will not work because we need to use the Singularity on Barnacle2. All other packages and environments are managed through the Singularity container.
+
+### 3. Install Snakemake in your base environment
+
+Barnacle2 has Singularity available system-wide. Install Snakemake (and dependencies) into the base environment — **do not** create a separate conda environment, as that will shadow the system Singularity.
 
 ```bash
-# First check that your Singularity works for you on Barnacle2, currently on version 3.6.4 as of 9/16/25
-singularity --version
+singularity --version   # verify Singularity is available
 
-# Pip install Snakemake and other needed dependencies
 pip install snakemake
 pip install wheel
 pip install datrie
 ```
 
-## 4. Add in the following lines to the beginning of `conduit/modules/annotation/uniprot/scripts/get_annotations_from_uniprot.R`
-Easiest/quickest way to do this is to `vim get_annotations_from_uniprot.R`, make your changes after typing `i`, and then `:x` and press enter to save and quit the file.
+### 4. Add SLURM core detection to the UniProt annotation script
 
+Edit `modules/annotation/uniprot/scripts/get_annotations_from_uniprot.R` and add these two lines after the opening comment block:
+
+```r
+slurm_cores <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", 1))
+options(parallelly.maxWorkers.localhost = slurm_cores)
 ```
-# Get Detected Proteins Annotation From Uniprot # previous line
-################################################################################ # previous line
 
-slurm_cores <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", 1)) # *** add this line here ***
-options(parallelly.maxWorkers.localhost = slurm_cores) # *** add this line here ***
+### 5. Submit the job
 
-# Open the log file to write both stdout and stderr # line continued
-````
-
-## 5. Download and put the SLURM script `run_conduit_barnacle2.sh` from the Conduit GitHub repo and place in your `conduit/` directory.
-You will need to update --email in the SBATCH header with your own email. You may also change any notification preferences as well.
+Use the `run_conduit_barnacle2.slurm` script included in the repository root. Update `--mail-user` in the SBATCH header with your email before submitting.
 
 ```bash
-# Submit your job to run the Conduit Snakemake workflow
-sbatch run_conduit_barnacle2.sh
-# Check your job via
-squeue --me
-# Check the Snakemake logged outputs in slurm_out .err file
-cat slurm_out/*.err
+sbatch run_conduit_barnacle2.slurm
+squeue --me           # check job status
+cat slurm_out/*.err   # check Snakemake logs
 ```
 
-
-With --cpus-per-task=16 and --mem=64G (pre-set in the SBATCH header), the test inputs took approximately 50 minutes to run on Barnacle2
-
-
-## Project Structure
-
-Below you will find a high level annotated diagram displaying the general structure of Conduit:
-
-```
-conduit/
-├── modules/                          # Snakemake modules. Each module should have snakefile and associated scripts.
-│   ├── setup/                        # Workflow setup (config copying, apptainer image building)
-│   ├── search_space/                 # Defining the search space
-│   │   ├── ncbi_taxonomy/            # from NCBI taxonomy IDs
-│   │   ├── uniprot_proteome_ids/     # from UniProt proteome IDs
-│   │   ├── metaphlan/                # from MetaPhlAn metagenomic profiling
-│   │   ├── MAGs/                     # from metagenome-assembled genomes
-│   │   └── database_processing/      # shared post-processing for database files
-│   ├── diann/                        # Identification and Quantification with DIA-NN
-│   ├── annotation/                   # Protein / taxonomic annotation
-│   │   ├── uniprot/                  # UniProt-based annotation (ncbi_taxonomy_id, uniprot_proteome_id, metaphlan)
-│   │   ├── MAGs/                     # Bakta + UniProt annotation for MAG-derived proteins
-│   │   └── external_annotations/     # KEGG, Pfam, CAZy, eggNOG, GO annotations
-│   └── build_conduit/                # Builds the final Conduit RDS object
-├── apptainer/                        # Apptainer configurations. Contains .def files
-├── config/                           # Default configurations (copied to each experiment config if not altered)
-├── images/                           # Contains diagrams of the workflow or any other images associated with Conduit.
-├── experiments/                      # Experiment directories
-│   └── example/                      # Example experiment (for additional experiments, create a new directory and config file.)
-│       ├── config                    # Configuration files for example experiment
-│       ├── logs                      # Log files for each rule. 
-│       ├── output                    # Outputs from the workflow
-│       └── input                     # Inputs into the workflow
-│           ├── sample_annotation.txt # Sample annotation file matching names of .raw MS files. 
-│           ├── ncbi_taxa_ids.txt     # Text file NCBI organism IDs defining the search space (if using ncbi_taxonomy)
-│           ├── proteome_id.txt       # Text file containing proteome ids (if using proteome id workflow)
-│           ├── fastq                 # Fastq input for metagenomic profiling or 16S
-│           ├── mags                  # MAG inputs.
-│           └── raw_files             # Thermo Mass Spectrometry .raw files. 
-└── tests/                            # Test suite
-```
-
-## Configuration
-
-The main configuration is done through `snakemake.yaml`. Key parameters include:
-
-```yaml
-# Define the name of the experiment (this will be used to find the correct experiment directory)
-experiment: 
-# Config file to generate the spectral library for DIA-NN (relative to main Snakefile)
-generate_diann_spectral_library_config: config/generate_diann_spectral_library.cfg
-# Config file to run DIA-NN search (relative to main Snakefile)
-run_diann_config: config/run_diann.cfg
-# Define the method used to define the search space. 
-# Options: 
-# - "ncbi_taxonomy_id": Use NCBI taxonomy IDs to define the search space.
-# - "uniprot_proteome_id": Use UniProt proteome IDs to define the search space.
-# - "MAGs": Use MAGs to define the search space.
-# - "metaphlan": Use MetaPhlAn metagenomic profiling to define the search space.
-search_space_method: ncbi_taxonomy_id
-# Define the sample annotation filepath relative to the experiment directory
-sample_annotation: input/sample_annotation.txt
-```
-You can use the configuration file in `config/snakemake.yaml` as a template file for your experiments.
-
-## Output Structure
-
-The workflow generates several key outputs:
-
-1. **Database Resources**
-   - Protein FASTA files
-   - Taxonomy information
-
-2. **DIA-NN Results**
-   - Spectral library
-   - Protein/peptide quantification
-
-3. **Detected Protein Annotations**
-   - GO term annotations
-   - KEGG pathway annotations
-   - Subcellular location annotations
-
-4. **Processed Matrices**
-   - Taxonomic level matrices
-   - Functional annotation matrices
-   - Protein-level matrices
-   - Peptide-level matrices
-   - Precursor-level matrices
-
-5. **R Objects**
-   - QFeatures object
-   - Analysis metrics
-   - Conduit object (accepted by Conduit-GUI/conduitR)
+With `--cpus-per-task=16` and `--mem=64G`, test inputs take approximately 50 minutes on Barnacle2.
 
 ## Troubleshooting
 
-### Common Issues
+### NCBI API failures
+If the `ncbi_taxonomy_id` method fails to fetch taxonomy, the NCBI API may be temporarily unavailable. Wait a few minutes and retry.
 
-1. **Issues getting NCBI taxonomy**: If you are having issues getting taxonomy with the ncbi_taxonomy_id search space method, try waiting for a bit and then retrying. I have seen that occasionally the NCBI API will be down.
+### Configuration errors
+Ensure your `snakemake.yaml` has values for all required fields: `experiment`, `run_name`, `search_space_method`, and `sample_annotation`.
 
-2. **Configuration Errors**: Make sure your `snakemake.yaml` file is properly formatted and all required fields are filled in.
+### Getting help
+- Check the [Issues](https://github.com/baynec2/conduit-ascent/issues) page for known problems
+- Open a new issue with your error message, configuration file, and relevant log from `runs/{run_name}/logs/`
 
-### Getting Help
+## Misc
 
-- Check the [Issues](https://github.com/baynec2/conduit/issues) page for known problems
-- Create a new issue with detailed error messages and your configuration
-- Include relevant log file from the `logs/` directory when reporting problems
+### Visualize the DAG
+
+```bash
+snakemake --configfile experiments/example/config/snakemake.yaml --dag \
+  | grep -v '^Found samples' \
+  | dot -Tpdf > dag.pdf
+```
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit an issue or pull request.
+Contributions are welcome! Please open an issue or pull request.
 
-### Contributing New Modules
+### New Module Development Guide
 
-We welcome contributions of new modules to expand Conduit's capabilities! Here's how to contribute:
+#### Module Structure
 
-#### New Conduit Module Development Guide
+- Each module lives in its own directory describing its task (e.g., `search_space/`, `diann/`, `annotation/`).
+- Alternative implementations of the same task go in subdirectories under the task directory.
+- Each module must contain a Snakemake file named `{module_name}.smk` and a `scripts/` subdirectory.
+- Logs must be written to the main experiment's `logs/` directory.
+- `rule all` must only be defined in the top-level `Snakefile`, never in modules.
 
-##### 1. Module Structure and Conventions
+#### Search Space and Annotation Pairing
 
-All Snakemake modules in Conduit should adhere to the following structure:
+Each search space module **must have a corresponding annotation module**, as different search space strategies require different protein annotation approaches.
 
-- **Directory Naming:**  
-  Each module should reside in its own directory describing the task it performs (e.g., `search_space/`, `diann/`, `annotation/`).
+#### Required Outputs: Search Space Modules
 
-- **Alternative Modules:**  
-  If multiple alternative modules exist for accomplishing the same task, they should be placed in subdirectories under the main task directory.  
-  *Example:*  
-  ```
-  defining_search_space/
-        ├── user_specified            # with ncbi_taxonomy and proteome_id 
-        ├── proteotyping              # with species specific peptides
-        ├── metagenomic_profiling     # with metagenomic profiling (reference based)
-        ├── mags                      # with metagenome assembled genome
-        └── 16s                       # with 16S data
-  ```
-- **Snakemake file:**  
-  Each module must contain a snakemake file with its rules. This should be named `module_name.smk`.
+All outputs must be placed in `database_resources/`. If a file cannot be generated for a given method, produce it with `NA` values.
 
-- **Scripts:**  
-  A `scripts/` subdirectory should contain any scripts required by that module.
+| File | Contents |
+|------|----------|
+| `database.fasta` | All protein sequences in the search space, UniProt-style headers |
+| `proteome_ids.txt` | UniProt proteome IDs used |
+| `taxonomy.txt` | Taxonomy information for the database |
+| `protein_info.txt` | Per-protein metadata |
+| `taxonomic_tree_of_database.pdf` | Taxonomic tree visualization of the search space |
+| `database.predicted.speclib` | DIA-NN predicted spectral library |
+| `README.md` | Metrics about the database resources |
 
-- **Logging:**  
-  Logs should be written to the main experiment's `logs/` directory.
+#### Required Outputs: Annotation Modules
 
-- **No `rule all` in Modules:**  
-  `rule all` should only be defined in the main Conduit Snakefile, never within modules.
-
-##### 2. Search Space and Annotation Modules
-
-Each search space module **must have a corresponding annotation module**, because different approaches to defining the search space will require different strategies for annotating proteins.
-
-##### 3. Required Outputs: Search Space Modules
-
-Each search space module must produce the following files, located in a folder named `database_resources/`.  
-If a particular file cannot be generated (e.g., unclear what to use as a proteome_id), it must still be produced with `NA` values as appropriate.
-
-**Required Output Files:**
-
-| Filename                          | Contents                                                                 |
-|------------------------------------|--------------------------------------------------------------------------|
-| `database.fasta`                | Fasta file containing all protein sequences to be included in search space with UniProt-style headers. |
-| `proteome_ids.txt`              | .txt file containing the proteome IDs that were used in the experiment.  |
-| `taxonomy.txt`                  | .txt file with all taxonomy information in the sample.                   |
-| `protein_info.txt`              | .txt file containing protein information.                                |
-| `taxonomic_tree_of_database.pdf`| PDF file showing an image of what the search space looks like from a taxonomic lens. |
-| `database.predicted.speclib`    | Spectral library produced by DIA-NN (automatically produced via the shared diann module). |
-| `README.md`                        | Readme containing metrics about the database resources.                  |
-
-##### 4. Required Outputs: Annotation Modules
-Each annotation module must produce the following files. If a particular annotation type cannot be retrieved (e.g., no subcellular prediction for MAGs), the file must still be generated with appropriate placeholder content.
-
-| Filename                        | Contents                                                                                   |
-|----------------------------------|--------------------------------------------------------------------------------------------|
-| `detected_protein_info.txt`      | Contains `protein_info.txt` filtered to only contain the proteins that were actually detected by DIA-NN. (Automatically generated via the shared diann module.) |
-| `detected_protein.fasta`         | The content from `detected_protein_info.txt` in fasta format. (Automatically generated via the shared diann module.) |
-| `annotated_protein_info.txt`     | Adds annotations to the detected proteins.                                                  |
-| `go_annotations.txt`             | File containing GO annotations in long format. Each protein should have its GO terms listed.|
-| `subcellular_locations.txt`      | File containing subcellular location predictions.                                           |
-| `kegg_annotations.txt`           | File containing KEGG pathway annotations.                                                   |
-
-## Misc Helpful Things
-
-### DAG plot
-You can use this code to construct a plot of the DAG.
-`snakemake --configfile experiments/example/config/snakemake.yaml --dag | grep -v '^Found samples'   | dot -Tpdf > dag.pdf`
-
+| File | Contents |
+|------|----------|
+| `detected_protein_info.txt` | `protein_info.txt` filtered to DIA-NN-detected proteins |
+| `detected_protein.fasta` | Detected proteins in FASTA format |
+| `annotated_protein_info.txt` | Detected proteins with annotations added |
+| `go_annotations.txt` | GO term annotations in long format |
+| `subcellular_locations.txt` | Subcellular location predictions |
+| `kegg_annotations.txt` | KEGG pathway annotations |
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License — see the LICENSE file for details.
 
 ## Acknowledgments
 
-Conduit would not be possible without the great work of many people. 
+Conduit would not be possible without the great work of many people.
 
 - Snakemake developers
 - DIA-NN developers
 - R Bioconductor community
 - R tidyverse community
-- R developers
 - UniProt consortium
 - NCBI taxonomy database maintainers
 - KEGG database maintainers
 - Gene Ontology consortium
-
+- MetaPhlAn team
+- Bakta developers
+- eggNOG-mapper team
+- Unipept team
