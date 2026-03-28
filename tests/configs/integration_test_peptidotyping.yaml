@@ -1,3 +1,11 @@
+containers:
+  conduitr:     "docker://baynec2/conduitr:alpha"
+  diann:        "docker://baynec2/diann2.1.0:alpha"
+  bakta:        "docker://baynec2/bakta:alpha"
+  metaphlan:    "docker://baynec2/metaphlan:alpha"
+  eggnogmapper: "docker://baynec2/eggnogmapper:2.1.12"
+  umgap:        "docker://baynec2/umgap:alpha"
+  taxonkit:     "quay.io/biocontainers/taxonkit:0.20.0--h9ee0642_1"
 experiment: integration_test
 run_name: peptidotyping
 generate_diann_spectral_library_config: config/generate_diann_spectral_library.cfg

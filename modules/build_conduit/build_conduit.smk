@@ -35,7 +35,7 @@ rule build_conduit:
     diann_run_config          = config["run_diann_config"]
   params:
     workflow_version  = open("VERSION").read().strip(),
-    snakemake_version = workflow.snakemake_version
+    snakemake_version = __import__('snakemake').__version__
   output:
     conduit = os.path.join(
       RUN_DIR,
