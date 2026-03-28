@@ -75,7 +75,7 @@ proteome_id = selected_proteome_id)
 # Save to file
 conduitR::log_with_timestamp("Saving proteome ids to file.")
 
-readr::write_delim(best_proteome_ids,proteome_ids_fp)
+readr::write_tsv(best_proteome_ids,proteome_ids_fp)
 
 end_time <- Sys.time()
 
