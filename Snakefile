@@ -36,9 +36,10 @@ if not config.get("search_space_method"):
     raise ValueError("Please provide 'search_space_method' in config file")
 # Defining the allowed methods. Will uncomment as they become supported.
 ALLOWED_METHODS = [
-    "ncbi_taxonomy_id", 
+    "ncbi_taxonomy_id",
     "uniprot_proteome_id",
     "peptidotyping",
+    "unipept_hapid",
     "MAGs",
     "metaphlan",
    # "16S"
@@ -99,6 +100,9 @@ module metaphlan:
   config: config
 module peptidotyping:
   snakefile: "modules/search_space/peptidotyping/peptidotyping.smk"
+  config: config
+module unipept_hapid:
+  snakefile: "modules/search_space/unipept_hapid/unipept_hapid.smk"
   config: config
 module mags:
   snakefile: "modules/search_space/MAGs/MAGs.smk"
@@ -171,9 +175,19 @@ if config["search_space_method"] == "uniprot_proteome_id":
     use rule * from eggnogmapper_annotation
     use rule * from external_annotation
 
-# Proteotyping has an additional first pass search module
+# Peptidotyping: family-level first-pass with genus fallback, then species/strain second pass
 if config["search_space_method"] == "peptidotyping":
     use rule * from peptidotyping
+    use rule * from ncbi_search_space
+    use rule * from uniprot_proteome_ids_search_space
+    use rule * from diann
+    use rule * from uniprot_annotation
+    use rule * from eggnogmapper_annotation
+    use rule * from external_annotation
+
+# unipept_hapid: HAPiID-inspired GO-filtered first pass directly at species/strain level
+if config["search_space_method"] == "unipept_hapid":
+    use rule * from unipept_hapid
     use rule * from ncbi_search_space
     use rule * from uniprot_proteome_ids_search_space
     use rule * from diann
