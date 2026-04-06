@@ -74,6 +74,7 @@ config_list <- list(
   snakemake_yaml = tibble::tibble(
     parameter = names(snakemake@config),
     value     = vapply(snakemake@config, function(x) {
+      if (is.null(x) || length(x) == 0) return("")
       if (is.list(x)) paste(names(x), unlist(x), sep = "=", collapse = ", ")
       else as.character(x)
     }, character(1))
