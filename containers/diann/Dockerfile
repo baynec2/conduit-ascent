@@ -3,7 +3,7 @@ FROM ubuntu:22.04
 LABEL base_image="ubuntu:22.04" \
       version="2" \
       software="diann" \
-      software.version="2.1.0" \
+      software.version="2.3.2" \
       description="DIA-NN - a universal software for data-independent acquisition (DIA) proteomics data processing." \
       homepage="https://github.com/vdemichev/DiaNN" \
       documentation="https://github.com/vdemichev/DiaNN" \
@@ -15,7 +15,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8 \
-    PATH="/usr/diann-2.1.0:$PATH" \
+    PATH="/usr/diann-2.3.2:$PATH" \
     DOTNET_ROOT=/usr/share/dotnet
 
 # Install dependencies, .NET, and DIA-NN in one step
@@ -37,11 +37,11 @@ RUN set -ex && \
     apt-get update && \
     apt-get install -y dotnet-sdk-8.0 && \
     # Download and install DIA-NN
-    wget --no-check-certificate https://github.com/vdemichev/DiaNN/releases/download/2.0/DIA-NN-2.3.0-Academia-Linux-Preview.zip -P /usr/ && \
-    unzip /usr/DIA-NN-2.3.0-Academia-Linux-Preview.zip -d /usr/ && \
-    rm /usr/DIA-NN-2.3.0-Academia-Linux-Preview.zip && \
-    chmod +x /usr/diann-2.3.0/diann-linux && \
-    ln -s /usr/diann-2.3.0/diann-linux /usr/local/bin/diann && \
+    wget --no-check-certificate https://github.com/vdemichev/DiaNN/releases/download/2.0/DIA-NN-2.3.2-Academia-Linux.zip -P /usr/ && \
+    unzip /usr/DIA-NN-2.3.2-Academia-Linux.zip -d /usr/ && \
+    rm /usr/DIA-NN-2.3.2-Academia-Linux.zip && \
+    chmod +x /usr/diann-2.3.2/diann-linux && \
+    ln -s /usr/diann-2.3.2/diann-linux /usr/local/bin/diann && \
     # Clean up unnecessary packages
     apt-get remove -y wget unzip && \
     apt-get autoremove -y && \
