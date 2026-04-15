@@ -34,8 +34,8 @@ rule build_sequence_index:
           -o {params.outdir}/relnotes.txt \
           https://ftp.uniprot.org/pub/databases/uniprot/relnotes.txt
 
-        # Setting temp dir
-        export TMPDIR={params.temp_outdir}
+        # Setting temp dir (must be absolute so cargo resolves it correctly)
+        export TMPDIR=$(realpath {params.temp_outdir})
 
         # Build UMGAP peptidotyping tables
         modules/search_space/peptidotyping/scripts/unipept-database/scripts/generate_umgap_tables.sh tryptic \
@@ -248,25 +248,29 @@ rule generate_peptidotyping_db:
 # never generated) with a principled, multi-rank strategy.
 #
 # Algorithm:
-#   1. For each family: count peptides at family, genus, and species/strain rank.
-#   2. Assign effective rank: finest rank with >= min_taxon_db_peptides peptides.
-#   3. Build the first-pass FASTA from the effective-rank peptides for each family.
-#   4. Add FAM=<family_taxid> to every FASTA header so infer_family_presence.R
+#   1. Build a taxid → family_taxid lineage lookup via taxonkit.
+#   2. For each family: aggregate peptide counts across ALL child taxa at each rank
+#      (family, genus, species/strain), producing one total per (family, rank).
+#   3. Assign effective rank: finest rank where the family's aggregate total
+#      >= min_taxon_db_peptides (family → genus → species/strain).
+#   4. Build the first-pass FASTA including ALL child taxa at the effective rank
+#      (not just a single representative), so the family can be detected even when
+#      no single child taxon has enough peptides on its own.
+#   5. Add FAM=<family_taxid> to every FASTA header so infer_family_presence.R
 #      can always recover the family from any hit regardless of the rank.
-#   5. Output effective_detection_rank_mapping.tsv for use in inference.
+#   6. Output effective_detection_rank_mapping.tsv for use in inference.
 rule build_effective_detection_rank_db:
     input:
-        family_tsv       = os.path.join(config["peptidotyping_resource_dir"],"family_lca_filtered_peptides.tsv"),
-        genus_tsv        = os.path.join(config["peptidotyping_resource_dir"],"genus_lca_filtered_peptides.tsv"),
-        species_tsv      = os.path.join(config["peptidotyping_resource_dir"],"species_strain_lca_filtered_peptides.tsv"),
-        taxons           = os.path.join(config["peptidotyping_resource_dir"],"taxons.tsv.lz4")
+        family_tsv  = os.path.join(config["peptidotyping_resource_dir"],"family_lca_filtered_peptides.tsv"),
+        genus_tsv   = os.path.join(config["peptidotyping_resource_dir"],"genus_lca_filtered_peptides.tsv"),
+        species_tsv = os.path.join(config["peptidotyping_resource_dir"],"species_strain_lca_filtered_peptides.tsv")
     output:
         first_pass_fasta = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
         rank_mapping     = os.path.join(config["peptidotyping_resource_dir"],"effective_detection_rank_mapping.tsv")
     params:
         min_peptides = config["min_taxon_db_peptides"]
-    threads: 8
-    container: config["containers"]["conduitr"]
+    threads: workflow.cores
+    container: config["containers"]["taxonkit"]
     log: os.path.join(config["peptidotyping_resource_dir"],"logs/build_effective_detection_rank_db.log")
     shell:
         r"""
@@ -275,6 +279,8 @@ rule build_effective_detection_rank_db:
         MIN_PEP="{params.min_peptides}"
 
         log_ts() {{ echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }}
+
+        export TAXONKIT_DB="{config[taxonkit_db_dir]}"
 
         log_ts "Building taxonomy lineage lookup (family/genus/species hierarchy)"
 
@@ -288,17 +294,16 @@ rule build_effective_detection_rank_db:
           tail -n +2 {input.family_tsv}  | cut -f4
           tail -n +2 {input.genus_tsv}   | cut -f4
           tail -n +2 {input.species_tsv} | cut -f4
-        }} | awk 'NF && $1!=""' | sort -u \
-        | taxonkit lineage -j {threads} \
-        | taxonkit reformat -t -r -f '{{taxid}}\t{{rank}}\t{{ranks}}\t{{lineage_taxids}}' \
-        | awk -F'\t' 'NR>1 {{
-            n=split($3,rk,";"); split($4,ln,";");
+        }} | awk 'NF && $1!="" && !seen[$1]++' \
+        | taxonkit lineage -j {threads} -t -R -r \
+        | awk -F'\t' '{{
+            n=split($5,rk,";"); split($3,lt,";");
             fam=""; gen="";
             for(i=1;i<=n;i++) {{
-                if(rk[i]=="family") fam=ln[i];
-                if(rk[i]=="genus")  gen=ln[i];
+                if(rk[i]=="family") fam=lt[i];
+                if(rk[i]=="genus")  gen=lt[i];
             }}
-            if (fam!="") print $1"\t"$2"\t"fam"\t"gen
+            if (fam!="") print $1"\t"$4"\t"fam"\t"gen
         }}' > "$LINEAGE_FILE"
 
         log_ts "Lineage lookup built: $(wc -l < "$LINEAGE_FILE") entries"
@@ -307,27 +312,27 @@ rule build_effective_detection_rank_db:
         # family_counts[family_taxid][rank] = n_peptides
 
         COUNTS_FILE="{config[peptidotyping_resource_dir]}/family_rank_peptide_counts.tsv"
-        echo -e "family_taxid\trank\tn_peptides\trepresentative_taxid" > "$COUNTS_FILE"
+        # One row per (family, rank): family_taxid | rank | total_n_peptides
+        echo -e "family_taxid\trank\tn_peptides" > "$COUNTS_FILE"
 
-        # Family-level peptides: lca_il IS the family taxid
-        tail -n +2 {input.family_tsv} | cut -f4 | awk 'NF && $1!=""' \
-        | sort | uniq -c | awk '{{print $2"\tfamily\t"$1"\t"$2}}' \
-        >> "$COUNTS_FILE"
-
-        # Genus-level peptides: count per genus, then attribute to parent family
-        tail -n +2 {input.genus_tsv} | cut -f4 | awk 'NF && $1!=""' \
-        | sort | uniq -c \
-        | awk -v lineage="$LINEAGE_FILE" '
-            BEGIN {{ while((getline < lineage)>0) fam[$1]=$3 }}
-            {{ gen=$2; n=$1; if(gen in fam) print fam[gen]"\tgenus\t"n"\t"gen }}
+        # Family-level peptides: lca_il IS the family taxid; count directly in awk.
+        tail -n +2 {input.family_tsv} | cut -f4 | awk '
+            NF && $1!="" {{ count[$1]++ }}
+            END {{ for (k in count) print k"\tfamily\t"count[k] }}
         ' >> "$COUNTS_FILE"
 
-        # Species/strain-level peptides: count per species, then attribute to parent family
-        tail -n +2 {input.species_tsv} | cut -f4 | awk 'NF && $1!=""' \
-        | sort | uniq -c \
-        | awk -v lineage="$LINEAGE_FILE" '
+        # Genus-level peptides: stream taxids and accumulate into parent family in one pass.
+        tail -n +2 {input.genus_tsv} | cut -f4 | awk -v lineage="$LINEAGE_FILE" '
             BEGIN {{ while((getline < lineage)>0) fam[$1]=$3 }}
-            {{ sp=$2; n=$1; if(sp in fam) print fam[sp]"\tspecies_strain\t"n"\t"sp }}
+            NF && $1!="" && $1 in fam {{ sum[fam[$1]]++ }}
+            END {{ for (f in sum) print f"\tgenus\t"sum[f] }}
+        ' >> "$COUNTS_FILE"
+
+        # Species/strain-level peptides: same single-pass approach.
+        tail -n +2 {input.species_tsv} | cut -f4 | awk -v lineage="$LINEAGE_FILE" '
+            BEGIN {{ while((getline < lineage)>0) fam[$1]=$3 }}
+            NF && $1!="" && $1 in fam {{ sum[fam[$1]]++ }}
+            END {{ for (f in sum) print f"\tspecies_strain\t"sum[f] }}
         ' >> "$COUNTS_FILE"
 
         log_ts "Peptide counts per family/rank computed"
@@ -336,39 +341,30 @@ rule build_effective_detection_rank_db:
         # Priority: family > genus > species_strain (finest available with >= min_peptides)
 
         MAPPING="{output.rank_mapping}"
-        echo -e "family_taxid\teffective_rank\tn_peptides\trepresentative_taxid" > "$MAPPING"
+        # Columns: family_taxid | effective_rank | n_peptides
+        echo -e "family_taxid\teffective_rank\tn_peptides" > "$MAPPING"
 
+        # COUNTS_FILE has exactly one row per (family, rank) with an aggregate total,
+        # so we just look up each family's count at each rank directly. Pick the finest
+        # rank whose aggregate peptide total meets the threshold (family → genus → species/strain).
         awk -F'\t' -v min="$MIN_PEP" '
             NR==1 {{ next }}
             {{
-                fam=$1; rank=$2; n=$3; rep=$4
-                # Store max count per (family, rank) - pick representative with most peptides
-                key = fam"\t"rank
-                if (!(key in count) || n > count[key]) {{
-                    count[key] = n
-                    reptax[key] = rep
-                }}
+                fam=$1; rank=$2; n=$3
+                count[fam"\t"rank] = n
+                families[fam] = 1
             }}
             END {{
-                # Collect all families
-                for (key in count) {{
-                    split(key, arr, "\t")
-                    families[arr[1]] = 1
-                }}
                 for (fam in families) {{
-                    # Try ranks finest-to-coarsest
-                    for (rank in count) {{
-                        # no-op, just to get to END
-                    }}
                     fam_key = fam"\tfamily"
                     gen_key = fam"\tgenus"
                     sps_key = fam"\tspecies_strain"
                     if (fam_key in count && count[fam_key]+0 >= min+0) {{
-                        print fam"\tfamily\t"count[fam_key]"\t"reptax[fam_key]
+                        print fam"\tfamily\t"count[fam_key]
                     }} else if (gen_key in count && count[gen_key]+0 >= min+0) {{
-                        print fam"\tgenus\t"count[gen_key]"\t"reptax[gen_key]
+                        print fam"\tgenus\t"count[gen_key]
                     }} else if (sps_key in count && count[sps_key]+0 >= min+0) {{
-                        print fam"\tspecies_strain\t"count[sps_key]"\t"reptax[sps_key]
+                        print fam"\tspecies_strain\t"count[sps_key]
                     }}
                     # else: family not reliably detectable; excluded from first-pass
                 }}
@@ -465,43 +461,18 @@ rule build_effective_detection_rank_db:
         TOTAL=$(grep -c "^>" {output.first_pass_fasta} || true)
         log_ts "Effective first-pass database built: $TOTAL entries"
         """
-
 ################################################################################
-# Generating the First Pass Spectral Library
+# Performing the First Pass Search, Find Broad Taxonomic Levels
 ################################################################################
-# We can generate a spectral library from the effective first-pass database to
-# use with DIA-NN. This can then be used to perform the first-pass search
-# identifying which families are present in the experiment.
-# NOTE: The HAPiID-style GO-filtered database has been moved to the
-# `unipept_hapid` search_space_method in modules/search_space/unipept_hapid/.
-rule generate_first_peptidotyping_spectral_library:
-    input:
-        fasta = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
-        config_file = "config/peptidotyping_firstpass_diann_spectral_library.cfg"
-    output:
-        os.path.join(config["peptidotyping_resource_dir"],"effective_peptidotyping.predicted.speclib")
-    # DIANN adds the .predicted.speclib extension
-    container: config["containers"]["diann"]
-    log: os.path.join(config["peptidotyping_resource_dir"],"logs/generate_effective_peptidotyping_spectral_library.log")
-    threads: workflow.cores
-    shell:
-        """
-        diann --cfg {input.config_file} \
-        --fasta {input.fasta} \
-        --threads {threads} \
-        --out-lib {config[peptidotyping_resource_dir]}effective_peptidotyping >> {log} 2>&1
-        """
-
-################################################################################
-# Performing the First Pass Search
-################################################################################
-# Searching our first pass spectral library with Diann
+# Searching our first pass spectral library with Diann on infinidia mode. 
+# The database searched is mostly family level peptides, but in the case that no
+# family level peptides for a family exists, fallback to genus or species/strain
+# specific if they do not exist (as defined in uild_effective_detection_rank_db).
 rule perform_first_pass_search:
     input:
         raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/raw_files"),
-        spectral_library = os.path.join(config["peptidotyping_resource_dir"],"effective_peptidotyping.predicted.speclib"),
         fasta = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
-        config_file = "config/peptidotyping_firstpass_diann.cfg"
+        config_file = "config/peptidotyping_infinidia.cfg"
     output:
         first_pass_diann_parquet = os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_diann.parquet"),
         first_pass_diann_protein_description =  os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_diann.protein_description.tsv")
@@ -515,30 +486,31 @@ rule perform_first_pass_search:
         --fasta {input.fasta} \
         --out  {RUN_DIR}/database_resources/peptidotyping/first_pass_diann \
         --dir {input.raw_files_dir} \
-        --lib {input.spectral_library} \
         --threads {threads} --verbose 1 >> {log} 2>&1
         """
 ################################################################################
 # Determine what families are present based on the first pass results
 ################################################################################
-# Here we will just use the number of peptides that were detected to infer the presence of families.
-# If a number of peptides > than the theshold are found, we will infer that the family is present and
-# only use the species/strain level peptides that belong to the family.
-rule infer_family_presence:
+# Here we will use a taxonomic target decoy strategy to determine which taxonomic
+# levels are likely present. 
+rule infer_first_pass_presence:
     input:
-        first_pass_diann = os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_diann.parquet"),
-        rank_mapping     = os.path.join(config["peptidotyping_resource_dir"],"effective_detection_rank_mapping.tsv"),
+        first_pass_diann  = os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_diann.parquet"),
+        taxid_family_map  = os.path.join(config["peptidotyping_resource_dir"],"taxid_to_family_genus.tsv")
     output:
-        ncbi_taxonomy_id = os.path.join(RUN_DIR,"database_resources/peptidotyping/detected_family_taxa_ids.txt")
+        ncbi_taxonomy_id = os.path.join(RUN_DIR,"database_resources/peptidotyping/detected_family_taxa_ids.txt"),
+        fdr_results      = os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_fdr_results.tsv")
     log: os.path.join(RUN_DIR,"logs/peptidotyping/infer_family_presence.log")
+    container: config["containers"]["conduitr"]
     script: "scripts/infer_family_presence.R"
 
 ################################################################################
-# Determine which species and strains belong to the detected families.
+# Determine which species and strains are descendants of the taxa detected in 
+# the first pass search.
 ################################################################################
-# By mapping these values, we can tell what species there is family level evidence for.
-# This will allow us to subsequently search a reduced strain/species specific peptide database.
-rule map_families_to_species_strains:
+# We will use the species/strain specific peptides for a second pass search to 
+# determine what species/strains are present. 
+rule map_first_pass_detected_taxa_to_species_strains:
     input:
         ncbi_taxonomy_ids = os.path.join(RUN_DIR,"database_resources/peptidotyping/detected_family_taxa_ids.txt")
     output:
@@ -548,36 +520,120 @@ rule map_families_to_species_strains:
         config["containers"]["taxonkit"]
     shell:
         """
-        # Make sure Taxonkit knows where the local taxonomy DB (optional)
-        export TAXONKIT_DB=${TAXONKIT_DB:-/root/.taxonkit}  # or mount your local DB if needed
+        export TAXONKIT_DB="{config[taxonkit_db_dir]}"
 
-        # Fetch species and strains for each family taxid
-        cut -f1 {input.ncbi_taxonomy_ids} | xargs -I {{}} taxonkit list --id {{}} --rank species --rank strain > {output.families_to_species_strains} 2> {log}
+        # Fetch species and strains for each family taxid (skip header row).
+        # If no families were detected, write an empty file and exit cleanly.
+        ids=$(tail -n +2 {input.ncbi_taxonomy_ids} | awk '{{print $1}}')
+        if [ -z "$ids" ]; then
+            echo "No families detected; writing empty species/strain list." > {log}
+            touch {output.families_to_species_strains}
+        else
+            echo "$ids" \
+                | taxonkit list \
+                | taxonkit filter -E species -E strain -N \
+                > {output.families_to_species_strains} 2> {log}
+        fi
         """
 
+################################################################################
+# Generate the second pass FASTA database
+################################################################################
+# Filter species_strain_lca_filtered_peptides.tsv to only include taxa that are
+# descendants of the families detected in the first pass. This reduces the search
+# space from all species/strains in UniProt to only those plausibly present.
+rule generate_second_pass_db:
+    input:
+        species_tsv                 = os.path.join(config["peptidotyping_resource_dir"],"species_strain_lca_filtered_peptides.tsv"),
+        families_to_species_strains = os.path.join(RUN_DIR,"database_resources/peptidotyping/families_to_species_strains.txt")
+    output:
+        second_pass_fasta = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_database.fasta")
+    log: os.path.join(RUN_DIR,"logs/peptidotyping/generate_second_pass_db.log")
+    container: config["containers"]["taxonkit"]
+    shell:
+        r"""
+        set -euo pipefail
+        log_ts() {{ echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a {log}; }}
 
+        log_ts "Building taxid allowlist from families_to_species_strains.txt"
+
+        ALLOWLIST=$(mktemp)
+        awk 'NF && /^[[:space:]]*[0-9]/' {input.families_to_species_strains} \
+            | tr -d '[:blank:]' | sort -u > "$ALLOWLIST"
+        log_ts "Allowlist: $(wc -l < "$ALLOWLIST") species/strain taxids"
+
+        log_ts "Filtering species_strain TSV to allowlist and writing FASTA"
+
+        # TSV cols (1-indexed): id(1) sequence(2) lca(3) lca_il(4) fa(5) fa_il(6)
+        #                       name(7) rank(8) parent_id(9) fasta_header(10)
+        awk -F'\t' '
+            ARGIND==1 {{ allowed[$1]=1; next }}
+            FNR==1    {{ next }}
+            $4 in allowed {{ print ">" $10; print $2 }}
+        ' "$ALLOWLIST" {input.species_tsv} > {output.second_pass_fasta}
+
+        rm -f "$ALLOWLIST"
+        log_ts "Second-pass FASTA: $(grep -c "^>" {output.second_pass_fasta} || true) entries"
+        """
+
+################################################################################
+# Performing the Second Pass Search, Resolve Species/Strains
+################################################################################
+# Search the filtered species/strain database with DIA-NN InfiniDIA to resolve
+# which specific species and strains are present within the detected families.
+rule perform_second_pass_search:
+    input:
+        raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/raw_files"),
+        fasta         = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_database.fasta"),
+        config_file   = "config/peptidotyping_infinidia.cfg"
+    output:
+        second_pass_diann_parquet             = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_diann.parquet"),
+        second_pass_diann_protein_description = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_diann.protein_description.tsv")
+    log: os.path.join(RUN_DIR,"logs/peptidotyping/perform_second_pass_search.log")
+    container: config["containers"]["diann"]
+    threads: workflow.cores
+    shell:
+        """
+        diann --cfg {input.config_file} \
+            --fasta {input.fasta} \
+            --out  {RUN_DIR}/database_resources/peptidotyping/second_pass_diann \
+            --dir  {input.raw_files_dir} \
+            --threads {threads} --verbose 1 >> {log} 2>&1
+        """
+
+################################################################################
+# Infer the presence of species and strains based on the second pass search
+# results using target-decoy FDR at the species/strain level.
+################################################################################
+rule infer_second_pass_presence:
+    input:
+        second_pass_diann = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_diann.parquet")
+    output:
+        detected_species_strains = os.path.join(RUN_DIR,"database_resources/peptidotyping/detected_species_strain_taxa_ids.txt"),
+        fdr_results              = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_fdr_results.tsv")
+    log: os.path.join(RUN_DIR,"logs/peptidotyping/infer_species_strain_presence.log")
+    container: config["containers"]["conduitr"]
+    script: "scripts/infer_species_strain_presence.R"
 
 ################################################################################
 # Generate ncbi_taxa_ids.txt for handoff to the ncbi_taxonomy_id workflow
 ################################################################################
-# The taxonkit list output from map_families_to_species_strains contains one
-# taxid per line. Reformat it into the tab-separated ncbi_taxa_ids.txt expected
-# by the ncbi_taxonomy module (single column: ncbi_taxonomy_id).
+# The second-pass inference produces a clean TSV of detected species/strain
+# taxids. Reformat it into the ncbi_taxa_ids.txt expected by the ncbi_taxonomy
+# module (single column: ncbi_taxonomy_id).
 rule generate_peptidotyping_ncbi_taxa_ids:
     input:
-        families_to_species_strains = os.path.join(RUN_DIR,"database_resources/peptidotyping/families_to_species_strains.txt")
+        detected_species_strains = os.path.join(RUN_DIR,"database_resources/peptidotyping/detected_species_strain_taxa_ids.txt")
     output:
         ncbi_taxa_ids = os.path.join(RUN_DIR,"ncbi_taxa_ids.txt")
     log: os.path.join(RUN_DIR,"logs/peptidotyping/generate_peptidotyping_ncbi_taxa_ids.log")
     shell:
         r"""
         set -euo pipefail
-        # taxonkit list emits indented taxids; strip whitespace and keep numeric lines only
         echo "ncbi_taxonomy_id" > {output.ncbi_taxa_ids}
-        awk 'NF && /^[[:space:]]*[0-9]/' {input.families_to_species_strains} \
-          | tr -d '[:blank:]' \
-          | sort -u \
-          >> {output.ncbi_taxa_ids} 2> {log}
+        tail -n +2 {input.detected_species_strains} \
+            | cut -f1 | sort -u \
+            >> {output.ncbi_taxa_ids} 2> {log}
         """
 
 # ncbi_taxa_ids.txt is now consumed by the ncbi_taxonomy_id workflow.
