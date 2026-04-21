@@ -31,7 +31,11 @@ rule generate_diann_spectral_library:
 rule run_diann:
     input:
         raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/raw_files"),
-        spectral_library = os.path.join(RUN_DIR,"database_resources/database.predicted.speclib"),
+        spectral_library = lambda w: (
+            os.path.join(RUN_DIR,"database_resources/database.predicted.speclib")
+            if config.get("diann_search_mode", "standard") == "standard"
+            else []
+        ),
         fasta = os.path.join(RUN_DIR,"database_resources/database.fasta"),
         config_file = os.path.join(RUN_DIR,"config/run_diann.cfg")
     output:
@@ -39,7 +43,12 @@ rule run_diann:
         diann_parquet = os.path.join(RUN_DIR,"diann_output/diann.parquet"),
         diann_pg_matrix = os.path.join(RUN_DIR,"diann_output/diann.pg_matrix.tsv")
     params:
-        out = lambda w, output: os.path.join(os.path.dirname(output.diann_stats), "diann")
+        out = lambda w, output: os.path.join(os.path.dirname(output.diann_stats), "diann"),
+        lib_flag = lambda w: (
+            f"--lib {os.path.join(RUN_DIR, 'database_resources/database.predicted.speclib')}"
+            if config.get("diann_search_mode", "standard") == "standard"
+            else ""
+        )
     log: os.path.join(RUN_DIR,"logs/diann/run_diann.log")
     container:
         config["containers"]["diann"]
@@ -50,7 +59,7 @@ rule run_diann:
         --fasta {input.fasta} \
         --out  {params.out} \
         --dir {input.raw_files_dir} \
-        --lib {input.spectral_library} \
+        {params.lib_flag} \
         --threads {threads} --verbose 1 >> {log} 2>&1
         """
 ################################################################################

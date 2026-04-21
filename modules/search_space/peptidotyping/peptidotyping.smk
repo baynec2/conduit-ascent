@@ -265,8 +265,9 @@ rule build_effective_detection_rank_db:
         genus_tsv   = os.path.join(config["peptidotyping_resource_dir"],"genus_lca_filtered_peptides.tsv"),
         species_tsv = os.path.join(config["peptidotyping_resource_dir"],"species_strain_lca_filtered_peptides.tsv")
     output:
-        first_pass_fasta = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
-        rank_mapping     = os.path.join(config["peptidotyping_resource_dir"],"effective_detection_rank_mapping.tsv")
+        first_pass_fasta    = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
+        rank_mapping        = os.path.join(config["peptidotyping_resource_dir"],"effective_detection_rank_mapping.tsv"),
+        taxid_family_map    = os.path.join(config["peptidotyping_resource_dir"],"taxid_to_family_genus.tsv")
     params:
         min_peptides = config["min_taxon_db_peptides"]
     threads: workflow.cores

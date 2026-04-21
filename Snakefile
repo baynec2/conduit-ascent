@@ -72,7 +72,7 @@ try:
     sample_df = pd.read_csv(os.path.join(EXPERIMENT_DIR, sample_annotation), sep='\t')
     if 'file' not in sample_df.columns:
         raise ValueError("sample_annotation file must contain a 'file' column")
-    expected_files = set(sample_df['file'].values)
+    expected_files = set(sample_df['file'].astype(str).values)
 except Exception as e:
     raise ValueError(f"Error reading sample annotation file: {str(e)}")
 

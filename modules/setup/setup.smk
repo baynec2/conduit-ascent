@@ -24,7 +24,11 @@ rule setup_diann_run_config:
     output:
         diann_run_config_file = os.path.join(RUN_DIR,"config/run_diann.cfg")
     params:
-        selected_config = config.get("run_diann_config")
+        selected_config = (
+            "config/run_diann_infinidia.cfg"
+            if config.get("diann_search_mode") == "infinidia"
+            else config.get("run_diann_config")
+        )
     log: os.path.join(RUN_DIR,"logs/setup/setup_diann_run_config.log")
     run:
         import shutil
