@@ -8,7 +8,6 @@ sink(zz,append = TRUE)       # redirect stdout
 sink(zz, type = "message")  # redirect stderr/messages
 
 start_time <- Sys.time()
-
 conduitR::log_with_timestamp("Running build_conduit.R script")
 
 conduitR::log_with_timestamp(paste0("Input file: ", snakemake@input[["diann_stats"]]))
@@ -31,8 +30,6 @@ workflow_version  <- snakemake@params[["workflow_version"]]
 snakemake_version <- snakemake@params[["snakemake_version"]]
 # Outputs
 conduit_fp = snakemake@output[["conduit"]]
-
-
 # Reading files
 conduitR::log_with_timestamp("Reading in input files")
   # Reading in QFeatures Object
@@ -74,6 +71,7 @@ config_list <- list(
   snakemake_yaml = tibble::tibble(
     parameter = names(snakemake@config),
     value     = vapply(snakemake@config, function(x) {
+      if (is.null(x) || length(x) == 0) return("")
       if (is.list(x)) paste(names(x), unlist(x), sep = "=", collapse = ", ")
       else as.character(x)
     }, character(1))

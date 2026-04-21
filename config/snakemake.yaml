@@ -2,7 +2,7 @@
 # Container images
 # ===============================
 containers:
-  conduitr:     "docker://baynec2/conduitr:alpha"
+  conduitr:     "docker://baynec2/conduitr:0aed251"
   diann:        "docker://baynec2/diann2.1.0:alpha"
   bakta:        "docker://baynec2/bakta:alpha"
   metaphlan:    "docker://baynec2/metaphlan:alpha"

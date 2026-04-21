@@ -8,7 +8,6 @@ sink(zz,append = TRUE)       # redirect stdout
 sink(zz, type = "message")  # redirect stderr/messages
 
 start_time <- Sys.time()
-
 conduitR::log_with_timestamp("Running generate_qfeatures_from_diann_parquet.R script")
 conduitR::log_with_timestamp(paste0("Input file: ", snakemake@input[["diann_parquet"]]))
 conduitR::log_with_timestamp(paste0("Input file: ", snakemake@input[["sample_annotation"]]))

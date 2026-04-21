@@ -36,9 +36,10 @@ if not config.get("search_space_method"):
     raise ValueError("Please provide 'search_space_method' in config file")
 # Defining the allowed methods. Will uncomment as they become supported.
 ALLOWED_METHODS = [
-    "ncbi_taxonomy_id", 
+    "ncbi_taxonomy_id",
     "uniprot_proteome_id",
     "peptidotyping",
+    "unipept_hapid",
     "MAGs",
     "metaphlan",
    # "16S"
@@ -71,7 +72,7 @@ try:
     sample_df = pd.read_csv(os.path.join(EXPERIMENT_DIR, sample_annotation), sep='\t')
     if 'file' not in sample_df.columns:
         raise ValueError("sample_annotation file must contain a 'file' column")
-    expected_files = set(sample_df['file'].values)
+    expected_files = set(sample_df['file'].astype(str).values)
 except Exception as e:
     raise ValueError(f"Error reading sample annotation file: {str(e)}")
 
@@ -99,6 +100,9 @@ module metaphlan:
   config: config
 module peptidotyping:
   snakefile: "modules/search_space/peptidotyping/peptidotyping.smk"
+  config: config
+module unipept_hapid:
+  snakefile: "modules/search_space/unipept_hapid/unipept_hapid.smk"
   config: config
 module mags:
   snakefile: "modules/search_space/MAGs/MAGs.smk"
@@ -147,10 +151,11 @@ rule all:
                    "taxonomy.txt",
                    "protein_info.txt",
                    "taxonomic_tree_of_database.pdf",
-                   "database.predicted.speclib",
                    "README.md",
                    "README.html"
                ]),
+        *([os.path.join(RUN_DIR, "database_resources/database.predicted.speclib")]
+          if config.get("diann_search_mode", "standard") == "standard" else []),
         expand(os.path.join(RUN_DIR, "database_resources/detected_protein_resources/{file}"),
                file=[
                    "detected_protein_info.txt",
@@ -171,9 +176,19 @@ if config["search_space_method"] == "uniprot_proteome_id":
     use rule * from eggnogmapper_annotation
     use rule * from external_annotation
 
-# Proteotyping has an additional first pass search module
+# Peptidotyping: family-level first-pass with genus fallback, then species/strain second pass
 if config["search_space_method"] == "peptidotyping":
     use rule * from peptidotyping
+    use rule * from ncbi_search_space
+    use rule * from uniprot_proteome_ids_search_space
+    use rule * from diann
+    use rule * from uniprot_annotation
+    use rule * from eggnogmapper_annotation
+    use rule * from external_annotation
+
+# unipept_hapid: HAPiID-inspired GO-filtered first pass directly at species/strain level
+if config["search_space_method"] == "unipept_hapid":
+    use rule * from unipept_hapid
     use rule * from ncbi_search_space
     use rule * from uniprot_proteome_ids_search_space
     use rule * from diann

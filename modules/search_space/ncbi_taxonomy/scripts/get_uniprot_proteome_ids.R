@@ -25,9 +25,11 @@ append_additional_ncbi_taxa_id <- snakemake@config$append_additional_ncbi_taxa_i
 conduitR::log_with_timestamp("Making the database_resources_directory if it doesn't exist.")
 
 conduitR::log_with_timestamp("Reading organism IDs from the input file.")
-# Read organism IDs from the input file
-organism_ids <- readr::read_delim(input_file) |>
-  dplyr::pull(organism_id)
+# Read organism IDs from the input file (single-column, skip header line)
+organism_ids <- readr::read_lines(input_file) |>
+  (\(x) x[nchar(trimws(x)) > 0])() |>   # drop blank lines
+  tail(-1L) |>                             # drop header
+  as.integer()
 
 # Append additional NCBI taxonomic IDs if specified by the user
 if (!isFALSE(append_additional_ncbi_taxa_id)) {

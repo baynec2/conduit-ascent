@@ -8,6 +8,7 @@ containers:
   taxonkit:     "quay.io/biocontainers/taxonkit:0.20.0--h9ee0642_1"
 experiment: integration_test
 run_name: ncbi_taxonomy_id
+diann_search_mode: "standard"
 generate_diann_spectral_library_config: config/generate_diann_spectral_library.cfg
 run_diann_config: config/run_diann.cfg
 sample_annotation: input/sample_annotation.txt
