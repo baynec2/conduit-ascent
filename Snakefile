@@ -151,10 +151,11 @@ rule all:
                    "taxonomy.txt",
                    "protein_info.txt",
                    "taxonomic_tree_of_database.pdf",
-                   "database.predicted.speclib",
                    "README.md",
                    "README.html"
                ]),
+        *([os.path.join(RUN_DIR, "database_resources/database.predicted.speclib")]
+          if config.get("diann_search_mode", "standard") == "standard" else []),
         expand(os.path.join(RUN_DIR, "database_resources/detected_protein_resources/{file}"),
                file=[
                    "detected_protein_info.txt",
