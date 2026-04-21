@@ -1,0 +1,39 @@
+name: Build and push container images
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'containers/*/Dockerfile'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push changed images
+        run: |
+          sha=$(git rev-parse --short HEAD)
+          changed=$(git diff --name-only HEAD~1 HEAD -- 'containers/*/Dockerfile')
+          for f in $changed; do
+            tool=$(echo "$f" | awk -F'/' '{print $2}')
+            echo "Building $tool:$sha from $f"
+            docker buildx build \
+              --file "$f" \
+              --tag ${{ secrets.DOCKERHUB_USERNAME }}/${tool}:${sha} \
+              --push \
+              "containers/${tool}"
+          done
