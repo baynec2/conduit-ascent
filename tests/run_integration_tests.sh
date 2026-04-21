@@ -12,11 +12,12 @@
 #   - apptainer/singularity
 #   - tests/data/sample1.raw (tracked via Git LFS)
 #
-# The metaphlan method mocks the MetaPhlAn database + profiling steps via --omit-from,
-# using the pre-committed merged_profiles.txt in the experiment input directory.
+# The metaphlan method mocks the MetaPhlAn database + profiling steps via --omit-from.
+# A pre-committed mock merged_profiles.txt is seeded into the run directory so that
+# downstream rules (call_ncbi_taxa_ids and beyond) are not also pruned from the DAG.
 #
 # The MAGs method requires a FASTA file at:
-#   experiments/integration_test_MAGs/input/MAG_files/ecoli_mag.fa
+#   experiments/integration_test/input/MAG_files/ecoli_mag.fa
 #
 # The peptidotyping method requires a pre-built sequence index at:
 #   resources/peptidotyping/
@@ -68,11 +69,34 @@ run_integration_test() {
 # ── Method dispatch ───────────────────────────────────────────────────────────
 
 run_ncbi_taxonomy_id()    { run_integration_test ncbi_taxonomy_id; }
-run_uniprot_proteome_id() { run_integration_test uniprot_proteome_id; }
+run_uniprot_proteome_id() {
+    run_integration_test uniprot_proteome_id
+    # Validate that eggnogmapper-derived annotation types are present in the
+    # final conduit_annotations.txt (catches protein-ID format mismatch bugs).
+    local annotations
+    annotations=$(find "$REPO_ROOT/experiments/integration_test/runs/uniprot_proteome_id" \
+        -name "conduit_annotations.txt" | head -1)
+    if [ -n "$annotations" ]; then
+        local emapper_types
+        emapper_types=$(awk '{print $2}' "$annotations" | grep -v "^uniprot_" | grep -v "^annotation_type$" | sort -u | wc -l)
+        if [ "$emapper_types" -gt 0 ]; then
+            echo "PASS: conduit_annotations.txt contains $emapper_types emapper-derived annotation type(s)"
+        else
+            echo "FAIL: conduit_annotations.txt contains no emapper-derived annotation types (protein ID mismatch?)"
+            FAILED+=("uniprot_proteome_id_annotation_validation")
+        fi
+    fi
+}
 run_MAGs()                { run_integration_test MAGs; }
 run_metaphlan() {
-    # Skip MetaPhlAn database download and profiling steps; use the
-    # pre-committed mock merged_profiles.txt instead.
+    # Seed the mock merged_profiles.txt into the run directory so downstream
+    # rules are not pruned from the DAG when merge_profiles is omitted.
+    local mock_src="$REPO_ROOT/experiments/integration_test/input/metaphlan/merged_profiles.txt"
+    local mock_dst="$REPO_ROOT/experiments/integration_test/runs/metaphlan/metaphlan/merged_profiles.txt"
+    mkdir -p "$(dirname "$mock_dst")"
+    cp "$mock_src" "$mock_dst"
+
+    # Skip MetaPhlAn database download and profiling steps.
     run_integration_test metaphlan \
         "--omit-from download_metaphlan_resources run_metaphlan merge_profiles"
 }

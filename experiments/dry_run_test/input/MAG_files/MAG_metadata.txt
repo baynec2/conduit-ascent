@@ -1,2 +1,0 @@
-mag	species_name	organism_id
-lag1	Escherichia coli	562

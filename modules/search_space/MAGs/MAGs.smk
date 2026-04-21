@@ -2,13 +2,14 @@ import os
 import glob
 
 # Experiment specific directories
-EXPERIMENT_DIR = os.path.join("experiments",config["experiment"])
+EXPERIMENT_DIR = config["experiment_dir"]
+RUN_DIR = config["run_dir"]
 MAG_DIR = os.path.join(EXPERIMENT_DIR,"input/MAG_files")
-# Resource specific directories. 
+# Resource specific directories.
 BAKTA_DIR = config["bakta_db_dir"]
 # Database specific output
-BAKTA_OUT_ROOT = os.path.join(EXPERIMENT_DIR,"input/database_resources/bakta")
-DB_OUT_ROOT = os.path.join(EXPERIMENT_DIR,"input/database_resources")
+BAKTA_OUT_ROOT = os.path.join(RUN_DIR,"database_resources/bakta")
+DB_OUT_ROOT = os.path.join(RUN_DIR,"database_resources")
 
 # Files that should be included in Bakta database
 REQUIRED_BAKTA_FILES = (
@@ -45,7 +46,7 @@ rule check_mag_fastas:
         touch(os.path.join(MAG_DIR, ".fastas_checked"))
     log:
         os.path.join(MAG_DIR, "logs/check_mag_fastas.log")
-    container: "docker://baynec2/bakta:alpha"
+    container: config["containers"]["bakta"]
     shell:
         r"""
         mkdir -p $(dirname {log})
@@ -75,7 +76,7 @@ rule download_bakta_resources:
     log:
         os.path.join(BAKTA_DIR, "logs/download_bakta_resources.log")
     container:
-        "docker://baynec2/bakta:alpha"
+        config["containers"]["bakta"]
     params:
         bakta_db_dir = config["bakta_db_dir"],
         bakta_db_type = config["bakta_db_type"]
@@ -105,7 +106,7 @@ rule annotate_mags_with_bakta:
         os.path.join(BAKTA_OUT_ROOT, "logs/{mag}_bakta.log")
     threads: workflow.cores
     container:
-        "docker://baynec2/bakta:alpha"
+        config["containers"]["bakta"]
     shell:
         r"""
         mkdir -p $(dirname {log})
@@ -154,9 +155,9 @@ rule create_uniprot_style_database:
     params:
         mag_metadata = os.path.join(MAG_DIR, "MAG_metadata.txt")
     log:
-        os.path.join(EXPERIMENT_DIR,"logs/search_space/MAGs/create_uniprot_sytle_database.log")
-    container: 
-        "docker://baynec2/bakta:alpha"
+        os.path.join(RUN_DIR,"logs/search_space/MAGs/create_uniprot_sytle_database.log")
+    container:
+        config["containers"]["bakta"]
     script:
         "scripts/MAG_uniprot_headers.py"
 
@@ -165,9 +166,9 @@ rule get_mag_taxonomy:
         # File containing ncbi organism ids
         mag_metadata = os.path.join(EXPERIMENT_DIR,"input/MAG_files/MAG_metadata.txt")
     output:
-        taxonomy = os.path.join(EXPERIMENT_DIR,"input/database_resources/mag_taxonomy.txt")
-    log: os.path.join(EXPERIMENT_DIR,"logs/search_space/MAGs/get_mag_taxonomy.log")
-    container: "docker://baynec2/conduitr:alpha"
+        taxonomy = os.path.join(RUN_DIR,"database_resources/mag_taxonomy.txt")
+    log: os.path.join(RUN_DIR,"logs/search_space/MAGs/get_mag_taxonomy.log")
+    container: config["containers"]["conduitr"]
     script:
       "scripts/get_mag_taxonomy.R"
 
@@ -183,8 +184,8 @@ rule append_additional_organisms_or_proteomes:
         # modified files with 
         fasta = os.path.join(DB_OUT_ROOT,"database.fasta"),
         taxonomy = os.path.join(DB_OUT_ROOT,"taxonomy.txt")
-    log: os.path.join(EXPERIMENT_DIR,"logs/search_space/MAGs/append_additional_data.log")
-    container: "docker://baynec2/conduitr:alpha"
+    log: os.path.join(RUN_DIR,"logs/search_space/MAGs/append_additional_data.log")
+    container: config["containers"]["conduitr"]
     script:
         "scripts/append_additional_organisms_or_proteomes.R"
 
@@ -194,10 +195,10 @@ rule get_mag_annotations:
             os.path.join(BAKTA_OUT_ROOT, mag) for mag in get_mag_list()
         ],
     output:
-        mag_annotations = os.path.join(EXPERIMENT_DIR, "input/database_resources/bakta/mag_annotations.txt")
+        mag_annotations = os.path.join(RUN_DIR, "database_resources/bakta/mag_annotations.txt")
     log:
-        os.path.join(EXPERIMENT_DIR,"logs/search_space/MAGs/get_mag_annotations.log")
-    container: 
-        "docker://baynec2/conduitr:alpha"
+        os.path.join(RUN_DIR,"logs/search_space/MAGs/get_mag_annotations.log")
+    container:
+        config["containers"]["conduitr"]
     script:
         "scripts/get_mag_annotations.R"

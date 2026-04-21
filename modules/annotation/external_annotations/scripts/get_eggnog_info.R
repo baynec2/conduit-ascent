@@ -78,7 +78,7 @@ eggnog_codes = eggnog_combined |>
   tidyr::unnest(code) |> # make one row per letter
   dplyr::inner_join(eggnog_code_lookup,by = "code") |>
   dplyr::select(protein_id,term = code,description = code_description)|>
-  dplyr::mutate(annotation_type = "eggnog_code")|>
+  dplyr::mutate(annotation_type = "uniprot_eggnog_code")|>
   dplyr::select(protein_id,annotation_type,term,description)|>
   dplyr::distinct()
 
@@ -87,7 +87,7 @@ conduitR::log_with_timestamp("Extracting Eggnog descriptions")
 
 eggnog <- eggnog_combined |>
 dplyr::select(protein_id,term = xref_eggnog,description)|>
-dplyr::mutate(annotation_type = "eggnog") |>
+dplyr::mutate(annotation_type = "uniprot_eggnog") |>
 dplyr::select(protein_id,annotation_type,term,description)|>
 dplyr::distinct()
 

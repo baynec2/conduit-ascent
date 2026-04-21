@@ -6,7 +6,6 @@ logfile <- snakemake@log[[1]]
 zz <- file(logfile, open = "a")
 sink(zz,append = TRUE)       # redirect stdout
 sink(zz, type = "message")  # redirect stderr/messages
-
 conduitR::log_with_timestamp("Running make_database_resources_readme.R script")
 conduitR::log_with_timestamp(paste0("Input file: ", snakemake@input[[1]]))
 conduitR::log_with_timestamp(paste0("Output file: ", snakemake@output[[1]]))

@@ -1,25 +1,28 @@
 import glob
 import os
-EXPERIMENT_DIR = os.path.join("experiments",config["experiment"])
+EXPERIMENT_DIR = config["experiment_dir"]
+RUN_DIR = config["run_dir"]
 RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/raw_files/*.raw"))
 #################################################################################
 # Generating Spectral Library
 #################################################################################
 rule generate_diann_spectral_library:
     input:
-        fasta = os.path.join(EXPERIMENT_DIR,"input/database_resources/database.fasta"),
-        config_file = os.path.join(EXPERIMENT_DIR,"config/generate_diann_spectral_library.cfg")
+        fasta = os.path.join(RUN_DIR,"database_resources/database.fasta"),
+        config_file = os.path.join(RUN_DIR,"config/generate_diann_spectral_library.cfg")
     output:
-        os.path.join(EXPERIMENT_DIR,"input/database_resources/database.predicted.speclib")
-    log: os.path.join(EXPERIMENT_DIR,"logs/diann/generate_diann_spectral_library.log")
+        os.path.join(RUN_DIR,"database_resources/database.predicted.speclib")
+    params:
+        out_lib = lambda w, output: os.path.splitext(os.path.splitext(output[0])[0])[0]
+    log: os.path.join(RUN_DIR,"logs/diann/generate_diann_spectral_library.log")
     container:
-        "docker://baynec2/diann2.1.0:alpha"
-    threads: workflow.cores 
+        config["containers"]["diann"]
+    threads: workflow.cores
     shell:
         """
         diann --cfg {input.config_file} \
         --fasta {input.fasta} \
-        --out-lib {EXPERIMENT_DIR}/input/database_resources/database \
+        --out-lib {params.out_lib} \
         --threads {threads} >> {log} 2>&1
         """
 ################################################################################
@@ -28,24 +31,35 @@ rule generate_diann_spectral_library:
 rule run_diann:
     input:
         raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/raw_files"),
-        spectral_library = os.path.join(EXPERIMENT_DIR,"input/database_resources/database.predicted.speclib"),
-        fasta = os.path.join(EXPERIMENT_DIR,"input/database_resources/database.fasta"),
-        config_file = os.path.join(EXPERIMENT_DIR,"config/run_diann.cfg")
+        spectral_library = lambda w: (
+            os.path.join(RUN_DIR,"database_resources/database.predicted.speclib")
+            if config.get("diann_search_mode", "standard") == "standard"
+            else []
+        ),
+        fasta = os.path.join(RUN_DIR,"database_resources/database.fasta"),
+        config_file = os.path.join(RUN_DIR,"config/run_diann.cfg")
     output:
-        diann_stats = os.path.join(EXPERIMENT_DIR,"output/diann_output/diann.stats.tsv"),
-        diann_parquet = os.path.join(EXPERIMENT_DIR,"output/diann_output/diann.parquet"),
-        diann_pg_matrix = os.path.join(EXPERIMENT_DIR,"output/diann_output/diann.pg_matrix.tsv")
-    log: os.path.join(EXPERIMENT_DIR,"logs/diann/run_diann.log")
+        diann_stats = os.path.join(RUN_DIR,"diann_output/diann.stats.tsv"),
+        diann_parquet = os.path.join(RUN_DIR,"diann_output/diann.parquet"),
+        diann_pg_matrix = os.path.join(RUN_DIR,"diann_output/diann.pg_matrix.tsv")
+    params:
+        out = lambda w, output: os.path.join(os.path.dirname(output.diann_stats), "diann"),
+        lib_flag = lambda w: (
+            f"--lib {os.path.join(RUN_DIR, 'database_resources/database.predicted.speclib')}"
+            if config.get("diann_search_mode", "standard") == "standard"
+            else ""
+        )
+    log: os.path.join(RUN_DIR,"logs/diann/run_diann.log")
     container:
-        "docker://baynec2/diann2.1.0:alpha"
-    threads: workflow.cores 
+        config["containers"]["diann"]
+    threads: workflow.cores
     shell:
         """
         diann --cfg {input.config_file} \
         --fasta {input.fasta} \
-        --out  {EXPERIMENT_DIR}/output/diann_output/diann \
+        --out  {params.out} \
         --dir {input.raw_files_dir} \
-        --lib {input.spectral_library} \
+        {params.lib_flag} \
         --threads {threads} --verbose 1 >> {log} 2>&1
         """
 ################################################################################
@@ -53,13 +67,13 @@ rule run_diann:
 ################################################################################
 rule extract_detected_proteins:
   input:
-    protein_info_df=os.path.join(EXPERIMENT_DIR,"input/database_resources/protein_info.txt"),
-    protein_info_fasta =os.path.join(EXPERIMENT_DIR,"input/database_resources/database.fasta"),
-    report_pg_matrix=os.path.join(EXPERIMENT_DIR,"output/diann_output/diann.pg_matrix.tsv")
+    protein_info_df=os.path.join(RUN_DIR,"database_resources/protein_info.txt"),
+    protein_info_fasta =os.path.join(RUN_DIR,"database_resources/database.fasta"),
+    report_pg_matrix=os.path.join(RUN_DIR,"diann_output/diann.pg_matrix.tsv")
   output:
-    detected_protein_info_df = os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/detected_protein_info.txt"),
-    detected_protein_info_fasta = os.path.join(EXPERIMENT_DIR,"input/database_resources/detected_protein_resources/detected_protein.fasta")
-  log: os.path.join(EXPERIMENT_DIR,"logs/diann/extract_detected_proteins.log")
-  container: "docker://baynec2/conduitr:alpha"
+    detected_protein_info_df = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/detected_protein_info.txt"),
+    detected_protein_info_fasta = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/detected_protein.fasta")
+  log: os.path.join(RUN_DIR,"logs/diann/extract_detected_proteins.log")
+  container: config["containers"]["conduitr"]
   script:
     "scripts/extract_detected_proteins.R"

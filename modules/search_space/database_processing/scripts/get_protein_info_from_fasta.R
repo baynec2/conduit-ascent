@@ -14,7 +14,6 @@ taxonomy_txt <- snakemake@input[["taxonomy_txt"]]
 output_file <- snakemake@output[[1]]
 
 start_time <- Sys.time()
-
 # Now everything from print(), message(), warning() will go into the log file
 conduitR::log_with_timestamp("Running get_protein_info_from_fasta.R script")
 conduitR::log_with_timestamp(paste0("Input files: ", snakemake@input[[1]], " and ", snakemake@input[[2]]))

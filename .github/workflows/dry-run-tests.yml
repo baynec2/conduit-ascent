@@ -2,9 +2,9 @@ name: Snakemake dry-run tests
 
 on:
   push:
-    branches: [main, development, testing]
+    branches: [main, develop, testing]
   pull_request:
-    branches: [main, development]
+    branches: [main, develop]
 
 jobs:
   dry-runs:
@@ -22,13 +22,26 @@ jobs:
           pip install "snakemake>=8" pandas
           sudo apt-get install -y graphviz
 
+      - name: Run lint
+        run: snakemake --lint --configfile tests/configs/integration_test_uniprot_proteome_id.yaml
+
       - name: Run dry-run tests
         run: bash tests/run_dry_runs.sh
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: "4.3"
+
+      - name: Install R script test dependencies
+        run: Rscript -e "install.packages(c('readr','dplyr','stringr'), repos='https://cloud.r-project.org')"
+
+      - name: Run R script unit tests
+        run: Rscript tests/scripts/test_parse_eggnogmapper_annotations.R
 
       - name: Generate DAGs
         run: |
           mkdir -p dag_output
-          for method in ncbi_taxonomy_id uniprot_proteome_id peptidotyping MAGs metaphlan; do
+          for method in ncbi_taxonomy_id uniprot_proteome_id peptidotyping unipept_hapid MAGs metaphlan; do
             snakemake \
               --snakefile Snakefile \
               --configfile "tests/configs/integration_test_${method}.yaml" \

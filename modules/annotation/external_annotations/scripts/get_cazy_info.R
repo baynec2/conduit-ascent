@@ -40,7 +40,7 @@ description = c("glycoside_hydrolase","glycosyl_transferase", "polysaccharide_ly
 )
 
 cazy_class_info = dplyr::inner_join(detected_cazy,cazy_class_lookup, by = "class") |>
-dplyr::mutate(annotation_type = "cazy_class") |>
+dplyr::mutate(annotation_type = "uniprot_cazy_class") |>
 dplyr::select(protein_id,annotation_type,term = class,description)
 
 conduitR::log_with_timestamp("Exracting cazy family annotations")
@@ -48,7 +48,7 @@ conduitR::log_with_timestamp("Exracting cazy family annotations")
 cazy_resource = readr::read_delim(cazy_resource_fp,skip = 2,col_names = c("xref_cazy","description"))
 
 cazy_family_info = dplyr::inner_join(detected_cazy,cazy_resource, by = "xref_cazy") |>
-dplyr::mutate(annotation_type = "cazy_family")|>
+dplyr::mutate(annotation_type = "uniprot_cazy_family")|>
 dplyr::select(protein_id,annotation_type,term = xref_cazy,description)
 
 conduitR::log_with_timestamp("Saving cazy class annotations to file")

@@ -40,7 +40,7 @@ dplyr::filter(!is.na(term))
 conduitR::log_with_timestamp("Mapping detected pfams to their identities")
 
 pfam_info = dplyr::inner_join(detected_pfams,pfam_db, by = "term") |>
-dplyr::mutate(annotation_type = "pfam") |>
+dplyr::mutate(annotation_type = "uniprot_pfam") |>
 dplyr::select(protein_id,annotation_type,term,description)|>
 dplyr::distinct()
 

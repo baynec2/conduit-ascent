@@ -1,8 +1,22 @@
 # ===============================
+# Container images
+# ===============================
+containers:
+  conduitr:     "docker://baynec2/conduitr:0aed251"
+  diann:        "docker://baynec2/diann2.1.0:alpha"
+  bakta:        "docker://baynec2/bakta:alpha"
+  metaphlan:    "docker://baynec2/metaphlan:alpha"
+  eggnogmapper: "docker://baynec2/eggnogmapper:2.1.12"
+  umgap:        "docker://baynec2/umgap:alpha"
+  taxonkit:     "quay.io/biocontainers/taxonkit:0.20.0--h9ee0642_1"
+# ===============================
 # Experiment and file configuration
 # ===============================
 # Name of the experiment (used to locate the correct experiment directory)
-experiment: CB020
+experiment:
+# Name of this analysis run (used to namespace all outputs under experiments/{experiment}/runs/{run_name}/)
+# Allows multiple runs with different configs or methods to coexist in the same experiment directory.
+run_name:
 # Config file for generating DIA-NN spectral library (relative to main Snakefile)
 generate_diann_spectral_library_config: config/generate_diann_spectral_library.cfg
 # Config file for running DIA-NN search (relative to main Snakefile)
@@ -34,11 +48,11 @@ relative_abundance_threshold: 0.01
 # Optional: NCBI organism IDs to classify as 'host' rather than 'microbiome'.
 # Set to FALSE or [] to treat all organisms as microbiome.
 # Examples: Human = 9606, Mouse = 10090
-host_organism_ids: [9606, 10090]
+host_organism_ids: []
 # Optional: add an extra proteome ID (e.g., host reference)
 # FALSE = None
 # Examples: Human = UP000005640, Mouse C57/BL6 = UP000000589
-append_additional_proteome_id: UP000000589
+append_additional_proteome_id: FALSE
 # Optional: add an extra NCBI taxonomic ID (e.g., host species)
 # FALSE = None
 # Examples: Human = 9606, Mouse = 10090
@@ -73,6 +87,8 @@ unipept_sequences: "resources/databases/sequences.tsv.lz4" # ~ 1.46 Gb
 unipept_taxons: "resources/databases/taxons.tsv.lz4"
 # Resources needed for mags
 bakta_db_dir: "resources/bakta/db" # ~ 84 GB
+# Resources needed for eggNOG-mapper (used for sequence-based functional annotation)
+eggnogmapper_db_dir: "resources/eggnogmapper/db" # ~50 GB (full) or ~8 GB (bacteria only)
 # Specify the type of bakta database to use "full" (~84 Gb) or "light (~2Gb)"
 bakta_db_type: "light" # ~ 84 GB
 # Might not need this depending on how we want to call MAGs.
