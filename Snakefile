@@ -43,6 +43,7 @@ ALLOWED_METHODS = [
     "MAGs",
     "metaphlan",
     "hapid",
+    "genome_peptidotyping",
    # "16S"
 ]
 # Checking that the method is allowed.   
@@ -110,6 +111,9 @@ module mags:
   config: config
 module hapid:
   snakefile: "modules/search_space/hapid/hapid.smk"
+  config: config
+module genome_peptidotyping:
+  snakefile: "modules/search_space/genome_peptidotyping/genome_peptidotyping.smk"
   config: config
 # Genome download modules (optional pre-step for MAGs/hapid)
 module mgnify_download:
@@ -244,6 +248,16 @@ if config["search_space_method"] == "MAGs":
 # HAPiID: marker-gene profiling → greedy genome selection → Bakta annotation
 if config["search_space_method"] == "hapid":
     use rule * from hapid
+    use rule * from database_processing
+    use rule * from diann
+    use rule * from mag_annotation
+    use rule * from eggnogmapper_annotation
+    use rule * from external_annotation
+
+# Genome peptidotyping: two-pass peptide-based detection → selected genomes → MAGs DB construction
+if config["search_space_method"] == "genome_peptidotyping":
+    use rule * from genome_peptidotyping
+    use rule * from mags
     use rule * from database_processing
     use rule * from diann
     use rule * from mag_annotation

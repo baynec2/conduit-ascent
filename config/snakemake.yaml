@@ -31,9 +31,11 @@ output_dir: output/
 # Method to define the search space. Options:
 # - "ncbi_taxonomy_id": Use NCBI taxonomy IDs
 # - "uniprot_proteome_id": Use UniProt proteome IDs
-# - "peptidotyping": First-pass search on species-specific peptides
-# - "MAGs": Use metagenome-assembled genomes
+# - "peptidotyping": First-pass search on species-specific peptides (UniProt/UMGAP)
+# - "genome_peptidotyping": Peptidotyping on user-provided genomes (no UniProt dependency)
+# - "MAGs": Use metagenome-assembled genomes (all genomes, no selection)
 # - "metaphlan": Use MetaPhlAn profiling
+# - "hapid": HAPiID marker-gene profiling for genome selection
 # - "16S": Use 16S rRNA sequences
 search_space_method: ncbi_taxonomy_id
 ## Peptidotyping specific options
