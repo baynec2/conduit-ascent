@@ -31,6 +31,10 @@ REQUIRED_BAKTA_FILES = (
 
 def get_all_hapid_genomes():
     """Genome IDs from user-provided genome FASTAs (genome mode only)."""
+    if config.get("genome_download_source") == "mgnify":
+        reps_file = checkpoints.parse_mgnify_metadata.get().output.representatives
+        with open(reps_file) as f:
+            return sorted([line.strip() for line in f if line.strip()])
     genomes = []
     for ext in ("fa", "fna", "fasta"):
         for f in glob.glob(os.path.join(HAPID_DIR, f"*.{ext}")):
@@ -83,7 +87,9 @@ def hapid_database_fasta_path(wildcards=None):
 
 rule check_hapid_fastas:
     input:
-        HAPID_DIR
+        HAPID_DIR,
+        *([os.path.join(HAPID_DIR, ".mgnify_download_complete")]
+          if config.get("genome_download_source") == "mgnify" else [])
     output:
         touch(os.path.join(HAPID_DIR, ".fastas_checked"))
     log:

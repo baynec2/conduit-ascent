@@ -99,4 +99,19 @@ gbtk_database: "resources/gbtk" # ~140 GB
 hapid_hmm_profiles: "resources/hapid/ribP_elonF_profiles_refined_manually.hmm"
 hapid_percent_spectra: 80
 hapid_fgs_hmmer_container: "docker://baynec2/fraggenescan_hmmer:alpha"
+# ===============================
+# Genome download configuration
+# ===============================
+# Source for genome downloads. Options: FALSE (user-provided), "mgnify"
+genome_download_source: FALSE
+# MGnify catalog path, e.g., "human-gut/v2.0.2", "chicken-gut/v1.0.1"
+# Browse available catalogs at https://www.ebi.ac.uk/metagenomics/browse/genomes
+mgnify_catalog: ""
+# MGnify FTP base URL (should not need to change)
+mgnify_ftp_base: "https://ftp.ebi.ac.uk/pub/databases/metagenomics/mgnify_genomes"
+# Optional: filter species representatives by GTDB lineage substring
+# e.g., "p__Firmicutes" to only download Firmicutes genomes. FALSE = no filter
+mgnify_taxonomy_filter: FALSE
+# Optional: maximum number of species representatives to download. 0 = no limit
+mgnify_max_genomes: 0
 

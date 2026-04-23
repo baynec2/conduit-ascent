@@ -25,6 +25,10 @@ REQUIRED_BAKTA_FILES = (
 
 # Get MAG names (basenames without extension) for wildcards
 def get_mag_list():
+    if config.get("genome_download_source") == "mgnify":
+        reps_file = checkpoints.parse_mgnify_metadata.get().output.representatives
+        with open(reps_file) as f:
+            return sorted([line.strip() for line in f if line.strip()])
     mags = []
     for ext in ("fa", "fna", "fasta"):
         for f in glob.glob(os.path.join(MAG_DIR, f"*.{ext}")):
@@ -41,7 +45,9 @@ def mag_fasta_path(wildcards):
 
 rule check_mag_fastas:
     input:
-        MAG_DIR
+        MAG_DIR,
+        *([os.path.join(MAG_DIR, ".mgnify_download_complete")]
+          if config.get("genome_download_source") == "mgnify" else [])
     output:
         touch(os.path.join(MAG_DIR, ".fastas_checked"))
     log:

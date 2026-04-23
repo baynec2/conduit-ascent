@@ -111,6 +111,10 @@ module mags:
 module hapid:
   snakefile: "modules/search_space/hapid/hapid.smk"
   config: config
+# Genome download modules (optional pre-step for MAGs/hapid)
+module mgnify_download:
+  snakefile: "modules/genome_download/mgnify/mgnify.smk"
+  config: config
 module ncbi_search_space:
   snakefile: "modules/search_space/ncbi_taxonomy/ncbi_taxonomy.smk"
   config: config
@@ -222,6 +226,10 @@ if config["search_space_method"] == "ncbi_taxonomy_id":
     use rule * from eggnogmapper_annotation
     use rule * from external_annotation
 
+
+# Genome download pre-step (runs before MAG/HAPiID if configured)
+if config.get("genome_download_source") == "mgnify":
+    use rule * from mgnify_download
 
 # Search space specific workflows to generate a search space
 if config["search_space_method"] == "MAGs":
