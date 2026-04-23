@@ -42,6 +42,7 @@ ALLOWED_METHODS = [
     "unipept_hapid",
     "MAGs",
     "metaphlan",
+    "hapid",
    # "16S"
 ]
 # Checking that the method is allowed.   
@@ -107,6 +108,9 @@ module unipept_hapid:
 module mags:
   snakefile: "modules/search_space/MAGs/MAGs.smk"
   config: config
+module hapid:
+  snakefile: "modules/search_space/hapid/hapid.smk"
+  config: config
 module ncbi_search_space:
   snakefile: "modules/search_space/ncbi_taxonomy/ncbi_taxonomy.smk"
   config: config
@@ -156,6 +160,8 @@ rule all:
                ]),
         *([os.path.join(RUN_DIR, "database_resources/database.predicted.speclib")]
           if config.get("diann_search_mode", "standard") == "standard" else []),
+        *([os.path.join(RUN_DIR, "database_resources/hapid/input_taxonomy_plot.pdf")]
+          if config.get("search_space_method") == "hapid" else []),
         expand(os.path.join(RUN_DIR, "database_resources/detected_protein_resources/{file}"),
                file=[
                    "detected_protein_info.txt",
@@ -220,6 +226,16 @@ if config["search_space_method"] == "ncbi_taxonomy_id":
 # Search space specific workflows to generate a search space
 if config["search_space_method"] == "MAGs":
     use rule * from mags
+    use rule * from database_processing
+    use rule * from diann
+    use rule * from mag_annotation
+    use rule * from eggnogmapper_annotation
+    use rule * from external_annotation
+
+
+# HAPiID: marker-gene profiling → greedy genome selection → Bakta annotation
+if config["search_space_method"] == "hapid":
+    use rule * from hapid
     use rule * from database_processing
     use rule * from diann
     use rule * from mag_annotation

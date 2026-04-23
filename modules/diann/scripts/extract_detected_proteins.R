@@ -53,7 +53,7 @@ conduitR::log_with_timestamp("Filtering fasta file to only include detected prot
 # Reading in fasta file
 sequences <- Biostrings::readAAStringSet(protein_info_fasta)
 # Extract UniProt IDs from FASTA headers (expects sp|ID|... or tr|ID|... format)
-uniprot_ids <- names(sequences) |> stringr::str_extract("(?<=\\|)[A-Z0-9]+(?=\\|)")
+uniprot_ids <- names(sequences) |> stringr::str_extract("(?<=\\|)[A-Z0-9_]+(?=\\|)")
 n_failed <- sum(is.na(uniprot_ids))
 if (n_failed > 0) {
   warning(paste0(n_failed, " FASTA headers did not match the expected UniProt format ",

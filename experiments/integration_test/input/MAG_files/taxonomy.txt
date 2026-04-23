@@ -1,0 +1,2 @@
+genome	domain	kingdom	phylum	class	order	family	genus	species
+atcc_25922	Bacteria	Bacteria	Pseudomonadota	Gammaproteobacteria	Enterobacterales	Enterobacteriaceae	Escherichia	Escherichia coli

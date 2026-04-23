@@ -2,7 +2,7 @@
 # Container images
 # ===============================
 containers:
-  conduitr:     "docker://baynec2/conduitr:0aed251"
+  conduitr:     "docker://baynec2/conduitr:0ae9adc"
   diann:        "docker://baynec2/diann2.1.0:alpha"
   bakta:        "docker://baynec2/bakta:alpha"
   metaphlan:    "docker://baynec2/metaphlan:alpha"
@@ -93,4 +93,10 @@ eggnogmapper_db_dir: "resources/eggnogmapper/db" # ~50 GB (full) or ~8 GB (bacte
 bakta_db_type: "light" # ~ 84 GB
 # Might not need this depending on how we want to call MAGs.
 gbtk_database: "resources/gbtk" # ~140 GB
+# ===============================
+# HAPiID configuration
+# ===============================
+hapid_hmm_profiles: "resources/hapid/ribP_elonF_profiles_refined_manually.hmm"
+hapid_percent_spectra: 80
+hapid_fgs_hmmer_container: "docker://baynec2/fraggenescan_hmmer:alpha"
 

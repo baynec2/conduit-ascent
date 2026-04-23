@@ -66,7 +66,7 @@ rule check_mag_fastas:
         touch {output}
         """
 
-bakta_db_final = os.path.join(f"{BAKTA_DIR}-{config['bakta_db_type']}")
+bakta_db_final = os.path.join(BAKTA_DIR, f"db-{config['bakta_db_type']}")
 
 # Download the bakta resources if they do not exist at the user specified resource path.
 rule download_bakta_resources:
@@ -143,36 +143,37 @@ rule annotate_mags_with_bakta:
         echo "Finished {wildcards.mag}" >> {log}
         """
 
+rule parse_mag_taxonomy:
+    input:
+        taxonomy = os.path.join(MAG_DIR, "taxonomy.txt")
+    output:
+        os.path.join(DB_OUT_ROOT, "mag_taxonomy.txt")
+    log:
+        os.path.join(RUN_DIR, "logs/search_space/MAGs/parse_mag_taxonomy.log")
+    container:
+        config["containers"]["bakta"]
+    script:
+        "scripts/parse_mag_taxonomy.py"
+
 rule create_uniprot_style_database:
     input:
         bakta_dirs = lambda wildcards: [
             os.path.join(BAKTA_OUT_ROOT, mag) for mag in get_mag_list()
-        ]
+        ],
+        taxonomy = os.path.join(DB_OUT_ROOT, "mag_taxonomy.txt")
     output:
         fasta = os.path.join(DB_OUT_ROOT, "mag_database.fasta"),
         go = os.path.join(DB_OUT_ROOT, "go_annotations.txt"),
         kegg = os.path.join(DB_OUT_ROOT, "kegg_annotations.txt")
     params:
-        mag_metadata = os.path.join(MAG_DIR, "MAG_metadata.txt")
+        taxonomy = os.path.join(DB_OUT_ROOT, "mag_taxonomy.txt")
     log:
-        os.path.join(RUN_DIR,"logs/search_space/MAGs/create_uniprot_sytle_database.log")
+        os.path.join(RUN_DIR,"logs/search_space/MAGs/create_uniprot_style_database.log")
     container:
         config["containers"]["bakta"]
     script:
         "scripts/MAG_uniprot_headers.py"
 
-rule get_mag_taxonomy:
-    input:
-        # File containing ncbi organism ids
-        mag_metadata = os.path.join(EXPERIMENT_DIR,"input/MAG_files/MAG_metadata.txt")
-    output:
-        taxonomy = os.path.join(RUN_DIR,"database_resources/mag_taxonomy.txt")
-    log: os.path.join(RUN_DIR,"logs/search_space/MAGs/get_mag_taxonomy.log")
-    container: config["containers"]["conduitr"]
-    script:
-      "scripts/get_mag_taxonomy.R"
-
-# This will allow us to integrate 
 rule append_additional_organisms_or_proteomes:
     input:
         # Modifying the mag database to also have uniprot information. 
