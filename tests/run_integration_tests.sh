@@ -4,13 +4,35 @@
 # Usage:
 #   bash tests/run_integration_tests.sh [method]
 #
-#   method: ncbi_taxonomy_id | uniprot_proteome_id | MAGs | metaphlan | peptidotyping | all
+#   method: preflight | ncbi_taxonomy_id | uniprot_proteome_id | MAGs | metaphlan
+#           | peptidotyping | all
 #   Defaults to "all" if not specified.
+#
+# The "preflight" target runs DIA-NN against tests/data/sample1.raw with a trivial
+# FASTA to confirm the raw file is readable. When invoked via "all", preflight runs
+# first and aborts the suite on failure (no point running downstream tests if the
+# raw file cannot be read).
 #
 # Prerequisites:
 #   - snakemake >= 8
 #   - apptainer/singularity
 #   - tests/data/sample1.raw (tracked via Git LFS)
+#
+# Env-var overrides (optional, per-machine; test configs stay portable):
+#   PEPTIDOTYPING_RESOURCE_DIR   if the UMGAP index lives off-repo (e.g., HDD),
+#                                set this and the runner will pass
+#                                --config peptidotyping_resource_dir=$VALUE
+#                                to snakemake. Takes precedence over the config-file value.
+#   TAXONKIT_DB_DIR              location of the taxonkit NCBI taxonomy DB (required by
+#                                peptidotyping + genome_peptidotyping). If
+#                                PEPTIDOTYPING_RESOURCE_DIR is set and this is not,
+#                                defaults to $PEPTIDOTYPING_RESOURCE_DIR/taxonkit per
+#                                the CLAUDE.md convention.
+#   SINGULARITY_BIND_PATHS       comma- or colon-separated list of paths to bind
+#                                into apptainer containers (e.g., /home/nanopore-catalyst/HDD).
+#                                Required whenever an overridden resource dir is outside
+#                                the repo tree, since apptainer does not see external
+#                                paths by default.
 #
 # The metaphlan method mocks the MetaPhlAn database + profiling steps via --omit-from.
 # A pre-committed mock merged_profiles.txt is seeded into the run directory so that
@@ -20,7 +42,7 @@
 #   experiments/integration_test/input/MAG_files/ecoli_mag.fa
 #
 # The peptidotyping method requires a pre-built sequence index at:
-#   resources/peptidotyping/
+#   resources/peptidotyping/  (or wherever PEPTIDOTYPING_RESOURCE_DIR points)
 
 set -euo pipefail
 
@@ -39,24 +61,69 @@ if [ ! -f "$RAW_FILE" ]; then
     exit 1
 fi
 
+# ── Env-var overrides → snakemake args ────────────────────────────────────────
+
+# Collect all config overrides into a single --config invocation, since snakemake's
+# --config uses `store` semantics (a second --config overwrites the first).
+_config_overrides=()
+if [ -n "${PEPTIDOTYPING_RESOURCE_DIR:-}" ]; then
+    _config_overrides+=("peptidotyping_resource_dir=$PEPTIDOTYPING_RESOURCE_DIR")
+fi
+# Taxonkit DB: explicit env var wins; else derive from PEPTIDOTYPING_RESOURCE_DIR/taxonkit
+# per the convention documented in CLAUDE.md.
+_taxonkit_db="${TAXONKIT_DB_DIR:-}"
+if [ -z "$_taxonkit_db" ] && [ -n "${PEPTIDOTYPING_RESOURCE_DIR:-}" ]; then
+    _taxonkit_db="${PEPTIDOTYPING_RESOURCE_DIR%/}/taxonkit"
+fi
+if [ -n "$_taxonkit_db" ]; then
+    _config_overrides+=("taxonkit_db_dir=$_taxonkit_db")
+fi
+
+EXTRA_CONFIG_ARGS=()
+if [ ${#_config_overrides[@]} -gt 0 ]; then
+    EXTRA_CONFIG_ARGS+=(--config "${_config_overrides[@]}")
+fi
+
+SINGULARITY_ARGS=()
+if [ -n "${SINGULARITY_BIND_PATHS:-}" ]; then
+    # Normalize separators (accept comma or colon) → space.
+    bind_arg="--bind ${SINGULARITY_BIND_PATHS//[,:]/,}"
+    SINGULARITY_ARGS+=(--singularity-args "$bind_arg")
+fi
+
+# ── Peptidotyping resource resolution ─────────────────────────────────────────
+# Used by method dispatch functions to skip when the index is unavailable.
+_pep_root="${PEPTIDOTYPING_RESOURCE_DIR:-$REPO_ROOT/resources/peptidotyping}"
+PEPTIDOTYPING_INDEX="${_pep_root%/}/sequences.tsv.lz4"
+
 # ── Runner ────────────────────────────────────────────────────────────────────
 
 run_integration_test() {
     local method="$1"
+    local extra_flags_str="${2:-}"
     local config="$REPO_ROOT/tests/configs/integration_test_${method}.yaml"
-    local extra_flags="${2:-}"
 
     echo "============================================================"
     echo "Integration test: $method"
     echo "============================================================"
 
-    if snakemake \
-        --snakefile "$REPO_ROOT/Snakefile" \
-        --configfile "$config" \
-        --use-singularity \
-        --cores 4 \
-        $extra_flags \
-        2>&1; then
+    local snakemake_cmd=(
+        snakemake
+        --snakefile "$REPO_ROOT/Snakefile"
+        --configfile "$config"
+        --use-singularity
+        --cores 4
+        "${SINGULARITY_ARGS[@]}"
+        "${EXTRA_CONFIG_ARGS[@]}"
+    )
+    # extra_flags_str is a string (e.g., "--omit-from foo bar"). Word-split it.
+    if [ -n "$extra_flags_str" ]; then
+        # shellcheck disable=SC2206
+        local extra_flags=($extra_flags_str)
+        snakemake_cmd+=("${extra_flags[@]}")
+    fi
+
+    if "${snakemake_cmd[@]}" 2>&1; then
         echo "PASS: $method"
         PASSED+=("$method")
     else
@@ -67,6 +134,59 @@ run_integration_test() {
 }
 
 # ── Method dispatch ───────────────────────────────────────────────────────────
+
+run_preflight() {
+    echo "============================================================"
+    echo "Preflight: DIA-NN read test on tests/data/sample1.raw"
+    echo "============================================================"
+    local diann_image="docker://baynec2/diann2.1.0:alpha"
+    local tmpdir
+    tmpdir="$(mktemp -d)"
+    printf '>preflight_test_protein\nMSSSTPPAQKGRGTQGRGRVSLGEGHLGFTTKPSIGGELHTEEA\n' \
+        > "$tmpdir/tiny.fasta"
+    local log="$tmpdir/preflight.log"
+    # --fasta-search + --predictor + single tiny protein gives a fast end-to-end
+    # pass that reads the raw file. Exit status is ignored — we grep the log for
+    # the scan-count line, which is the actual signal.
+    apptainer exec \
+        --bind "$REPO_ROOT/tests/data:/raw" \
+        --bind "$tmpdir:/work" \
+        "$diann_image" \
+        diann \
+            --f /raw/sample1.raw \
+            --fasta /work/tiny.fasta \
+            --fasta-search --gen-spec-lib --predictor \
+            --cut "K*,R*" --missed-cleavages 0 \
+            --unimod4 --mass-acc 10 --mass-acc-ms1 4 \
+            --min-pep-len 7 --max-pep-len 30 \
+            --qvalue 1 --out /work/test.tsv --threads 4 \
+            > "$log" 2>&1 || true
+
+    local scan_line
+    scan_line=$(grep -E "[0-9]+ MS1 and [0-9]+ MS2 scans" "$log" | head -1) || true
+    if [ -z "$scan_line" ]; then
+        echo "FAIL: preflight — DIA-NN did not report MS1/MS2 scan counts for sample1.raw"
+        echo "Last 40 lines of DIA-NN log ($log):"
+        tail -40 "$log"
+        FAILED+=("preflight")
+        return
+    fi
+    # Extract MS1/MS2 counts by field, not regex — "MS1"/"MS2" contain digits that
+    # a naive [0-9]+ match would pick up alongside the intended scan counts.
+    local ms1 ms2
+    ms1=$(echo "$scan_line" | awk '{for(i=1;i<NF;i++) if($(i+1)=="MS1") {print $i; exit}}')
+    ms2=$(echo "$scan_line" | awk '{for(i=1;i<NF;i++) if($(i+1)=="MS2") {print $i; exit}}')
+    if [ "${ms1:-0}" -gt 0 ] && [ "${ms2:-0}" -gt 0 ]; then
+        echo "PASS: preflight — $ms1 MS1 and $ms2 MS2 scans read from sample1.raw"
+        PASSED+=("preflight")
+        rm -rf "$tmpdir"
+    else
+        echo "FAIL: preflight — zero scans read ($ms1 MS1, $ms2 MS2)"
+        echo "Log preserved at: $log"
+        FAILED+=("preflight")
+    fi
+    echo
+}
 
 run_ncbi_taxonomy_id()    { run_integration_test ncbi_taxonomy_id; }
 run_uniprot_proteome_id() {
@@ -101,30 +221,83 @@ run_metaphlan() {
         "--omit-from download_metaphlan_resources run_metaphlan merge_profiles"
 }
 run_peptidotyping() {
-    if [ ! -f "$REPO_ROOT/resources/peptidotyping/sequences.tsv.lz4" ]; then
+    if [ ! -f "$PEPTIDOTYPING_INDEX" ]; then
         echo "SKIP: peptidotyping — sequence index not found at resources/peptidotyping/"
         echo "      Run the build_sequence_index rule first to generate this resource."
         return
     fi
     run_integration_test peptidotyping
 }
+run_genome_peptidotyping() {
+    # Shares the peptidotyping sequence-index prerequisite.
+    if [ ! -f "$PEPTIDOTYPING_INDEX" ]; then
+        echo "SKIP: genome_peptidotyping — peptidotyping sequence index not found."
+        return
+    fi
+    run_integration_test genome_peptidotyping
+}
+run_unipept_hapid() {
+    # Shares the peptidotyping sequence-index prerequisite.
+    if [ ! -f "$PEPTIDOTYPING_INDEX" ]; then
+        echo "SKIP: unipept_hapid — peptidotyping sequence index not found."
+        return
+    fi
+    run_integration_test unipept_hapid
+}
+run_hapid() {
+    if [ ! -f "$REPO_ROOT/resources/hapid/ribP_elonF_profiles_refined_manually.hmm" ]; then
+        echo "SKIP: hapid — HAPiID HMM profiles not found at resources/hapid/."
+        return
+    fi
+    run_integration_test hapid
+}
+run_mgnify_MAGs() {
+    # Exercises the MGnify download path; mgnify_max_genomes: 3 keeps it cheap.
+    run_integration_test mgnify_MAGs
+}
+run_mgnify_hapid() {
+    if [ ! -f "$REPO_ROOT/resources/hapid/ribP_elonF_profiles_refined_manually.hmm" ]; then
+        echo "SKIP: mgnify_hapid — HAPiID HMM profiles not found at resources/hapid/."
+        return
+    fi
+    run_integration_test mgnify_hapid
+}
 
 case "$METHOD" in
+    preflight)           run_preflight ;;
     ncbi_taxonomy_id)    run_ncbi_taxonomy_id ;;
     uniprot_proteome_id) run_uniprot_proteome_id ;;
     MAGs)                run_MAGs ;;
     metaphlan)           run_metaphlan ;;
     peptidotyping)       run_peptidotyping ;;
+    genome_peptidotyping) run_genome_peptidotyping ;;
+    unipept_hapid)       run_unipept_hapid ;;
+    hapid)               run_hapid ;;
+    mgnify_MAGs)         run_mgnify_MAGs ;;
+    mgnify_hapid)        run_mgnify_hapid ;;
     all)
+        run_preflight
+        if [ ${#FAILED[@]} -gt 0 ]; then
+            echo "ERROR: preflight failed — aborting integration tests."
+            echo "  FAILED: ${FAILED[*]}"
+            exit 1
+        fi
         run_ncbi_taxonomy_id
         run_uniprot_proteome_id
         run_MAGs
         run_metaphlan
         run_peptidotyping
+        run_genome_peptidotyping
+        run_unipept_hapid
+        run_hapid
+        run_mgnify_MAGs
+        run_mgnify_hapid
         ;;
     *)
         echo "Unknown method: $METHOD"
-        echo "Valid options: ncbi_taxonomy_id | uniprot_proteome_id | MAGs | metaphlan | peptidotyping | all"
+        echo "Valid options: preflight | ncbi_taxonomy_id | uniprot_proteome_id | MAGs | metaphlan"
+        echo "             | peptidotyping | genome_peptidotyping | unipept_hapid | hapid"
+        echo "             | mgnify_MAGs | mgnify_hapid | all"
         exit 1
         ;;
 esac

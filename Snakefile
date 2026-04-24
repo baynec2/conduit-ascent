@@ -11,8 +11,14 @@ import logging
 from datetime import datetime
 
 
+# Load base defaults. Any --configfile passed on the command line merges on top
+# of this (later files win, per Snakemake semantics), so experiment configs only
+# need to specify deltas (experiment, run_name, search_space_method, tuned flags).
+configfile: "config/snakemake.yaml"
+
+
 # Load configuration from command line
-# Usage: snakemake --configfile path/to/config.yaml --use-apptainer 
+# Usage: snakemake --configfile path/to/config.yaml --use-apptainer
 if not config.get("experiment"):
     raise ValueError("Please provide experiment name in config file, this will be used to find the correct experiment directory")
 
@@ -155,6 +161,8 @@ module build_conduit:
 ################################################################################
 rule all:
     input:
+        # Reproducibility snapshot
+        os.path.join(RUN_DIR, "manifest.json"),
         # Database resources
         expand(os.path.join(RUN_DIR, "database_resources/{file}"),
                file=[
