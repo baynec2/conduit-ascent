@@ -39,7 +39,11 @@
 # downstream rules (call_ncbi_taxa_ids and beyond) are not also pruned from the DAG.
 #
 # The MAGs method requires a FASTA file at:
-#   experiments/integration_test/input/MAG_files/ecoli_mag.fa
+#   experiments/integration_test/input/MAG_files/atcc_25922.fasta
+#
+# All methods read MS spectra from experiments/<exp>/input/ms_files/ — .raw and
+# .mzML are both accepted by DIA-NN. For integration tests this directory
+# contains a symlink to tests/data/sample1.mzML.
 #
 # The peptidotyping method requires a pre-built sequence index at:
 #   resources/peptidotyping/  (or wherever PEPTIDOTYPING_RESOURCE_DIR points)
@@ -136,38 +140,82 @@ run_integration_test() {
 # ── Method dispatch ───────────────────────────────────────────────────────────
 
 run_preflight() {
+    # Preflight exercises DIA-NN's library-search code path (--dir + --lib) —
+    # the same path run_diann uses in production. An earlier version only
+    # exercised --fasta-search + --f, which passed even on a file that broke
+    # the real workflow (see memory/feedback_preflight_must_match_target_codepath.md).
+    #
+    # Steps:
+    #   1. Discover the test spectra file (sample1.mzML preferred; sample1.raw fallback)
+    #   2. Predict a tiny library from a one-protein FASTA
+    #   3. Run DIA-NN library search with --dir pointing at the test data
+    #   4. Parse the scan-count line to confirm the file loaded
     echo "============================================================"
-    echo "Preflight: DIA-NN read test on tests/data/sample1.raw"
+    echo "Preflight: DIA-NN --dir + --lib read test on tests/data/"
     echo "============================================================"
     local diann_image="docker://baynec2/diann2.1.0:alpha"
+
+    # Pick an input — prefer mzML (open format, portable); fall back to .raw.
+    local spectra_file
+    if [ -f "$REPO_ROOT/tests/data/sample1.mzML" ]; then
+        spectra_file="sample1.mzML"
+    elif [ -f "$REPO_ROOT/tests/data/sample1.raw" ]; then
+        spectra_file="sample1.raw"
+    else
+        echo "FAIL: preflight — neither tests/data/sample1.mzML nor sample1.raw found"
+        FAILED+=("preflight")
+        return
+    fi
+
     local tmpdir
     tmpdir="$(mktemp -d)"
+    # Isolate the single test file into its own dir — DIA-NN --dir would
+    # otherwise pick up any other files (sidecars, stale outputs) alongside.
+    mkdir -p "$tmpdir/raw"
+    ln -sf "$REPO_ROOT/tests/data/$spectra_file" "$tmpdir/raw/$spectra_file"
     printf '>preflight_test_protein\nMSSSTPPAQKGRGTQGRGRVSLGEGHLGFTTKPSIGGELHTEEA\n' \
         > "$tmpdir/tiny.fasta"
-    local log="$tmpdir/preflight.log"
-    # --fasta-search + --predictor + single tiny protein gives a fast end-to-end
-    # pass that reads the raw file. Exit status is ignored — we grep the log for
-    # the scan-count line, which is the actual signal.
-    apptainer exec \
-        --bind "$REPO_ROOT/tests/data:/raw" \
-        --bind "$tmpdir:/work" \
-        "$diann_image" \
+
+    local predict_log="$tmpdir/predict.log"
+    local search_log="$tmpdir/search.log"
+
+    # Step 1: predict a tiny library from the tiny FASTA.
+    apptainer exec --bind "$tmpdir:/work" "$diann_image" \
         diann \
-            --f /raw/sample1.raw \
             --fasta /work/tiny.fasta \
             --fasta-search --gen-spec-lib --predictor \
             --cut "K*,R*" --missed-cleavages 0 \
             --unimod4 --mass-acc 10 --mass-acc-ms1 4 \
             --min-pep-len 7 --max-pep-len 30 \
-            --qvalue 1 --out /work/test.tsv --threads 4 \
-            > "$log" 2>&1 || true
+            --out-lib /work/tiny \
+            --threads 4 \
+            > "$predict_log" 2>&1 || true
+    if [ ! -f "$tmpdir/tiny.predicted.speclib" ]; then
+        echo "FAIL: preflight — library prediction step did not produce /tmp/.../tiny.predicted.speclib"
+        echo "Last 30 lines of predict log:"
+        tail -30 "$predict_log"
+        FAILED+=("preflight")
+        return
+    fi
+
+    # Step 2: library-based search against /work/raw (the real path run_diann uses).
+    apptainer exec --bind "$tmpdir:/work" "$diann_image" \
+        diann \
+            --dir /work/raw \
+            --lib /work/tiny.predicted.speclib \
+            --fasta /work/tiny.fasta \
+            --qvalue 1 \
+            --mass-acc 10 --mass-acc-ms1 4 \
+            --out /work/search_report \
+            --threads 4 \
+            > "$search_log" 2>&1 || true
 
     local scan_line
-    scan_line=$(grep -E "[0-9]+ MS1 and [0-9]+ MS2 scans" "$log" | head -1) || true
+    scan_line=$(grep -E "[0-9]+ MS1 and [0-9]+ MS2 scans" "$search_log" | head -1) || true
     if [ -z "$scan_line" ]; then
-        echo "FAIL: preflight — DIA-NN did not report MS1/MS2 scan counts for sample1.raw"
-        echo "Last 40 lines of DIA-NN log ($log):"
-        tail -40 "$log"
+        echo "FAIL: preflight — DIA-NN library search did not report scan counts for $spectra_file"
+        echo "Last 40 lines of search log ($search_log):"
+        tail -40 "$search_log"
         FAILED+=("preflight")
         return
     fi
@@ -177,12 +225,12 @@ run_preflight() {
     ms1=$(echo "$scan_line" | awk '{for(i=1;i<NF;i++) if($(i+1)=="MS1") {print $i; exit}}')
     ms2=$(echo "$scan_line" | awk '{for(i=1;i<NF;i++) if($(i+1)=="MS2") {print $i; exit}}')
     if [ "${ms1:-0}" -gt 0 ] && [ "${ms2:-0}" -gt 0 ]; then
-        echo "PASS: preflight — $ms1 MS1 and $ms2 MS2 scans read from sample1.raw"
+        echo "PASS: preflight — $ms1 MS1 and $ms2 MS2 scans read from $spectra_file (--dir + --lib mode)"
         PASSED+=("preflight")
         rm -rf "$tmpdir"
     else
         echo "FAIL: preflight — zero scans read ($ms1 MS1, $ms2 MS2)"
-        echo "Log preserved at: $log"
+        echo "Log preserved at: $search_log"
         FAILED+=("preflight")
     fi
     echo

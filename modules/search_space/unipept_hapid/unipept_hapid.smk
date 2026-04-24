@@ -25,7 +25,7 @@ import os
 
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR = config["run_dir"]
-RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/raw_files/*.raw"))
+RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/ms_files/*.raw"))
 
 ################################################################################
 # Generating the HAPiID-style peptide database
@@ -196,7 +196,7 @@ rule generate_hapid_spectral_library:
 ################################################################################
 rule perform_hapid_first_pass_search:
     input:
-        raw_files_dir    = os.path.join(EXPERIMENT_DIR,"input/raw_files"),
+        raw_files_dir    = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
         spectral_library = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping.predicted.speclib"),
         fasta            = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping_db.fasta"),
         config_file      = config["diann_library_search_base_config"]

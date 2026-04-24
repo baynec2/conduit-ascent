@@ -2,7 +2,7 @@ import glob
 import os
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR = config["run_dir"]
-RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/raw_files/*.raw"))
+RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/ms_files/*.raw"))
 
 ################################################################################
 # Determining Version of Uniprotkb that is being used in experiment
@@ -432,7 +432,7 @@ rule build_effective_detection_rank_db:
 # specific if they do not exist (as defined in uild_effective_detection_rank_db).
 rule perform_first_pass_search:
     input:
-        raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/raw_files"),
+        raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
         fasta = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
         config_file = "config/peptidotyping_infinidia.cfg"
     output:
@@ -545,7 +545,7 @@ rule generate_second_pass_db:
 # which specific species and strains are present within the detected families.
 rule perform_second_pass_search:
     input:
-        raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/raw_files"),
+        raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
         fasta         = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_database.fasta"),
         config_file   = "config/peptidotyping_infinidia.cfg"
     output:

@@ -4,7 +4,7 @@ import os
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR = config["run_dir"]
 MAG_DIR = os.path.join(EXPERIMENT_DIR, "input/MAG_files")
-RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/raw_files/*.raw"))
+RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/ms_files/*.raw"))
 
 # Output directories for genome peptidotyping intermediate files
 GP_RESOURCE_DIR = os.path.join(RUN_DIR, "database_resources/genome_peptidotyping")
@@ -279,7 +279,7 @@ rule build_genome_peptidotyping_effective_detection_rank_db:
 
 rule perform_genome_peptidotyping_first_pass_search:
     input:
-        raw_files_dir = os.path.join(EXPERIMENT_DIR, "input/raw_files"),
+        raw_files_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files"),
         fasta = os.path.join(GP_RESOURCE_DIR, "effective_first_pass_database.fasta"),
         config_file = "config/peptidotyping_infinidia.cfg"
     output:
@@ -366,7 +366,7 @@ rule generate_genome_peptidotyping_second_pass_db:
 
 rule perform_genome_peptidotyping_second_pass_search:
     input:
-        raw_files_dir = os.path.join(EXPERIMENT_DIR, "input/raw_files"),
+        raw_files_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files"),
         fasta         = os.path.join(GP_RESOURCE_DIR, "second_pass_database.fasta"),
         config_file   = "config/peptidotyping_infinidia.cfg"
     output:

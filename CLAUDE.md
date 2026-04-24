@@ -19,7 +19,7 @@ modules/
 ├── annotation/            # UniProt, eggNOG-mapper, external annotations
 └── build_conduit/         # Final conduit object construction (uses conduitR)
 config/                    # DIA-NN and tool config files
-experiments/               # Per-experiment input dirs (raw files, config YAML)
+experiments/               # Per-experiment input dirs (ms_files/*.raw|*.mzML, config YAML)
 tests/                     # Integration tests
 ```
 

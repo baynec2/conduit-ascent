@@ -62,15 +62,24 @@ METHOD = config["search_space_method"]
 if METHOD not in ALLOWED_METHODS:
     raise ValueError(f"Method '{METHOD}' not allowed. Must be one of: {', '.join(ALLOWED_METHODS)}")
 
-# Get the full paths to all raw files by joining experiment dir with pattern and then using glob
-RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/raw_files/*.raw"))
+# Collect both .raw (Thermo native) and .mzML (open format) — DIA-NN accepts
+# both as inputs. Tests ship mzML because some filtered raw files are missing
+# instrument-index metadata DIA-NN needs in library-search mode; real runs
+# typically use .raw directly. Directory is named ms_files/ (not raw_files/)
+# because it may hold either format.
+RAW_FILEPATHS = (
+    glob.glob(os.path.join(EXPERIMENT_DIR, "input/ms_files/*.raw"))
+    + glob.glob(os.path.join(EXPERIMENT_DIR, "input/ms_files/*.mzML"))
+)
 # Get just the base filenames without extension for SAMPLES
 SAMPLES = []  # Initialize empty list
 for filepath in RAW_FILEPATHS:
     # Get just the filename without path and without extension
-    basename = os.path.basename(filepath)  # gets 'example2.raw'
-    name_without_ext = os.path.splitext(basename)[0]  # gets 'example2'
+    basename = os.path.basename(filepath)  # 'example2.raw' or 'example2.mzML'
+    name_without_ext = os.path.splitext(basename)[0]  # 'example2'
     SAMPLES.append(name_without_ext)
+# If a sample is present as both .raw and .mzML, keep a stable unique list.
+SAMPLES = sorted(set(SAMPLES))
 
 # Print found samples for debugging
 print(f"Found samples: {SAMPLES}", file=sys.stderr)

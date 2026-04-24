@@ -2,7 +2,7 @@ import glob
 import os
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR = config["run_dir"]
-RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/raw_files/*.raw"))
+RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/ms_files/*.raw"))
 #################################################################################
 # Generating Spectral Library
 #################################################################################
@@ -35,7 +35,7 @@ rule generate_diann_spectral_library:
 ################################################################################
 rule run_diann:
     input:
-        raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/raw_files"),
+        raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
         spectral_library = lambda w: (
             os.path.join(RUN_DIR,"database_resources/database.predicted.speclib")
             if config.get("diann_search_mode", "standard") == "standard"

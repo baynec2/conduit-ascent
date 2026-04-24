@@ -237,7 +237,7 @@ rule create_hapid_profiling_spectral_library:
 
 rule perform_hapid_profiling_search:
     input:
-        raw_dir = os.path.join(EXPERIMENT_DIR, "input/raw_files"),
+        raw_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files"),
         speclib = os.path.join(HAPID_OUT_ROOT, "marker_gene.predicted.speclib"),
         fasta   = marker_gene_db_path,
         cfg     = config["diann_library_search_base_config"]
