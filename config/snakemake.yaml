@@ -1,6 +1,44 @@
-# ===============================
-# Container images
-# ===============================
+# =============================================================================
+#  conduit-ascent base configuration
+# -----------------------------------------------------------------------------
+#  This file is the source of default values for every run. The Snakefile loads
+#  it automatically via `configfile:`. Any experiment-specific --configfile
+#  merges on top (later wins), and --config key=value wins over both. See
+#  memory-aid "precedence cheat sheet" in the docs if this stops feeling
+#  obvious.
+#
+#  Keys are grouped by WHICH METHOD NEEDS THEM — jump to the section for the
+#  search_space_method you're running. Truly-shared keys are at the top.
+# =============================================================================
+
+
+# =============================================================================
+#  SHARED — all methods
+# =============================================================================
+
+# --- Required per run (experiment YAML overrides these) ---
+# Name of the experiment; used to locate experiments/<experiment>/ and namespace outputs.
+experiment:
+# Name of this analysis run; outputs land under experiments/<experiment>/runs/<run_name>/.
+# Multiple runs with different configs/methods can coexist in the same experiment dir.
+run_name:
+# Which search-space method to use. Options:
+#   ncbi_taxonomy_id     user-provided NCBI taxon IDs → UniProt proteomes
+#   uniprot_proteome_id  user-provided UniProt proteome IDs
+#   peptidotyping        UMGAP-LCA peptide-based species detection
+#   unipept_hapid        HAPiID-style GO-filtered first-pass
+#   genome_peptidotyping peptidotyping on user-provided genomes (no UniProt)
+#   metaphlan            MetaPhlAn profiling → NCBI taxon IDs
+#   MAGs                 all user-provided MAGs, no selection
+#   hapid                HAPiID marker-gene profiling → greedy genome selection
+search_space_method: ncbi_taxonomy_id
+# Sample annotation file (relative to experiment dir).
+sample_annotation: input/sample_annotation.txt
+# Output dir (relative to experiment dir).
+output_dir: output/
+
+# --- Container images ---
+# Moving tags like :alpha / :develop are OK for active dev; pin to @sha256:... for reproducibility.
 containers:
   conduitr:     "docker://baynec2/conduitr:0ae9adc"
   diann:        "docker://baynec2/diann2.1.0:alpha"
@@ -9,115 +47,112 @@ containers:
   eggnogmapper: "docker://baynec2/eggnogmapper:2.1.12"
   umgap:        "docker://baynec2/umgap:alpha"
   taxonkit:     "quay.io/biocontainers/taxonkit:0.20.0--h9ee0642_1"
-# ===============================
-# Experiment and file configuration
-# ===============================
-# Name of the experiment (used to locate the correct experiment directory)
-experiment:
-# Name of this analysis run (used to namespace all outputs under experiments/{experiment}/runs/{run_name}/)
-# Allows multiple runs with different configs or methods to coexist in the same experiment directory.
-run_name:
-# Base config for DIA-NN spectral-library generation (shared flags only;
-# per-purpose digest flags are passed inline by each calling rule).
-diann_spectral_library_base_config: config/diann_spectral_library_base.cfg
-# Base config for DIA-NN library-based searches (shared flags only;
-# per-purpose digest flags are passed inline by each calling rule).
-diann_library_search_base_config: config/diann_library_search_base.cfg
-# Config file for running DIA-NN search (relative to main Snakefile)
-run_diann_config: config/run_diann.cfg
-# Sample annotation file path (relative to experiment directory)
-sample_annotation: input/sample_annotation.txt
-# Output directory path (relative to experiment directory)
-output_dir: output/
-# ===============================
-# Search space configuration
-# ===============================
-# Method to define the search space. Options:
-# - "ncbi_taxonomy_id": Use NCBI taxonomy IDs
-# - "uniprot_proteome_id": Use UniProt proteome IDs
-# - "peptidotyping": First-pass search on species-specific peptides (UniProt/UMGAP)
-# - "genome_peptidotyping": Peptidotyping on user-provided genomes (no UniProt dependency)
-# - "MAGs": Use metagenome-assembled genomes (all genomes, no selection)
-# - "metaphlan": Use MetaPhlAn profiling
-# - "hapid": HAPiID marker-gene profiling for genome selection
-# - "16S": Use 16S rRNA sequences
-search_space_method: ncbi_taxonomy_id
-## Peptidotyping specific options
-# If using peptidotyping, the number of unique peptides that must be identified to call a species present. 
-presence_min_peptides: 3
-presence_min_coverage: 0
-min_taxon_db_peptides: 10
-## Metaphlan specific options 
-# If using sequencing-based methods, the minimum relative abundance to include a species
-relative_abundance_threshold: 0.01
-## Options for all workflows
-# Optional: NCBI organism IDs to classify as 'host' rather than 'microbiome'.
-# Set to FALSE or [] to treat all organisms as microbiome.
-# Examples: Human = 9606, Mouse = 10090
-host_organism_ids: []
-# Optional: add an extra proteome ID (e.g., host reference)
-# FALSE = None
-# Examples: Human = UP000005640, Mouse C57/BL6 = UP000000589
-append_additional_proteome_id: FALSE
-# Optional: add an extra NCBI taxonomic ID (e.g., host species)
-# FALSE = None
-# Examples: Human = 9606, Mouse = 10090
-append_additional_ncbi_taxa_id: FALSE
-## Exclude from database
-# This may be useful especially for peptidotyping. If it detects
-# Optional: exclude proteome id from database
-# FALSE = Mone
-# Examples: Human = UP000005640, Mouse C57/BL6 = UP000000589
-exclude_proteome_id: FALSE
-# Optional: exclude ncbi_taxa_id from database
-# FALSE = Mone
-# Examples: Human = UP000005640, Mouse C57/BL6 = UP000000589
-exclude_ncbi_taxa_id: FALSE
-# ===============================
-# Resource configuration. Allows the user to specify paths to any hefty resources if they already exist on system.
-# If not, conduit will handle their download automatically if they are required by workflow user specifies.
-# ===============================
-# Peptidotyping resources
-peptidotyping_resource_dir: "resources/peptidotyping/"
-# Annotation resources. 
-eggnog_database: "resources/annotation/eggnog/e5.og_annotations.tsv" # ~200mb
-# Download URLs for external annotation databases.
-# Update these if a newer version of a database is available.
-pfam_db_url: "https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/pfamA.txt.gz"
-cazy_db_url: "https://pro.unl.edu/dbCAN2/download/Databases/CAZyDB.07302020.fam-activities.txt"
-eggnog_db_url: "http://eggnog6.embl.de/download/eggnog_5.0/e5.og_annotations.tsv"
-# Resources for metaphlan strategy.
-metaphlan_database_dir: "resources/metaphlan" # ~54 Gb
-# Resources for peptidotyping strategy
-unipept_sequences: "resources/databases/sequences.tsv.lz4" # ~ 1.46 Gb
-unipept_taxons: "resources/databases/taxons.tsv.lz4"
-# Resources needed for mags
-bakta_db_dir: "resources/bakta/db" # ~ 84 GB
-# Resources needed for eggNOG-mapper (used for sequence-based functional annotation)
-eggnogmapper_db_dir: "resources/eggnogmapper/db" # ~50 GB (full) or ~8 GB (bacteria only)
-# Specify the type of bakta database to use "full" (~84 Gb) or "light (~2Gb)"
-bakta_db_type: "light" # ~ 84 GB
-# Might not need this depending on how we want to call MAGs.
-gbtk_database: "resources/gbtk" # ~140 GB
-# ===============================
-# HAPiID configuration
-# ===============================
-hapid_hmm_profiles: "resources/hapid/ribP_elonF_profiles_refined_manually.hmm"
-hapid_percent_spectra: 80
-hapid_fgs_hmmer_container: "docker://baynec2/fraggenescan_hmmer:alpha"
-# ===============================
-# Genome download configuration
-# ===============================
-# Source for genome downloads. Options: FALSE (user-provided), "mgnify"
-genome_download_source: FALSE
-# MGnify catalog path, e.g., "human-gut/v2.0.2", "chicken-gut/v1.0.1"
-# Browse available catalogs at https://www.ebi.ac.uk/metagenomics/browse/genomes
-mgnify_catalog: ""
-# MGnify FTP base URL (should not need to change)
-mgnify_ftp_base: "https://ftp.ebi.ac.uk/pub/databases/metagenomics/mgnify_genomes"
-# Optional: filter species representatives by GTDB lineage substring
-# e.g., "p__Firmicutes" to only download Firmicutes genomes. FALSE = no filter
-mgnify_taxonomy_filter: FALSE
-# Optional: maximum number of species representatives to download. 0 = no limit
-mgnify_max_genomes: 0
 
+# --- DIA-NN cfg-file pointers (rarely changed per-experiment) ---
+# Shared flags for spectral-library generation. Per-rule digest flags are inline in module rules.
+diann_spectral_library_base_config: config/diann_spectral_library_base.cfg
+# Shared flags for library-based DIA-NN searches (HAPiID-style).
+diann_library_search_base_config: config/diann_library_search_base.cfg
+# Main DIA-NN search config. The setup rule selects run_diann_infinidia.cfg automatically
+# when diann_search_mode == "infinidia".
+run_diann_config: config/run_diann.cfg
+
+# --- Host / target filtering (optional; applies to every method) ---
+# NCBI IDs to tag as 'host' rather than 'microbiome' (e.g., 9606 = human, 10090 = mouse).
+# Set to FALSE or [] to treat all organisms as microbiome.
+host_organism_ids: []
+# Append an extra UniProt proteome to the database (e.g., a host reference).
+# FALSE = none.  Examples: Human = UP000005640, Mouse C57/BL6 = UP000000589.
+append_additional_proteome_id: FALSE
+# Append an extra NCBI taxon ID to the database (same idea, different key).
+# FALSE = none.  Examples: Human = 9606, Mouse = 10090.
+append_additional_ncbi_taxa_id: FALSE
+# Exclude a UniProt proteome ID from the database. Useful in peptidotyping when a
+# host is detected by the first pass but you don't want its proteome in the final DB.
+# FALSE = none.
+exclude_proteome_id: FALSE
+# Exclude an NCBI taxon ID from the database. FALSE = none.
+exclude_ncbi_taxa_id: FALSE
+
+# --- Annotation resources (eggnog-mapper runs for every method) ---
+eggnogmapper_db_dir: "resources/eggnogmapper/db"       # ~50 GB (full) or ~8 GB (bacteria only)
+eggnog_database:     "resources/annotation/eggnog/e5.og_annotations.tsv"  # ~200 MB
+pfam_db_url:         "https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/pfamA.txt.gz"
+cazy_db_url:         "https://pro.unl.edu/dbCAN2/download/Databases/CAZyDB.07302020.fam-activities.txt"
+eggnog_db_url:       "http://eggnog6.embl.de/download/eggnog_5.0/e5.og_annotations.tsv"
+
+
+# =============================================================================
+#  PEPTIDOTYPING FAMILY
+#  Used by: peptidotyping · unipept_hapid · genome_peptidotyping
+# =============================================================================
+# Location of UMGAP-derived sequences.tsv.lz4 + taxons.tsv.lz4 (~170 GB combined).
+# For per-machine off-repo storage, set PEPTIDOTYPING_RESOURCE_DIR env var when
+# invoking via tests/run_integration_tests.sh — the runner injects --config.
+peptidotyping_resource_dir: "resources/peptidotyping/"
+# Location of the taxonkit NCBI-taxonomy database. Convention is this lives under
+# peptidotyping_resource_dir (CLAUDE.md); the test runner derives it from
+# PEPTIDOTYPING_RESOURCE_DIR if TAXONKIT_DB_DIR isn't set.
+taxonkit_db_dir: "resources/peptidotyping/taxonkit"
+# Minimum unique peptides to call a species present.
+presence_min_peptides: 3
+# Minimum coverage to call a species present (0 = no coverage filter).
+presence_min_coverage: 0
+# Minimum diagnostic peptides per taxon required for it to enter the search database.
+min_taxon_db_peptides: 10
+
+
+# =============================================================================
+#  HAPiID
+#  Used by: hapid · mgnify_hapid
+# =============================================================================
+# HMM profiles for marker-gene identification (ribosomal proteins, elongation factors).
+hapid_hmm_profiles: "resources/hapid/ribP_elonF_profiles_refined_manually.hmm"
+# Greedy genome-selection cutoff — take the smallest set of genomes that covers this
+# fraction of marker-gene-annotated spectra.
+hapid_percent_spectra: 80
+# Container for FragGeneScan + HMMER (ORF prediction + marker-gene matching).
+hapid_fgs_hmmer_container: "docker://baynec2/fraggenescan_hmmer:alpha"
+
+
+# =============================================================================
+#  MAGs / bakta annotation
+#  Used by: MAGs · hapid · genome_peptidotyping
+#           (any method that produces MAGs to annotate, incl. mgnify_* variants)
+# =============================================================================
+# Bakta database location and variant.
+# Bakta DB size: light ~2 GB, full ~84 GB. The light DB is sufficient for most
+# bacterial-MAG workflows; use full only when you need plasmid/viral DBs.
+bakta_db_dir:  "resources/bakta/db"
+bakta_db_type: "light"
+
+
+# =============================================================================
+#  MetaPhlAn
+#  Used by: metaphlan
+# =============================================================================
+metaphlan_database_dir: "resources/metaphlan"   # ~54 GB
+# Minimum relative abundance to include a species from MetaPhlAn profiling.
+relative_abundance_threshold: 0.01
+
+
+# =============================================================================
+#  MGnify genome download  (optional pre-step)
+#  Activated when: genome_download_source == "mgnify"
+#  Consumed by:    MAGs · hapid · genome_peptidotyping (when the flag is set)
+# =============================================================================
+# Where to fetch genomes from. FALSE = user-provided MAGs only. "mgnify" = download.
+genome_download_source: FALSE
+# MGnify catalog string. The string IS the version pin (no extra version key needed).
+# e.g. "human-gut/v2.0.2", "chicken-gut/v1.0.1"
+# Browse: https://www.ebi.ac.uk/metagenomics/browse/genomes
+mgnify_catalog: ""
+# FTP base — should not need to change.
+mgnify_ftp_base: "https://ftp.ebi.ac.uk/pub/databases/metagenomics/mgnify_genomes"
+# Optional GTDB-lineage substring filter. e.g. "p__Firmicutes". FALSE = no filter.
+mgnify_taxonomy_filter: FALSE
+# Optional cap on number of species representatives to download. 0 = no limit.
+mgnify_max_genomes: 0
+# Shared genome cache root — one subdir per catalog (phase-2 globalization).
+# Multiple experiments using the same mgnify_catalog share one copy.
+mgnify_cache_dir: "resources/genome_databases/mgnify"
