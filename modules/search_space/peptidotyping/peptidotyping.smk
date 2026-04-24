@@ -5,50 +5,11 @@ RUN_DIR = config["run_dir"]
 RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/raw_files/*.raw"))
 
 ################################################################################
-# Generating the Sequence Index
-################################################################################
-# This is needed to generate the file containing all peptides in TREMBL and SWISSPROT
-# And their LCAS. See https://github.com/unipept/unipept-database/issues/75
-rule build_sequence_index:
-    output:
-        sequences = os.path.join(config["peptidotyping_resource_dir"],"sequences.tsv.lz4"),
-        taxons    = os.path.join(config["peptidotyping_resource_dir"],"taxons.tsv.lz4")
-    params:
-        outdir = config["peptidotyping_resource_dir"],
-        temp_outdir = os.path.join(config["peptidotyping_resource_dir"],"temp")
-    log:
-        os.path.join(config["peptidotyping_resource_dir"],"logs/build_sequence_index.log")
-    container:
-        config["containers"]["umgap"]
-    shell:
-        r"""
-        set -euo pipefail
-
-        # Ensure directories exist
-        mkdir -p {params.outdir}
-        mkdir -p $(dirname {log})
-        mkdir -p {params.temp_outdir}
-
-        # Download UniProt release notes
-        curl -L \
-          -o {params.outdir}/relnotes.txt \
-          https://ftp.uniprot.org/pub/databases/uniprot/relnotes.txt
-
-        # Setting temp dir (must be absolute so cargo resolves it correctly)
-        export TMPDIR=$(realpath {params.temp_outdir})
-
-        # Build UMGAP peptidotyping tables
-        modules/search_space/peptidotyping/scripts/unipept-database/scripts/generate_umgap_tables.sh tryptic \
-          --output-dir {params.outdir} \
-          --database-sources swissprot,trembl \
-          --temp-dir {params.temp_outdir} \
-          --min-peptide-length 5 \
-          --max-peptide-length 50 \
-          >> {log} 2>&1
-        """
-################################################################################
 # Determining Version of Uniprotkb that is being used in experiment
 ################################################################################
+# Note: build_sequence_index (which produces sequences.tsv.lz4 + taxons.tsv.lz4)
+# is shared with the unipept_hapid module and lives in
+# modules/search_space/_shared/unipept_resources.smk.
 rule check_sequence_index_version:
     input:
         relnotes = os.path.join(config["peptidotyping_resource_dir"],"relnotes.txt")

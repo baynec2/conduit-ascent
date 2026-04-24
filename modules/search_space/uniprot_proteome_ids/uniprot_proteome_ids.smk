@@ -58,35 +58,7 @@ rule get_taxonomy:
     script:
       "scripts/get_taxonomy.R"
 
-# Taking the data from fasta and taxonomy file, putting it in fasta.
-rule get_protein_info_from_fasta:
-    input:
-      database_fasta= os.path.join(RUN_DIR,"database_resources/database.fasta"),
-      taxonomy_txt= os.path.join(RUN_DIR,"database_resources/taxonomy.txt")
-    output:
-      os.path.join(RUN_DIR,"database_resources/protein_info.txt")
-    log:
-      os.path.join(RUN_DIR,"logs/search_space/ncbi_taxonomy/get_protein_info_from_fasta.log")
-    container: config["containers"]["conduitr"]
-    script:
-      "scripts/get_protein_info_from_fasta.R"
-
-# Plotting a taxonomic tree containing the taxonomy used in experiment
-rule plot_taxonomic_tree:
-    input: os.path.join(RUN_DIR,"database_resources/taxonomy.txt")
-    output: os.path.join(RUN_DIR,"database_resources/taxonomic_tree_of_database.pdf")
-    log: os.path.join(RUN_DIR,"logs/search_space/ncbi_taxonomy/plot_taxonomic_tree.log")
-    container: config["containers"]["conduitr"]
-    script:
-      "scripts/plot_taxonomic_tree.R"
-
-# Creating a DataBase ReadMe
-rule make_database_resources_readme:
-    input: os.path.join(RUN_DIR,"database_resources/protein_info.txt")
-    output:
-      md = os.path.join(RUN_DIR,"database_resources/README.md"),
-      html = os.path.join(RUN_DIR,"database_resources/README.html")
-    log: os.path.join(RUN_DIR,"logs/search_space/ncbi_taxonomy/make_database_resources_readme.log")
-    container: config["containers"]["conduitr"]
-    script:
-     "scripts/make_database_resources_readme.R"
+# Note: get_protein_info_from_fasta, plot_taxonomic_tree, and
+# make_database_resources_readme are provided by database_processing.smk.
+# All UniProt-based search-space methods include that module alongside this
+# one via `use rule * from database_processing` in the main Snakefile.

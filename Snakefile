@@ -112,6 +112,10 @@ module peptidotyping:
 module unipept_hapid:
   snakefile: "modules/search_space/unipept_hapid/unipept_hapid.smk"
   config: config
+# Shared Unipept resource build (used by both peptidotyping and unipept_hapid).
+module shared_unipept_resources:
+  snakefile: "modules/search_space/_shared/unipept_resources.smk"
+  config: config
 module mags:
   snakefile: "modules/search_space/MAGs/MAGs.smk"
   config: config
@@ -191,6 +195,7 @@ use rule * from setup
 # Search space specific workflows to generate a search space
 if config["search_space_method"] == "uniprot_proteome_id":
     use rule * from uniprot_proteome_ids_search_space
+    use rule * from database_processing
     use rule * from diann
     use rule * from uniprot_annotation
     use rule * from eggnogmapper_annotation
@@ -198,9 +203,11 @@ if config["search_space_method"] == "uniprot_proteome_id":
 
 # Peptidotyping: family-level first-pass with genus fallback, then species/strain second pass
 if config["search_space_method"] == "peptidotyping":
+    use rule * from shared_unipept_resources
     use rule * from peptidotyping
     use rule * from ncbi_search_space
     use rule * from uniprot_proteome_ids_search_space
+    use rule * from database_processing
     use rule * from diann
     use rule * from uniprot_annotation
     use rule * from eggnogmapper_annotation
@@ -208,9 +215,11 @@ if config["search_space_method"] == "peptidotyping":
 
 # unipept_hapid: HAPiID-inspired GO-filtered first pass directly at species/strain level
 if config["search_space_method"] == "unipept_hapid":
+    use rule * from shared_unipept_resources
     use rule * from unipept_hapid
     use rule * from ncbi_search_space
     use rule * from uniprot_proteome_ids_search_space
+    use rule * from database_processing
     use rule * from diann
     use rule * from uniprot_annotation
     use rule * from eggnogmapper_annotation
@@ -221,16 +230,18 @@ if config["search_space_method"] == "metaphlan":
     use rule * from metaphlan
     use rule * from ncbi_search_space
     use rule * from uniprot_proteome_ids_search_space
+    use rule * from database_processing
     use rule * from diann
     use rule * from uniprot_annotation
     use rule * from eggnogmapper_annotation
     use rule * from external_annotation
 
 
-# NCBI taxa id based workflow uses entire ncbi module. 
+# NCBI taxa id based workflow uses entire ncbi module.
 if config["search_space_method"] == "ncbi_taxonomy_id":
     use rule * from ncbi_search_space
     use rule * from uniprot_proteome_ids_search_space
+    use rule * from database_processing
     use rule * from diann
     use rule * from uniprot_annotation
     use rule * from eggnogmapper_annotation

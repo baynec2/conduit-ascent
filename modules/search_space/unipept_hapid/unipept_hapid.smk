@@ -13,9 +13,9 @@
 # first-pass search results are used directly to identify present species/strains
 # which are then handed off as ncbi_taxa_ids.txt to the ncbi_taxonomy_id workflow.
 #
-# TODO: Both this module and `peptidotyping` share the same underlying Unipept
-# resource files (sequences.tsv.lz4, taxons.tsv.lz4) via peptidotyping_resource_dir.
-# build_sequence_index is duplicated here; only one method should be active at a time.
+# Note: build_sequence_index (which produces sequences.tsv.lz4 + taxons.tsv.lz4)
+# is shared with the peptidotyping module and lives in
+# modules/search_space/_shared/unipept_resources.smk.
 #
 # Reference: HAPiID — https://pmc.ncbi.nlm.nih.gov/articles/PMC8017886/
 ################################################################################
@@ -26,43 +26,6 @@ import os
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR = config["run_dir"]
 RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/raw_files/*.raw"))
-
-################################################################################
-# Building the Unipept Sequence Index (shared resource with peptidotyping)
-################################################################################
-rule build_sequence_index:
-    output:
-        sequences = os.path.join(config["peptidotyping_resource_dir"],"sequences.tsv.lz4"),
-        taxons    = os.path.join(config["peptidotyping_resource_dir"],"taxons.tsv.lz4")
-    params:
-        outdir = config["peptidotyping_resource_dir"],
-        temp_outdir = os.path.join(config["peptidotyping_resource_dir"],"temp")
-    log:
-        os.path.join(config["peptidotyping_resource_dir"],"logs/build_sequence_index.log")
-    container:
-        config["containers"]["umgap"]
-    shell:
-        r"""
-        set -euo pipefail
-
-        mkdir -p {params.outdir}
-        mkdir -p $(dirname {log})
-        mkdir -p {params.temp_outdir}
-
-        curl -L \
-          -o {params.outdir}/relnotes.txt \
-          https://ftp.uniprot.org/pub/databases/uniprot/relnotes.txt
-
-        export TMPDIR={params.temp_outdir}
-
-        modules/search_space/peptidotyping/scripts/unipept-database/scripts/generate_umgap_tables.sh tryptic \
-          --output-dir {params.outdir} \
-          --database-sources swissprot,trembl \
-          --temp-dir {params.temp_outdir} \
-          --min-peptide-length 5 \
-          --max-peptide-length 50 \
-          >> {log} 2>&1
-        """
 
 ################################################################################
 # Generating the HAPiID-style peptide database
