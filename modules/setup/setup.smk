@@ -47,4 +47,6 @@ rule write_run_manifest:
     params:
         repo_root = workflow.basedir
     log: os.path.join(RUN_DIR, "logs/setup/write_run_manifest.log")
+    # conduitr has python3 + git; the script uses stdlib + subprocess to git.
+    container: config["containers"]["conduitr"]
     script: "scripts/write_run_manifest.py"
