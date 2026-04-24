@@ -9,6 +9,16 @@ RUN_DIR         = config["run_dir"]
 HAPID_DIR       = os.path.join(EXPERIMENT_DIR, "input/MAG_files")
 HAPID_OUT_ROOT  = os.path.join(RUN_DIR, "database_resources/hapid")
 
+# MGnify shared cache (see modules/genome_download/mgnify/mgnify.smk).
+_MGNIFY_CACHE_DIR    = config.get("mgnify_cache_dir",
+                                  "resources/genome_databases/mgnify")
+_MGNIFY_CATALOG_SLUG = config.get("mgnify_catalog", "").replace("/", "_")
+_MGNIFY_CATALOG_ROOT = (os.path.join(_MGNIFY_CACHE_DIR, _MGNIFY_CATALOG_SLUG)
+                        if _MGNIFY_CATALOG_SLUG else "")
+
+def _mgnify_genome_path(genome):
+    return os.path.join(_MGNIFY_CATALOG_ROOT, "genomes", f"{genome}.fna")
+
 # ==============================================================================
 # Helper functions
 # ==============================================================================
@@ -28,9 +38,10 @@ def get_all_hapid_genomes():
 
 
 def hapid_fasta_path(wildcards):
-    """Path to user-provided genome FASTA for a given wildcard."""
+    """Path to genome FASTA for a given wildcard. MGnify-sourced genomes come
+    from the shared cache; user-provided genomes come from HAPID_DIR."""
     if config.get("genome_download_source") == "mgnify":
-        return os.path.join(HAPID_DIR, f"{wildcards.genome}.fna")
+        return _mgnify_genome_path(wildcards.genome)
     for ext in ("fa", "fna", "fasta"):
         p = os.path.join(HAPID_DIR, f"{wildcards.genome}.{ext}")
         if os.path.exists(p):

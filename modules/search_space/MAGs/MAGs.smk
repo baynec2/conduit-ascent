@@ -12,6 +12,21 @@ BAKTA_DIR = config["bakta_db_dir"]
 BAKTA_OUT_ROOT = os.path.join(RUN_DIR,"database_resources/bakta")
 DB_OUT_ROOT = os.path.join(RUN_DIR,"database_resources")
 
+# MGnify shared cache paths (see modules/genome_download/mgnify/mgnify.smk).
+# Duplicated here rather than imported because Snakemake modules don't share
+# Python helpers across snakefiles; the logic is three lines.
+_MGNIFY_CACHE_DIR    = config.get("mgnify_cache_dir",
+                                  "resources/genome_databases/mgnify")
+_MGNIFY_CATALOG_SLUG = config.get("mgnify_catalog", "").replace("/", "_")
+_MGNIFY_CATALOG_ROOT = (os.path.join(_MGNIFY_CACHE_DIR, _MGNIFY_CATALOG_SLUG)
+                        if _MGNIFY_CATALOG_SLUG else "")
+
+def _mgnify_genome_path(mag):
+    return os.path.join(_MGNIFY_CATALOG_ROOT, "genomes", f"{mag}.fna")
+
+def _mgnify_taxonomy_path():
+    return os.path.join(_MGNIFY_CATALOG_ROOT, "taxonomy.txt")
+
 # Files that should be included in Bakta database
 REQUIRED_BAKTA_FILES = (
     "bakta.db",
@@ -50,10 +65,11 @@ def get_mag_list():
             mags.append(os.path.splitext(os.path.basename(f))[0])
     return sorted(list(set(mags)))
 
-# Get full path to MAG file given a MAG name (wildcard)
+# Get full path to MAG file given a MAG name (wildcard). MGnify-sourced
+# genomes live in the shared cache; user-provided MAGs live in MAG_DIR.
 def mag_fasta_path(wildcards):
     if config.get("genome_download_source") == "mgnify":
-        return os.path.join(MAG_DIR, f"{wildcards.mag}.fna")
+        return _mgnify_genome_path(wildcards.mag)
     for ext in ("fa", "fna", "fasta"):
         candidate = os.path.join(MAG_DIR, f"{wildcards.mag}.{ext}")
         if os.path.exists(candidate):
@@ -63,7 +79,7 @@ def mag_fasta_path(wildcards):
 rule check_mag_fastas:
     input:
         MAG_DIR,
-        *([os.path.join(MAG_DIR, ".mgnify_download_complete")]
+        *([os.path.join(RUN_DIR, "genome_download/mgnify/.mgnify_download_complete")]
           if config.get("genome_download_source") == "mgnify" else [])
     output:
         touch(os.path.join(MAG_DIR, ".fastas_checked"))
@@ -166,9 +182,15 @@ rule annotate_mags_with_bakta:
         echo "Finished {wildcards.mag}" >> {log}
         """
 
+def _mag_taxonomy_input():
+    """Taxonomy source: shared cache when mgnify, experiment-local otherwise."""
+    if config.get("genome_download_source") == "mgnify":
+        return _mgnify_taxonomy_path()
+    return os.path.join(MAG_DIR, "taxonomy.txt")
+
 rule parse_mag_taxonomy:
     input:
-        taxonomy = os.path.join(MAG_DIR, "taxonomy.txt")
+        taxonomy = _mag_taxonomy_input()
     output:
         os.path.join(DB_OUT_ROOT, "mag_taxonomy.txt")
     log:

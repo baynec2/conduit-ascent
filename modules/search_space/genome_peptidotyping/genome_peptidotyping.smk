@@ -10,6 +10,25 @@ RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/raw_files/*.raw"))
 GP_RESOURCE_DIR = os.path.join(RUN_DIR, "database_resources/genome_peptidotyping")
 GP_PRODIGAL_DIR = os.path.join(GP_RESOURCE_DIR, "prodigal")
 
+# MGnify shared cache (see modules/genome_download/mgnify/mgnify.smk).
+_MGNIFY_CACHE_DIR    = config.get("mgnify_cache_dir",
+                                  "resources/genome_databases/mgnify")
+_MGNIFY_CATALOG_SLUG = config.get("mgnify_catalog", "").replace("/", "_")
+_MGNIFY_CATALOG_ROOT = (os.path.join(_MGNIFY_CACHE_DIR, _MGNIFY_CATALOG_SLUG)
+                        if _MGNIFY_CATALOG_SLUG else "")
+
+def _mgnify_genome_path(genome):
+    return os.path.join(_MGNIFY_CATALOG_ROOT, "genomes", f"{genome}.fna")
+
+def _mgnify_taxonomy_path():
+    return os.path.join(_MGNIFY_CATALOG_ROOT, "taxonomy.txt")
+
+def _taxonomy_input():
+    """Taxonomy source: shared cache when mgnify, experiment-local otherwise."""
+    if config.get("genome_download_source") == "mgnify":
+        return _mgnify_taxonomy_path()
+    return os.path.join(MAG_DIR, "taxonomy.txt")
+
 # Get all genome names from MAG_files directory
 def get_all_genome_names():
     if config.get("genome_download_source") == "mgnify":
@@ -23,10 +42,11 @@ def get_all_genome_names():
             genomes.append(os.path.splitext(os.path.basename(f))[0])
     return sorted(list(set(genomes)))
 
-# Get full path to genome FASTA given a genome name
+# Get full path to genome FASTA given a genome name. MGnify-sourced genomes
+# live in the shared cache; user-provided genomes live in MAG_DIR.
 def genome_fasta_path(wildcards):
     if config.get("genome_download_source") == "mgnify":
-        return os.path.join(MAG_DIR, f"{wildcards.genome}.fna")
+        return _mgnify_genome_path(wildcards.genome)
     for ext in ("fa", "fna", "fasta"):
         candidate = os.path.join(MAG_DIR, f"{wildcards.genome}.{ext}")
         if os.path.exists(candidate):
@@ -70,7 +90,7 @@ rule tryptic_digest_genomes:
             os.path.join(GP_PRODIGAL_DIR, f"{genome}.faa")
             for genome in get_all_genome_names()
         ],
-        taxonomy = os.path.join(MAG_DIR, "taxonomy.txt")
+        taxonomy = _taxonomy_input()
     output:
         peptide_mapping = os.path.join(GP_RESOURCE_DIR, "peptide_genome_mapping.tsv.gz")
     params:
@@ -86,7 +106,7 @@ rule tryptic_digest_genomes:
 rule compute_peptide_lca_and_build_dbs:
     input:
         peptide_mapping = os.path.join(GP_RESOURCE_DIR, "peptide_genome_mapping.tsv.gz"),
-        taxonomy = os.path.join(MAG_DIR, "taxonomy.txt")
+        taxonomy = _taxonomy_input()
     output:
         family_tsv      = os.path.join(GP_RESOURCE_DIR, "family_lca_filtered_peptides.tsv"),
         family_fasta    = os.path.join(GP_RESOURCE_DIR, "family_peptidotyping_db.fasta"),
@@ -299,7 +319,7 @@ rule infer_genome_peptidotyping_first_pass_presence:
 rule map_genome_peptidotyping_families_to_species:
     input:
         detected_families = os.path.join(GP_RESOURCE_DIR, "detected_family_taxa_ids.txt"),
-        taxonomy = os.path.join(MAG_DIR, "taxonomy.txt")
+        taxonomy = _taxonomy_input()
     output:
         families_to_species = os.path.join(GP_RESOURCE_DIR, "families_to_species.txt")
     log:
@@ -392,7 +412,7 @@ rule infer_genome_peptidotyping_second_pass_presence:
 checkpoint select_genomes_by_peptidotyping:
     input:
         detected_species = os.path.join(GP_RESOURCE_DIR, "detected_species_strain_taxa_ids.txt"),
-        taxonomy = os.path.join(MAG_DIR, "taxonomy.txt")
+        taxonomy = _taxonomy_input()
     output:
         detected_genomes = os.path.join(GP_RESOURCE_DIR, "detected_genomes.txt")
     log:
