@@ -26,10 +26,6 @@ REQUIRED_BAKTA_FILES = (
 
 # Get MAG names (basenames without extension) for wildcards
 def get_mag_list():
-    if config.get("genome_download_source") == "mgnify":
-        reps_file = checkpoints.parse_mgnify_metadata.get().output.representatives
-        with open(reps_file) as f:
-            return sorted([line.strip() for line in f if line.strip()])
     # genome_peptidotyping: use only the genomes selected by peptidotyping detection
     if config.get("search_space_method") == "genome_peptidotyping":
         selected_file = checkpoints.select_genomes_by_peptidotyping.get().output.detected_genomes
@@ -43,6 +39,11 @@ def get_mag_list():
         above = df[df["cumulative_pct"] >= pct]
         cutoff = (above.index[0] + 1) if not above.empty else len(df)
         return df["genome"].tolist()[:cutoff]
+    # MAGs method (no selection): use all available genomes
+    if config.get("genome_download_source") == "mgnify":
+        reps_file = checkpoints.parse_mgnify_metadata.get().output.representatives
+        with open(reps_file) as f:
+            return sorted([line.strip() for line in f if line.strip()])
     mags = []
     for ext in ("fa", "fna", "fasta"):
         for f in glob.glob(os.path.join(MAG_DIR, f"*.{ext}")):
@@ -51,6 +52,8 @@ def get_mag_list():
 
 # Get full path to MAG file given a MAG name (wildcard)
 def mag_fasta_path(wildcards):
+    if config.get("genome_download_source") == "mgnify":
+        return os.path.join(MAG_DIR, f"{wildcards.mag}.fna")
     for ext in ("fa", "fna", "fasta"):
         candidate = os.path.join(MAG_DIR, f"{wildcards.mag}.{ext}")
         if os.path.exists(candidate):

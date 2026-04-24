@@ -12,6 +12,11 @@ GP_PRODIGAL_DIR = os.path.join(GP_RESOURCE_DIR, "prodigal")
 
 # Get all genome names from MAG_files directory
 def get_all_genome_names():
+    if config.get("genome_download_source") == "mgnify":
+        reps_file = checkpoints.parse_mgnify_metadata.get().output.representatives
+        if os.path.exists(reps_file):
+            with open(reps_file) as f:
+                return sorted([line.strip() for line in f if line.strip()])
     genomes = []
     for ext in ("fa", "fna", "fasta"):
         for f in glob.glob(os.path.join(MAG_DIR, f"*.{ext}")):
@@ -20,6 +25,8 @@ def get_all_genome_names():
 
 # Get full path to genome FASTA given a genome name
 def genome_fasta_path(wildcards):
+    if config.get("genome_download_source") == "mgnify":
+        return os.path.join(MAG_DIR, f"{wildcards.genome}.fna")
     for ext in ("fa", "fna", "fasta"):
         candidate = os.path.join(MAG_DIR, f"{wildcards.genome}.{ext}")
         if os.path.exists(candidate):
@@ -50,7 +57,7 @@ rule predict_orfs_with_prodigal:
         r"""
         mkdir -p $(dirname {output.faa})
         mkdir -p $(dirname {log})
-        prodigal -i {input.genome_fa} -a {output.faa} -p meta -q >> {log} 2>&1
+        pyrodigal -i {input.genome_fa} -a {output.faa} -p meta >> {log} 2>&1
         """
 
 ################################################################################
@@ -112,11 +119,12 @@ rule build_genome_peptidotyping_effective_detection_rank_db:
         first_pass_fasta = os.path.join(GP_RESOURCE_DIR, "effective_first_pass_database.fasta"),
         rank_mapping     = os.path.join(GP_RESOURCE_DIR, "effective_detection_rank_mapping.tsv")
     params:
-        min_peptides = config["min_taxon_db_peptides"]
+        min_peptides = config["min_taxon_db_peptides"],
+        resource_dir = GP_RESOURCE_DIR
     log:
         os.path.join(GP_RESOURCE_DIR, "logs/build_effective_detection_rank_db.log")
     container:
-        config["containers"]["bakta"]
+        config["containers"]["taxonkit"]
     shell:
         r"""
         set -euo pipefail
@@ -131,7 +139,7 @@ rule build_genome_peptidotyping_effective_detection_rank_db:
         log_ts "Using pre-built lineage file: $LINEAGE_FILE"
 
         # ── Step 1: count peptides per family at each rank ───────────────────────
-        COUNTS_FILE="{GP_RESOURCE_DIR}/family_rank_peptide_counts.tsv"
+        COUNTS_FILE="{params.resource_dir}/family_rank_peptide_counts.tsv"
         echo -e "family_taxid\trank\tn_peptides" > "$COUNTS_FILE"
 
         # Family-level peptides: lca_il IS the family; count directly.
@@ -191,7 +199,7 @@ rule build_genome_peptidotyping_effective_detection_rank_db:
         # ── Step 3: build the first-pass FASTA ────────────────────────────────────
         > {output.first_pass_fasta}
 
-        RANK_LOOKUP="{GP_RESOURCE_DIR}/effective_rank_lookup.tsv"
+        RANK_LOOKUP="{params.resource_dir}/effective_rank_lookup.tsv"
         tail -n +2 "$MAPPING" | awk -F'\t' '{{print $1"\t"$2}}' > "$RANK_LOOKUP"
 
         # Family-level peptides: include where family is assigned family rank
@@ -257,6 +265,8 @@ rule perform_genome_peptidotyping_first_pass_search:
     output:
         first_pass_diann_parquet = os.path.join(GP_RESOURCE_DIR, "first_pass_diann.parquet"),
         first_pass_diann_protein_description = os.path.join(GP_RESOURCE_DIR, "first_pass_diann.protein_description.tsv")
+    params:
+        out_prefix = os.path.join(GP_RESOURCE_DIR, "first_pass_diann")
     log:
         os.path.join(RUN_DIR, "logs/genome_peptidotyping/first_pass_search.log")
     container:
@@ -267,7 +277,7 @@ rule perform_genome_peptidotyping_first_pass_search:
         mkdir -p $(dirname {log})
         diann --cfg {input.config_file} \
             --fasta {input.fasta} \
-            --out {GP_RESOURCE_DIR}/first_pass_diann \
+            --out {params.out_prefix} \
             --dir {input.raw_files_dir} \
             --threads {threads} --verbose 1 >> {log} 2>&1
         """
@@ -308,7 +318,7 @@ rule generate_genome_peptidotyping_second_pass_db:
     log:
         os.path.join(RUN_DIR, "logs/genome_peptidotyping/generate_second_pass_db.log")
     container:
-        config["containers"]["bakta"]
+        config["containers"]["taxonkit"]
     shell:
         r"""
         set -euo pipefail
@@ -342,6 +352,8 @@ rule perform_genome_peptidotyping_second_pass_search:
     output:
         second_pass_diann_parquet             = os.path.join(GP_RESOURCE_DIR, "second_pass_diann.parquet"),
         second_pass_diann_protein_description = os.path.join(GP_RESOURCE_DIR, "second_pass_diann.protein_description.tsv")
+    params:
+        out_prefix = os.path.join(GP_RESOURCE_DIR, "second_pass_diann")
     log:
         os.path.join(RUN_DIR, "logs/genome_peptidotyping/second_pass_search.log")
     container:
@@ -352,7 +364,7 @@ rule perform_genome_peptidotyping_second_pass_search:
         mkdir -p $(dirname {log})
         diann --cfg {input.config_file} \
             --fasta {input.fasta} \
-            --out {GP_RESOURCE_DIR}/second_pass_diann \
+            --out {params.out_prefix} \
             --dir {input.raw_files_dir} \
             --threads {threads} --verbose 1 >> {log} 2>&1
         """

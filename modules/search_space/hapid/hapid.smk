@@ -17,8 +17,9 @@ def get_all_hapid_genomes():
     """Genome IDs from user-provided genome FASTAs (genome mode only)."""
     if config.get("genome_download_source") == "mgnify":
         reps_file = checkpoints.parse_mgnify_metadata.get().output.representatives
-        with open(reps_file) as f:
-            return sorted([line.strip() for line in f if line.strip()])
+        if os.path.exists(reps_file):
+            with open(reps_file) as f:
+                return sorted([line.strip() for line in f if line.strip()])
     genomes = []
     for ext in ("fa", "fna", "fasta"):
         for f in glob.glob(os.path.join(HAPID_DIR, f"*.{ext}")):
@@ -28,6 +29,8 @@ def get_all_hapid_genomes():
 
 def hapid_fasta_path(wildcards):
     """Path to user-provided genome FASTA for a given wildcard."""
+    if config.get("genome_download_source") == "mgnify":
+        return os.path.join(HAPID_DIR, f"{wildcards.genome}.fna")
     for ext in ("fa", "fna", "fasta"):
         p = os.path.join(HAPID_DIR, f"{wildcards.genome}.{ext}")
         if os.path.exists(p):

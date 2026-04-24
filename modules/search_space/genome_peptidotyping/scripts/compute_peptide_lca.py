@@ -236,7 +236,7 @@ def main():
 
         # Build FASTA header matching peptidotyping format
         fasta_header = (
-            f"gp|{pid}|{lca_name_u} {lca_rank}_{lca_name_u} "
+            f"gpep|{pid}|{lca_name_u} {lca_rank}_{lca_name_u} "
             f"OS={lca_name} OX={lca_name_u} RK={lca_rank} PT={parent_name_u}"
         )
 
