@@ -1,36 +1,6 @@
-containers:
-  conduitr:     "docker://baynec2/conduitr:alpha"
-  diann:        "docker://baynec2/diann2.1.0:alpha"
-  bakta:        "docker://baynec2/bakta:alpha"
-  metaphlan:    "docker://baynec2/metaphlan:alpha"
-  eggnogmapper: "docker://baynec2/eggnogmapper:2.1.12"
-  umgap:        "docker://baynec2/umgap:alpha"
-  taxonkit:     "quay.io/biocontainers/taxonkit:0.20.0--h9ee0642_1"
+# Integration test: unipept_hapid
+# Requires the ~170 GB UMGAP index; the per-host profile points
+# peptidotyping_resource_dir at its actual on-disk location.
 experiment: integration_test
 run_name: unipept_hapid
-diann_search_mode: "standard"
-run_diann_config: config/run_diann.cfg
-sample_annotation: input/sample_annotation.txt
-output_dir: output/
 search_space_method: unipept_hapid
-presence_min_peptides: 3
-presence_min_coverage: 0
-min_taxon_db_peptides: 10
-relative_abundance_threshold: 0.01
-host_organism_ids: []
-append_additional_proteome_id: FALSE
-append_additional_ncbi_taxa_id: FALSE
-exclude_proteome_id: FALSE
-exclude_ncbi_taxa_id: FALSE
-peptidotyping_resource_dir: "resources/peptidotyping/"
-eggnog_database: "resources/annotation/eggnog/e5.og_annotations.tsv"
-pfam_db_url: "https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/pfamA.txt.gz"
-cazy_db_url: "https://pro.unl.edu/dbCAN2/download/Databases/CAZyDB.07302020.fam-activities.txt"
-eggnog_db_url: "http://eggnog6.embl.de/download/eggnog_5.0/e5.og_annotations.tsv"
-metaphlan_database_dir: "resources/metaphlan"
-unipept_sequences: "resources/databases/sequences.tsv.lz4"
-unipept_taxons: "resources/databases/taxons.tsv.lz4"
-bakta_db_dir: "resources/bakta/db"
-bakta_db_type: "light"
-gbtk_database: "resources/gbtk"
-eggnogmapper_db_dir: "resources/eggnogmapper/db"

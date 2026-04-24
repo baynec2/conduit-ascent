@@ -93,13 +93,21 @@ run_integration_test() {
     echo "Integration test: $method"
     echo "============================================================"
 
+    # With a host profile active, let it set cores (typically 20 for a
+    # workstation). Without a profile (e.g., CI on a tiny runner), fall back
+    # to 4 cores so snakemake has something to work with.
+    local cores_args=()
+    if [ ${#PROFILE_ARGS[@]} -eq 0 ]; then
+        cores_args+=(--cores 4)
+    fi
+
     local snakemake_cmd=(
         snakemake
         --snakefile "$REPO_ROOT/Snakefile"
         --configfile "$config"
         --use-singularity
-        --cores 4
         "${PROFILE_ARGS[@]}"
+        "${cores_args[@]}"
     )
     # extra_flags_str is a string (e.g., "--omit-from foo bar"). Word-split it.
     if [ -n "$extra_flags_str" ]; then
