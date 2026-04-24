@@ -9,7 +9,6 @@ containers:
 experiment: integration_test
 run_name: metaphlan
 diann_search_mode: "standard"
-generate_diann_spectral_library_config: config/generate_diann_spectral_library.cfg
 run_diann_config: config/run_diann.cfg
 sample_annotation: input/sample_annotation.txt
 output_dir: output/

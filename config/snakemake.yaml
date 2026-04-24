@@ -17,8 +17,12 @@ experiment:
 # Name of this analysis run (used to namespace all outputs under experiments/{experiment}/runs/{run_name}/)
 # Allows multiple runs with different configs or methods to coexist in the same experiment directory.
 run_name:
-# Config file for generating DIA-NN spectral library (relative to main Snakefile)
-generate_diann_spectral_library_config: config/generate_diann_spectral_library.cfg
+# Base config for DIA-NN spectral-library generation (shared flags only;
+# per-purpose digest flags are passed inline by each calling rule).
+diann_spectral_library_base_config: config/diann_spectral_library_base.cfg
+# Base config for DIA-NN library-based searches (shared flags only;
+# per-purpose digest flags are passed inline by each calling rule).
+diann_library_search_base_config: config/diann_library_search_base.cfg
 # Config file for running DIA-NN search (relative to main Snakefile)
 run_diann_config: config/run_diann.cfg
 # Sample annotation file path (relative to experiment directory)

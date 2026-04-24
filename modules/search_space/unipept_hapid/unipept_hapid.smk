@@ -208,7 +208,7 @@ rule generate_hapid_database:
 rule generate_hapid_spectral_library:
     input:
         fasta       = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping_db.fasta"),
-        config_file = "config/peptidotyping_firstpass_diann_spectral_library.cfg"
+        config_file = config["diann_spectral_library_base_config"]
     output:
         os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping.predicted.speclib")
     # DIA-NN appends .predicted.speclib to the --out-lib path
@@ -220,7 +220,12 @@ rule generate_hapid_spectral_library:
         diann --cfg {input.config_file} \
         --fasta {input.fasta} \
         --threads {threads} \
-        --out-lib {config[peptidotyping_resource_dir]}hapid_peptidotyping >> {log} 2>&1
+        --out-lib {config[peptidotyping_resource_dir]}hapid_peptidotyping \
+        --cut "" \
+        --missed-cleavages 0 \
+        --min-pep-len 5 \
+        --max-pep-len 50 \
+        --species-ids >> {log} 2>&1
         """
 
 ################################################################################
@@ -231,7 +236,7 @@ rule perform_hapid_first_pass_search:
         raw_files_dir    = os.path.join(EXPERIMENT_DIR,"input/raw_files"),
         spectral_library = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping.predicted.speclib"),
         fasta            = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping_db.fasta"),
-        config_file      = "config/peptidotyping_firstpass_diann.cfg"
+        config_file      = config["diann_library_search_base_config"]
     output:
         hapid_diann_parquet = os.path.join(RUN_DIR,"database_resources/unipept_hapid/hapid_first_pass_diann.parquet")
     log: os.path.join(RUN_DIR,"logs/unipept_hapid/perform_hapid_first_pass_search.log")
@@ -244,6 +249,10 @@ rule perform_hapid_first_pass_search:
         --out  {RUN_DIR}/database_resources/unipept_hapid/hapid_first_pass_diann \
         --dir {input.raw_files_dir} \
         --lib {input.spectral_library} \
+        --cut "" \
+        --missed-cleavages 0 \
+        --min-pep-len 5 \
+        --max-pep-len 50 \
         --threads {threads} --verbose 1 >> {log} 2>&1
         """
 

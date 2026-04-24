@@ -207,7 +207,7 @@ rule build_protein_genome_dict:
 rule create_hapid_profiling_spectral_library:
     input:
         fasta = marker_gene_db_path,
-        cfg   = "config/hapid_profiling_diann_spectral_library.cfg"
+        cfg   = config["diann_spectral_library_base_config"]
     output:
         os.path.join(HAPID_OUT_ROOT, "marker_gene.predicted.speclib")
     params:
@@ -226,6 +226,11 @@ rule create_hapid_profiling_spectral_library:
             --fasta {input.fasta} \
             --threads {threads} \
             --out-lib {params.out_prefix} \
+            --cut "K*,R*" \
+            --missed-cleavages 1 \
+            --min-pep-len 7 \
+            --max-pep-len 30 \
+            --species-ids \
             > {log} 2>&1
         """
 
@@ -235,7 +240,7 @@ rule perform_hapid_profiling_search:
         raw_dir = os.path.join(EXPERIMENT_DIR, "input/raw_files"),
         speclib = os.path.join(HAPID_OUT_ROOT, "marker_gene.predicted.speclib"),
         fasta   = marker_gene_db_path,
-        cfg     = "config/hapid_profiling_diann.cfg"
+        cfg     = config["diann_library_search_base_config"]
     output:
         os.path.join(HAPID_OUT_ROOT, "marker_gene_profiling_report.parquet")
     params:
@@ -255,6 +260,10 @@ rule perform_hapid_profiling_search:
             --out {params.out_prefix} \
             --dir {input.raw_dir} \
             --lib {input.speclib} \
+            --cut "K*,R*" \
+            --missed-cleavages 1 \
+            --min-pep-len 7 \
+            --max-pep-len 30 \
             --threads {threads} \
             > {log} 2>&1
         """

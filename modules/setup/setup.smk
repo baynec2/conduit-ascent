@@ -8,12 +8,14 @@ localrules: setup_diann_spectral_library_config, setup_diann_run_config, write_r
 ################################################################################
 # Configuration Setup Rules
 ################################################################################
-# Handle DIANN spectral library config
+# Snapshot the DIA-NN spectral-library base config into RUN_DIR/config/
+# for reproducibility. Per-rule digest flags are added inline by the
+# consuming rules; see diann_spectral_library_base.cfg for context.
 rule setup_diann_spectral_library_config:
     output:
-        output_config_file = os.path.join(RUN_DIR,"config/generate_diann_spectral_library.cfg")
+        output_config_file = os.path.join(RUN_DIR,"config/diann_spectral_library_base.cfg")
     params:
-        selected_config = config.get("generate_diann_spectral_library_config")
+        selected_config = config.get("diann_spectral_library_base_config")
     log: os.path.join(RUN_DIR,"logs/setup/setup_diann_spectral_library_config.log")
     run:
         import shutil
