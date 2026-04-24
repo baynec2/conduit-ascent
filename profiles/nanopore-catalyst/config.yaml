@@ -1,0 +1,32 @@
+# Machine-specific Snakemake profile for the `nanopore-catalyst` host.
+#
+# Auto-applied by tests/run_integration_tests.sh when `hostname` matches this
+# directory's name. For ad-hoc runs:
+#   snakemake --profile profiles/nanopore-catalyst --configfile <...>
+#
+# Why per-hostname: heavy peptidotyping indices (~170 GB) live on the HDD
+# mounted at /home/nanopore-catalyst/HDD — that path is machine-specific and
+# belongs nowhere near a checked-in test config. Each machine that wants to
+# run the workflow creates its own profiles/<hostname>/ directory with the
+# paths to its own resources, following this file as a template. The base
+# config/snakemake.yaml remains portable.
+
+# --- CLI defaults (same as profiles/local, baked in because Snakemake ---
+# --- takes exactly one --profile per invocation; can't stack them)    ---
+cores: 20
+use-singularity: true
+rerun-incomplete: true
+
+# --- Make /home/nanopore-catalyst/HDD visible inside every container ---
+# Apptainer's default auto-binds cover the repo + $HOME but NOT the HDD.
+# This single bind exposes the whole drive so rules referencing anything
+# under it (peptidotyping index, future bakta/eggnog caches, etc.) can
+# read through to the host filesystem.
+singularity-args: "--bind /home/nanopore-catalyst/HDD"
+
+# --- Config overrides pointing at this machine's off-repo resources ---
+# These override keys from config/snakemake.yaml whose portable defaults
+# (resources/peptidotyping/...) don't match the actual storage layout here.
+config:
+  - peptidotyping_resource_dir=/home/nanopore-catalyst/HDD/peptidotyping_resources/
+  - taxonkit_db_dir=/home/nanopore-catalyst/HDD/peptidotyping_resources/taxonkit

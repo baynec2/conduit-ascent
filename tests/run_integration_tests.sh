@@ -18,21 +18,17 @@
 #   - apptainer/singularity
 #   - tests/data/sample1.raw (tracked via Git LFS)
 #
-# Env-var overrides (optional, per-machine; test configs stay portable):
-#   PEPTIDOTYPING_RESOURCE_DIR   if the UMGAP index lives off-repo (e.g., HDD),
-#                                set this and the runner will pass
-#                                --config peptidotyping_resource_dir=$VALUE
-#                                to snakemake. Takes precedence over the config-file value.
-#   TAXONKIT_DB_DIR              location of the taxonkit NCBI taxonomy DB (required by
-#                                peptidotyping + genome_peptidotyping). If
-#                                PEPTIDOTYPING_RESOURCE_DIR is set and this is not,
-#                                defaults to $PEPTIDOTYPING_RESOURCE_DIR/taxonkit per
-#                                the CLAUDE.md convention.
-#   SINGULARITY_BIND_PATHS       comma- or colon-separated list of paths to bind
-#                                into apptainer containers (e.g., /home/nanopore-catalyst/HDD).
-#                                Required whenever an overridden resource dir is outside
-#                                the repo tree, since apptainer does not see external
-#                                paths by default.
+# Per-machine configuration lives in profiles/$(hostname)/config.yaml.
+# The runner auto-detects a directory matching the current hostname and
+# passes --profile to snakemake. Put this machine's bind mounts, resource
+# path overrides, and cores there. See profiles/nanopore-catalyst/ for
+# the reference layout; copy that directory name → your hostname and
+# edit paths to match your storage.
+#
+# Without a host profile, the portable base-config defaults apply — fine
+# for ncbi_taxonomy_id / uniprot_proteome_id / MAGs / metaphlan / hapid,
+# insufficient for peptidotyping family (those methods require the ~170 GB
+# UMGAP index, which lives off-repo on most machines).
 #
 # The metaphlan method mocks the MetaPhlAn database + profiling steps via --omit-from.
 # A pre-committed mock merged_profiles.txt is seeded into the run directory so that
@@ -46,7 +42,8 @@
 # contains a symlink to tests/data/sample1.mzML.
 #
 # The peptidotyping method requires a pre-built sequence index at:
-#   resources/peptidotyping/  (or wherever PEPTIDOTYPING_RESOURCE_DIR points)
+#   resources/peptidotyping/  (or wherever the host profile's
+#   peptidotyping_resource_dir points)
 
 set -euo pipefail
 
@@ -65,40 +62,25 @@ if [ ! -f "$RAW_FILE" ]; then
     exit 1
 fi
 
-# ── Env-var overrides → snakemake args ────────────────────────────────────────
+# ── Host-matched Snakemake profile ────────────────────────────────────────────
 
-# Collect all config overrides into a single --config invocation, since snakemake's
-# --config uses `store` semantics (a second --config overwrites the first).
-_config_overrides=()
-if [ -n "${PEPTIDOTYPING_RESOURCE_DIR:-}" ]; then
-    _config_overrides+=("peptidotyping_resource_dir=$PEPTIDOTYPING_RESOURCE_DIR")
-fi
-# Taxonkit DB: explicit env var wins; else derive from PEPTIDOTYPING_RESOURCE_DIR/taxonkit
-# per the convention documented in CLAUDE.md.
-_taxonkit_db="${TAXONKIT_DB_DIR:-}"
-if [ -z "$_taxonkit_db" ] && [ -n "${PEPTIDOTYPING_RESOURCE_DIR:-}" ]; then
-    _taxonkit_db="${PEPTIDOTYPING_RESOURCE_DIR%/}/taxonkit"
-fi
-if [ -n "$_taxonkit_db" ]; then
-    _config_overrides+=("taxonkit_db_dir=$_taxonkit_db")
+# If profiles/$(hostname)/config.yaml exists, apply it. The profile carries
+# machine-specific settings (bind mounts, resource overrides, cores).
+PROFILE_ARGS=()
+_host_profile="$REPO_ROOT/profiles/$(hostname)"
+if [ -d "$_host_profile" ] && [ -f "$_host_profile/config.yaml" ]; then
+    PROFILE_ARGS+=(--profile "$_host_profile")
 fi
 
-EXTRA_CONFIG_ARGS=()
-if [ ${#_config_overrides[@]} -gt 0 ]; then
-    EXTRA_CONFIG_ARGS+=(--config "${_config_overrides[@]}")
+# ── Peptidotyping resource pre-check ──────────────────────────────────────────
+# Skip peptidotyping-family tests with a helpful message when the index is
+# unavailable. With a host profile active, trust the profile (it's responsible
+# for pointing at the right path); otherwise check the portable default.
+if [ ${#PROFILE_ARGS[@]} -eq 0 ]; then
+    PEPTIDOTYPING_INDEX="$REPO_ROOT/resources/peptidotyping/sequences.tsv.lz4"
+else
+    PEPTIDOTYPING_INDEX=""   # bypass pre-check; let snakemake resolve
 fi
-
-SINGULARITY_ARGS=()
-if [ -n "${SINGULARITY_BIND_PATHS:-}" ]; then
-    # Normalize separators (accept comma or colon) → space.
-    bind_arg="--bind ${SINGULARITY_BIND_PATHS//[,:]/,}"
-    SINGULARITY_ARGS+=(--singularity-args "$bind_arg")
-fi
-
-# ── Peptidotyping resource resolution ─────────────────────────────────────────
-# Used by method dispatch functions to skip when the index is unavailable.
-_pep_root="${PEPTIDOTYPING_RESOURCE_DIR:-$REPO_ROOT/resources/peptidotyping}"
-PEPTIDOTYPING_INDEX="${_pep_root%/}/sequences.tsv.lz4"
 
 # ── Runner ────────────────────────────────────────────────────────────────────
 
@@ -117,8 +99,7 @@ run_integration_test() {
         --configfile "$config"
         --use-singularity
         --cores 4
-        "${SINGULARITY_ARGS[@]}"
-        "${EXTRA_CONFIG_ARGS[@]}"
+        "${PROFILE_ARGS[@]}"
     )
     # extra_flags_str is a string (e.g., "--omit-from foo bar"). Word-split it.
     if [ -n "$extra_flags_str" ]; then
@@ -269,7 +250,7 @@ run_metaphlan() {
         "--omit-from download_metaphlan_resources run_metaphlan merge_profiles"
 }
 run_peptidotyping() {
-    if [ ! -f "$PEPTIDOTYPING_INDEX" ]; then
+    if [ -n "$PEPTIDOTYPING_INDEX" ] && [ ! -f "$PEPTIDOTYPING_INDEX" ]; then
         echo "SKIP: peptidotyping — sequence index not found at resources/peptidotyping/"
         echo "      Run the build_sequence_index rule first to generate this resource."
         return
@@ -278,7 +259,7 @@ run_peptidotyping() {
 }
 run_genome_peptidotyping() {
     # Shares the peptidotyping sequence-index prerequisite.
-    if [ ! -f "$PEPTIDOTYPING_INDEX" ]; then
+    if [ -n "$PEPTIDOTYPING_INDEX" ] && [ ! -f "$PEPTIDOTYPING_INDEX" ]; then
         echo "SKIP: genome_peptidotyping — peptidotyping sequence index not found."
         return
     fi
@@ -286,7 +267,7 @@ run_genome_peptidotyping() {
 }
 run_unipept_hapid() {
     # Shares the peptidotyping sequence-index prerequisite.
-    if [ ! -f "$PEPTIDOTYPING_INDEX" ]; then
+    if [ -n "$PEPTIDOTYPING_INDEX" ] && [ ! -f "$PEPTIDOTYPING_INDEX" ]; then
         echo "SKIP: unipept_hapid — peptidotyping sequence index not found."
         return
     fi
