@@ -1,5 +1,6 @@
 import os
 import glob
+import pandas as pd
 
 # Experiment specific directories
 EXPERIMENT_DIR = config["experiment_dir"]
@@ -34,6 +35,14 @@ def get_mag_list():
         selected_file = checkpoints.select_genomes_by_peptidotyping.get().output.detected_genomes
         with open(selected_file) as f:
             return sorted([line.strip() for line in f if line.strip()])
+    # hapid: use only the genomes selected by greedy genome selection
+    if config.get("search_space_method") == "hapid":
+        chk = checkpoints.run_greedy_genome_selection.get().output[0]
+        df = pd.read_csv(chk, sep="\t")
+        pct = config.get("hapid_percent_spectra", 80)
+        above = df[df["cumulative_pct"] >= pct]
+        cutoff = (above.index[0] + 1) if not above.empty else len(df)
+        return df["genome"].tolist()[:cutoff]
     mags = []
     for ext in ("fa", "fna", "fasta"):
         for f in glob.glob(os.path.join(MAG_DIR, f"*.{ext}")):

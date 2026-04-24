@@ -1,29 +1,13 @@
 import os
 import glob
-import pandas as pd
 
 # ==============================================================================
-# Paths and mode flags
+# Paths
 # ==============================================================================
 EXPERIMENT_DIR  = config["experiment_dir"]
 RUN_DIR         = config["run_dir"]
 HAPID_DIR       = os.path.join(EXPERIMENT_DIR, "input/MAG_files")
-BAKTA_DIR       = config["bakta_db_dir"]
-BAKTA_OUT_ROOT  = os.path.join(RUN_DIR, "database_resources/bakta")
-DB_OUT_ROOT     = os.path.join(RUN_DIR, "database_resources")
-HAPID_OUT_ROOT  = os.path.join(DB_OUT_ROOT, "hapid")
-bakta_db_final  = os.path.join(BAKTA_DIR, f"db-{config['bakta_db_type']}")
-
-REQUIRED_BAKTA_FILES = (
-    "bakta.db",
-    "version.json",
-    "expert-protein-sequences.dmnd",
-    "sorf.dmnd",
-    "psc.dmnd",
-    "rfam-go.tsv",
-    "oric.fna",
-    "orit.fna",
-)
+HAPID_OUT_ROOT  = os.path.join(RUN_DIR, "database_resources/hapid")
 
 # ==============================================================================
 # Helper functions
@@ -51,16 +35,6 @@ def hapid_fasta_path(wildcards):
     return os.path.join(HAPID_DIR, f"{wildcards.genome}.fa")
 
 
-def get_selected_genomes(wildcards):
-    """Return genome IDs covering hapid_percent_spectra% of profiling spectra."""
-    chk = checkpoints.run_greedy_genome_selection.get().output[0]
-    df  = pd.read_csv(chk, sep="\t")
-    pct = config.get("hapid_percent_spectra", 80)
-    above = df[df["cumulative_pct"] >= pct]
-    cutoff = (above.index[0] + 1) if not above.empty else len(df)
-    return df["genome"].tolist()[:cutoff]
-
-
 def marker_gene_db_path(wildcards=None):
     """Deduplicated marker gene FASTA."""
     return os.path.join(HAPID_OUT_ROOT, "marker_gene_db.fasta")
@@ -76,45 +50,9 @@ def protein2genome_dic_path(wildcards=None):
     return os.path.join(HAPID_OUT_ROOT, "protein2genome_dic.json")
 
 
-def hapid_database_fasta_path(wildcards=None):
-    """Path of the hapid protein database before append step."""
-    return os.path.join(DB_OUT_ROOT, "hapid_database.fasta")
-
-
 # ==============================================================================
-# Stage 1 — Genome mode: validation + FGS + scatter HMMER
+# Stage 1 — ORF prediction + HMMER marker gene identification
 # ==============================================================================
-
-rule check_hapid_fastas:
-    input:
-        HAPID_DIR,
-        *([os.path.join(HAPID_DIR, ".mgnify_download_complete")]
-          if config.get("genome_download_source") == "mgnify" else [])
-    output:
-        touch(os.path.join(HAPID_DIR, ".fastas_checked"))
-    log:
-        os.path.join(HAPID_DIR, "logs/check_hapid_fastas.log")
-    container:
-        config["containers"]["bakta"]
-    shell:
-        r"""
-        mkdir -p $(dirname {log})
-        echo "Checking HAPiID genome FASTA files in {input}" > {log} 2>&1
-
-        shopt -s nullglob
-        files=({input}/*.fa {input}/*.fna {input}/*.fasta)
-
-        if [ ${{#files[@]}} -eq 0 ]; then
-            echo "ERROR: No genome FASTA files found in {input}" | tee -a {log}
-            exit 1
-        fi
-
-        echo "Genome FASTA files found:" >> {log}
-        printf "%s\n" "${{files[@]}}" >> {log}
-
-        touch {output}
-        """
-
 
 rule press_hapid_hmm_profiles:
     input:
@@ -249,7 +187,7 @@ rule build_protein_genome_dict:
 
 
 # ==============================================================================
-# Stage 2 — DIA-NN profiling search (shared by all modes)
+# Stage 2 — DIA-NN profiling search
 # ==============================================================================
 
 rule create_hapid_profiling_spectral_library:
@@ -309,7 +247,7 @@ rule perform_hapid_profiling_search:
 
 
 # ==============================================================================
-# Stage 3 — Greedy genome selection (checkpoint) — shared by all modes
+# Stage 3 — Greedy genome selection (checkpoint)
 # ==============================================================================
 
 rule build_genome_spectrum_mapping:
@@ -343,178 +281,3 @@ checkpoint run_greedy_genome_selection:
             {input} {output} \
             > {log} 2>&1
         """
-
-
-# ==============================================================================
-# Stage 3b — Filter taxonomy to selected genomes
-# ==============================================================================
-
-rule parse_hapid_selected_taxonomy:
-    input:
-        taxonomy  = os.path.join(HAPID_DIR, "taxonomy.txt"),
-        selection = os.path.join(HAPID_OUT_ROOT, "hapid_greedy_selection.tsv")
-    output:
-        os.path.join(DB_OUT_ROOT, "hapid_selected_taxonomy.txt")
-    log:
-        os.path.join(RUN_DIR, "logs/search_space/hapid/parse_hapid_selected_taxonomy.log")
-    params:
-        hapid_percent_spectra = config.get("hapid_percent_spectra", 80)
-    container:
-        config["hapid_fgs_hmmer_container"]
-    script:
-        "scripts/parse_hapid_selected_taxonomy.py"
-
-
-# ==============================================================================
-# Stage 4 — Bakta annotation on selected genomes
-# ==============================================================================
-
-rule download_bakta_resources:
-    output:
-        bakta_db_files = expand(
-            os.path.join(bakta_db_final, "{file}"), file=REQUIRED_BAKTA_FILES
-        ),
-        amrfinder_db = directory(os.path.join(bakta_db_final, "amrfinderplus-db"))
-    log:
-        os.path.join(BAKTA_DIR, "logs/download_bakta_resources.log")
-    container:
-        config["containers"]["bakta"]
-    params:
-        bakta_db_dir  = config["bakta_db_dir"],
-        bakta_db_type = config["bakta_db_type"]
-    shell:
-        """
-        mkdir -p $(dirname {log})
-        echo "Starting Bakta DB download..." > {log}
-        bakta_db download --output {params.bakta_db_dir} --type {params.bakta_db_type} >> {log} 2>&1
-        echo "Bakta DB download finished!" >> {log}
-        """
-
-
-rule annotate_selected_hapid_genomes_with_bakta:
-    input:
-        fastas_ok = os.path.join(HAPID_DIR, ".fastas_checked"),
-        genome_fa = hapid_fasta_path,
-        bakta_db  = expand(
-            os.path.join(bakta_db_final, "{file}"), file=REQUIRED_BAKTA_FILES
-        )
-    output:
-        directory(os.path.join(BAKTA_OUT_ROOT, "{genome}"))
-    params:
-        bakta_db_final = bakta_db_final
-    log:
-        os.path.join(BAKTA_OUT_ROOT, "logs/{genome}_bakta.log")
-    threads: workflow.cores
-    container:
-        config["containers"]["bakta"]
-    shell:
-        r"""
-        mkdir -p $(dirname {log})
-        echo "Annotating {input.genome_fa}" > {log}
-
-        export TMPDIR=$(mktemp -d -p /tmp)
-        export TEMP=$TMPDIR
-        export TMP=$TMPDIR
-        export MPLCONFIGDIR=$TMPDIR/matplotlib
-        mkdir -p $MPLCONFIGDIR
-
-        bakta \
-            --db {params.bakta_db_final} \
-            --threads {threads} \
-            --output {output} \
-            --prefix {wildcards.genome} \
-            {input.genome_fa} >> {log} 2>&1
-
-        BAKTA_EXIT=$?
-        rm -rf $TMPDIR
-
-        if [ $BAKTA_EXIT -ne 0 ]; then
-            echo "Bakta failed with exit code $BAKTA_EXIT" >> {log}
-            exit $BAKTA_EXIT
-        fi
-
-        echo "Finished {wildcards.genome}" >> {log}
-        """
-
-
-rule create_hapid_uniprot_style_database:
-    input:
-        bakta_dirs     = lambda wildcards: [
-            os.path.join(BAKTA_OUT_ROOT, g) for g in get_selected_genomes(wildcards)
-        ],
-        hapid_taxonomy = os.path.join(DB_OUT_ROOT, "hapid_selected_taxonomy.txt")
-    output:
-        fasta = os.path.join(DB_OUT_ROOT, "hapid_database.fasta"),
-        go    = os.path.join(DB_OUT_ROOT, "go_annotations.txt"),
-        kegg  = os.path.join(DB_OUT_ROOT, "kegg_annotations.txt")
-    params:
-        hapid_taxonomy = os.path.join(DB_OUT_ROOT, "hapid_selected_taxonomy.txt")
-    log:
-        os.path.join(RUN_DIR, "logs/search_space/hapid/create_uniprot_style_database.log")
-    container:
-        config["containers"]["bakta"]
-    script:
-        "scripts/hapid_uniprot_headers.py"
-
-
-# ==============================================================================
-# Stage 5 — Taxonomy, annotations, final database (shared, mode-aware inputs)
-# ==============================================================================
-
-rule parse_hapid_taxonomy:
-    input:
-        taxonomy = os.path.join(HAPID_DIR, "taxonomy.txt")
-    output:
-        os.path.join(DB_OUT_ROOT, "hapid_taxonomy.txt")
-    log:
-        os.path.join(RUN_DIR, "logs/search_space/hapid/parse_hapid_taxonomy.log")
-    container:
-        config["hapid_fgs_hmmer_container"]
-    script:
-        "scripts/parse_hapid_taxonomy.py"
-
-
-rule plot_input_taxonomy:
-    input:
-        os.path.join(DB_OUT_ROOT, "hapid_taxonomy.txt")
-    output:
-        os.path.join(HAPID_OUT_ROOT, "input_taxonomy_plot.pdf")
-    log:
-        os.path.join(RUN_DIR, "logs/search_space/hapid/plot_input_taxonomy.log")
-    container:
-        config["containers"]["conduitr"]
-    script:
-        "../database_processing/scripts/plot_taxonomic_tree.R"
-
-
-rule get_hapid_annotations:
-    input:
-        bakta_dirs = lambda wildcards: [
-            os.path.join(BAKTA_OUT_ROOT, g) for g in get_selected_genomes(wildcards)
-        ]
-    output:
-        mag_annotations = os.path.join(
-            RUN_DIR, "database_resources/bakta/mag_annotations.txt"
-        )
-    log:
-        os.path.join(RUN_DIR, "logs/search_space/hapid/get_hapid_annotations.log")
-    container:
-        config["hapid_fgs_hmmer_container"]
-    script:
-        "scripts/get_hapid_annotations.py"
-
-
-rule append_hapid_additional_organisms_or_proteomes:
-    input:
-        mag_fasta    = hapid_database_fasta_path,
-        mag_taxonomy = os.path.join(DB_OUT_ROOT, "hapid_selected_taxonomy.txt")
-    output:
-        uniprot_fasta_dir = directory(os.path.join(DB_OUT_ROOT, "uniprot_database")),
-        fasta             = os.path.join(DB_OUT_ROOT, "database.fasta"),
-        taxonomy          = os.path.join(DB_OUT_ROOT, "taxonomy.txt")
-    log:
-        os.path.join(RUN_DIR, "logs/search_space/hapid/append_additional_data.log")
-    container:
-        config["containers"]["conduitr"]
-    script:
-        "../MAGs/scripts/append_additional_organisms_or_proteomes.R"

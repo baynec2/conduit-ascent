@@ -168,8 +168,6 @@ rule all:
                ]),
         *([os.path.join(RUN_DIR, "database_resources/database.predicted.speclib")]
           if config.get("diann_search_mode", "standard") == "standard" else []),
-        *([os.path.join(RUN_DIR, "database_resources/hapid/input_taxonomy_plot.pdf")]
-          if config.get("search_space_method") == "hapid" else []),
         expand(os.path.join(RUN_DIR, "database_resources/detected_protein_resources/{file}"),
                file=[
                    "detected_protein_info.txt",
@@ -245,9 +243,10 @@ if config["search_space_method"] == "MAGs":
     use rule * from external_annotation
 
 
-# HAPiID: marker-gene profiling → greedy genome selection → Bakta annotation
+# HAPiID: marker-gene profiling → greedy genome selection → MAGs DB construction
 if config["search_space_method"] == "hapid":
     use rule * from hapid
+    use rule * from mags
     use rule * from database_processing
     use rule * from diann
     use rule * from mag_annotation
