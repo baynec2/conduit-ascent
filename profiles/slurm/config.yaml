@@ -1,0 +1,32 @@
+# SLURM executor profile (template — customize for your cluster).
+#
+# Requires: snakemake-executor-plugin-slurm
+#   pip install snakemake-executor-plugin-slurm
+#
+# Usage:
+#   snakemake --profile profiles/slurm --configfile experiments/<exp>/config/<method>.yaml
+#
+# Existing alternative: run_conduit_barnacle2.slurm submits a single SBATCH job
+# that runs Snakemake inline. This profile is for the inverse pattern — let
+# Snakemake submit each rule as its own SLURM job, which parallelizes much
+# better on a cluster.
+#
+# Adapt slurm_account / slurm_partition / runtime / mem_mb to your site.
+executor: slurm
+use-singularity: true
+rerun-incomplete: true
+
+# Cap simultaneously-queued jobs to avoid scheduler overload.
+jobs: 50
+
+# Cluster-wide default resources. Individual rules can override by setting
+# their own `resources:` block. Adjust for your cluster's partitions.
+default-resources:
+  slurm_account: ""             # your SLURM account (set or remove)
+  slurm_partition: ""           # your partition name
+  runtime: 120                  # minutes
+  mem_mb: 8000
+  cpus_per_task: 4
+
+# Retry transient failures (e.g., node OOMs) with a bump in resources.
+restart-times: 2

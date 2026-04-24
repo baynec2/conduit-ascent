@@ -1,0 +1,16 @@
+# Local development profile.
+#
+# Usage:
+#   snakemake --profile profiles/local --configfile tests/configs/integration_test_ncbi_taxonomy_id.yaml
+#
+# Keys below are Snakemake CLI flags with their dashes converted to
+# underscores (e.g., --use-singularity → use-singularity: true).
+# Anything you'd pass on the CLI can live here; CLI flags still win if
+# both are given.
+#
+# Per-machine heavy-resource overrides (e.g., PEPTIDOTYPING_RESOURCE_DIR,
+# SINGULARITY_BIND_PATHS) remain env-var driven — see
+# tests/run_integration_tests.sh for the full contract.
+cores: 20
+use-singularity: true
+rerun-incomplete: true

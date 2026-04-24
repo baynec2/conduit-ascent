@@ -9,6 +9,11 @@ import pandas as pd
 import shutil
 import logging
 from datetime import datetime
+from snakemake.utils import min_version
+
+# Pin minimum Snakemake version — this workflow uses the module system
+# (introduced in 6.0) and checkpoint features that expect ≥ 8.0 semantics.
+min_version("8.0")
 
 
 # Load base defaults. Any --configfile passed on the command line merges on top
