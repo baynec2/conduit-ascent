@@ -1,2 +1,0 @@
-mag	species_name	organism_id
-atcc_25922	Escherichia coli	562
