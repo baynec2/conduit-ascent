@@ -49,7 +49,10 @@ rule generate_hapid_database:
     params:
         taxon_ranks_str = "species,strain",
         go_terms        = "GO:0005840,GO:0006412,GO:0003746"
-    container: config["containers"]["conduitr"]
+    # Needs lz4 + awk + bash. Older conduitr:alpha had lz4; the rebuilt
+    # conduitr (:f0dbc03 / :0ae9adc) dropped it. umgap has lz4 since it
+    # produces these .lz4 indices, so use it here until conduitr regains lz4.
+    container: config["containers"]["umgap"]
     log: os.path.join(config["peptidotyping_resource_dir"],"logs/generate_hapid_database.log")
     shell:
         r"""

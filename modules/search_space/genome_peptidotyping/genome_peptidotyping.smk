@@ -21,7 +21,8 @@ def _mgnify_genome_path(genome):
     return os.path.join(_MGNIFY_CATALOG_ROOT, "genomes", f"{genome}.fna")
 
 def _mgnify_taxonomy_path():
-    return os.path.join(_MGNIFY_CATALOG_ROOT, "taxonomy.txt")
+    # Per-run, NOT shared — see MAGs.smk _mgnify_taxonomy_path docstring.
+    return os.path.join(RUN_DIR, "genome_download/mgnify/taxonomy.txt")
 
 def _taxonomy_input():
     """Taxonomy source: shared cache when mgnify, experiment-local otherwise."""
@@ -29,13 +30,14 @@ def _taxonomy_input():
         return _mgnify_taxonomy_path()
     return os.path.join(MAG_DIR, "taxonomy.txt")
 
-# Get all genome names from MAG_files directory
+# Get all genome names — from MGnify representatives when source=mgnify, else
+# from user-provided FASTAs in MAG_DIR. The mgnify branch must NOT fall through
+# to the local scan; see hapid.smk get_all_hapid_genomes() for context.
 def get_all_genome_names():
     if config.get("genome_download_source") == "mgnify":
         reps_file = checkpoints.parse_mgnify_metadata.get().output.representatives
-        if os.path.exists(reps_file):
-            with open(reps_file) as f:
-                return sorted([line.strip() for line in f if line.strip()])
+        with open(reps_file) as f:
+            return sorted([line.strip() for line in f if line.strip()])
     genomes = []
     for ext in ("fa", "fna", "fasta"):
         for f in glob.glob(os.path.join(MAG_DIR, f"*.{ext}")):

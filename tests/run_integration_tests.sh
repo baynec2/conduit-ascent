@@ -48,7 +48,6 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RAW_FILE="$REPO_ROOT/tests/data/sample1.raw"
 METHOD="${1:-all}"
 
 PASSED=()
@@ -56,8 +55,10 @@ FAILED=()
 
 # ── Preflight checks ──────────────────────────────────────────────────────────
 
-if [ ! -f "$RAW_FILE" ]; then
-    echo "ERROR: $RAW_FILE not found."
+# Require at least one test spectra file — either Thermo .raw or open-format
+# .mzML. Both are LFS-tracked; the current default is sample1.mzML.
+if [ ! -f "$REPO_ROOT/tests/data/sample1.mzML" ] && [ ! -f "$REPO_ROOT/tests/data/sample1.raw" ]; then
+    echo "ERROR: neither tests/data/sample1.mzML nor tests/data/sample1.raw is present."
     echo "Ensure Git LFS is installed and run: git lfs pull"
     exit 1
 fi

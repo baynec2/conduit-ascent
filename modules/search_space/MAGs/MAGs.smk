@@ -25,7 +25,10 @@ def _mgnify_genome_path(mag):
     return os.path.join(_MGNIFY_CATALOG_ROOT, "genomes", f"{mag}.fna")
 
 def _mgnify_taxonomy_path():
-    return os.path.join(_MGNIFY_CATALOG_ROOT, "taxonomy.txt")
+    # Per-run, NOT shared — the file is a filtered projection by per-run
+    # mgnify_taxonomy_filter / mgnify_max_genomes, so two runs with different
+    # filters would clobber each other in a shared location.
+    return os.path.join(RUN_DIR, "genome_download/mgnify/taxonomy.txt")
 
 # Files that should be included in Bakta database
 REQUIRED_BAKTA_FILES = (

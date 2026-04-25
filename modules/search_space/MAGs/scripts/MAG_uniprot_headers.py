@@ -28,9 +28,12 @@ def logprint(msg):
     print(msg, file=log)
 
 # -----------------------------
-# Determine base bakta directory
+# Map MAG name -> its bakta output dir, directly from the snakemake input.
+# Avoids reconstructing paths from a derived BASE_DIR, which broke for the
+# 1-MAG case (commonpath returns the dir itself, not its parent) and for the
+# 0-MAG case (IndexError on BAKTA_DIRS[0]).
 # -----------------------------
-BASE_DIR = os.path.commonpath(BAKTA_DIRS)
+MAG_DIR_BY_NAME = {os.path.basename(d): d for d in BAKTA_DIRS}
 
 # -----------------------------
 # Load taxonomy lookup (genome → species_name, organism_id)
@@ -182,19 +185,20 @@ def replace_faa_headers(MAG_dir, MAG, df):
     return faa_out
 
 
-def concatenate_uniprot_fastas(base_dir, output_path):
+def concatenate_uniprot_fastas(mag_dirs_by_name, output_path):
     """
-    Combines all MAG uniprot fastas into one file.
+    Combines all MAG uniprot fastas into one file. mag_dirs_by_name is the
+    {basename: full_path} mapping of bakta output dirs.
     """
     files = []
-
-    for MAG in os.listdir(base_dir):
-        f = os.path.join(base_dir, MAG, f"{MAG}_uniprot.faa")
+    for MAG, d in mag_dirs_by_name.items():
+        f = os.path.join(d, f"{MAG}_uniprot.faa")
         if os.path.exists(f):
             files.append(f)
 
     if not files:
-        logprint("No uniprot FASTAs found.")
+        logprint("No uniprot FASTAs found — writing empty combined FASTA.")
+        open(output_path, "w").close()
         return
 
     with open(output_path, "w") as out:
@@ -225,9 +229,9 @@ def main():
     all_meta = []
 
     for MAG in MAG_list:
-        MAG_dir = os.path.join(BASE_DIR, MAG)
-        if not os.path.isdir(MAG_dir):
-            logprint(f"[{MAG}] Skipping (missing bakta directory)")
+        MAG_dir = MAG_DIR_BY_NAME.get(MAG)
+        if not MAG_dir or not os.path.isdir(MAG_dir):
+            logprint(f"[{MAG}] Skipping (no bakta directory in inputs)")
             continue
 
         logprint(f"Processing {MAG}")
@@ -241,14 +245,19 @@ def main():
             all_meta.append(df)
 
     if not all_meta:
-        logprint("No MAG metadata found — nothing to export.")
+        # Snakemake requires every declared output to exist on completion.
+        # Touch empties so the rule succeeds; downstream rules will surface
+        # the "no proteins found" condition more clearly than us crashing here.
+        logprint("No MAG metadata found — writing empty outputs.")
+        for path in (FASTA_OUT, GO_OUT, KEGG_OUT):
+            open(path, "w").close()
         log.close()
         return
 
     full_df = pd.concat(all_meta)
 
     write_go_kegg_annotation_files(full_df)
-    concatenate_uniprot_fastas(BASE_DIR, FASTA_OUT)
+    concatenate_uniprot_fastas(MAG_DIR_BY_NAME, FASTA_OUT)
 
     logprint("MAG UniProt + GO/KEGG processing complete.")
     log.close()

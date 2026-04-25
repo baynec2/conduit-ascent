@@ -12,11 +12,18 @@ MGNIFY_FTP_BASE = config.get("mgnify_ftp_base",
     "https://ftp.ebi.ac.uk/pub/databases/metagenomics/mgnify_genomes")
 MGNIFY_CATALOG  = config.get("mgnify_catalog", "")
 
-# Globalized cache: genomes, metadata, and taxonomy live under a per-catalog
-# directory keyed by the catalog string (e.g., "human-gut/v2.0.2" →
-# "human-gut_v2.0.2") so multiple experiments / runs using the same catalog
-# share one copy instead of re-downloading per-experiment. The catalog string
-# is the version pin; no extra versioning is needed.
+# Globalized cache for content-identical files: genomes and the raw
+# metadata.tsv live under a per-catalog directory keyed by the catalog
+# string (e.g., "human-gut/v2.0.2" → "human-gut_v2.0.2") so multiple
+# experiments / runs using the same catalog share one copy instead of
+# re-downloading per-experiment. The catalog string is the version pin.
+#
+# NOTE: taxonomy.txt is NOT shared. It's a FILTERED projection of the
+# metadata, with per-run filters (mgnify_taxonomy_filter, mgnify_max_genomes)
+# already applied — different runs would produce different files. It lives
+# in MGNIFY_OUT (per-run) alongside the per-run species_representatives.txt.
+# Mixing per-run and shared outputs in the same checkpoint also confuses
+# Snakemake's "is this checkpoint done?" check, which is why this matters.
 MGNIFY_CACHE_DIR       = config.get("mgnify_cache_dir",
                                     "resources/genome_databases/mgnify")
 MGNIFY_CATALOG_SLUG    = MGNIFY_CATALOG.replace("/", "_")
@@ -24,7 +31,6 @@ MGNIFY_CATALOG_ROOT    = (os.path.join(MGNIFY_CACHE_DIR, MGNIFY_CATALOG_SLUG)
                           if MGNIFY_CATALOG_SLUG else "")
 MGNIFY_CACHE_GENOMES   = os.path.join(MGNIFY_CATALOG_ROOT, "genomes")
 MGNIFY_CACHE_METADATA  = os.path.join(MGNIFY_CATALOG_ROOT, "genomes-all_metadata.tsv")
-MGNIFY_CACHE_TAXONOMY  = os.path.join(MGNIFY_CATALOG_ROOT, "taxonomy.txt")
 
 # ==============================================================================
 # Helper functions
@@ -73,14 +79,15 @@ rule download_mgnify_metadata:
         """
 
 
-# Taxonomy is derived from the shared metadata and lives in the shared cache.
-# species_representatives.txt stays per-run because mgnify_taxonomy_filter /
-# mgnify_max_genomes may differ between runs.
+# Both outputs are per-run: taxonomy.txt is a filtered projection (depends on
+# mgnify_taxonomy_filter + mgnify_max_genomes); representatives is the same
+# filtered set as accessions only. Keeping both per-run keeps Snakemake's
+# checkpoint "done?" check honest and avoids cross-run output collisions.
 checkpoint parse_mgnify_metadata:
     input:
         metadata = MGNIFY_CACHE_METADATA
     output:
-        taxonomy        = MGNIFY_CACHE_TAXONOMY,
+        taxonomy        = os.path.join(MGNIFY_OUT, "taxonomy.txt"),
         representatives = os.path.join(MGNIFY_OUT, "species_representatives.txt")
     params:
         taxonomy_filter = config.get("mgnify_taxonomy_filter", False),
@@ -120,6 +127,6 @@ rule mgnify_download_complete:
             os.path.join(MGNIFY_CACHE_GENOMES, "{acc}.fna"),
             acc=get_mgnify_genome_list()
         ),
-        taxonomy = MGNIFY_CACHE_TAXONOMY
+        taxonomy = os.path.join(MGNIFY_OUT, "taxonomy.txt")
     output:
         touch(os.path.join(MGNIFY_OUT, ".mgnify_download_complete"))

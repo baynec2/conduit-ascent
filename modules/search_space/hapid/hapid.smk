@@ -24,12 +24,14 @@ def _mgnify_genome_path(genome):
 # ==============================================================================
 
 def get_all_hapid_genomes():
-    """Genome IDs from user-provided genome FASTAs (genome mode only)."""
+    """Genome IDs — from MGnify representatives when source=mgnify, else from
+    user-provided FASTAs in HAPID_DIR. The mgnify branch must NOT fall through
+    to the local scan: doing so caused atcc_25922 to be queued for MGnify
+    download (404 → corrupt cache file) when the checkpoint hadn't fired yet."""
     if config.get("genome_download_source") == "mgnify":
         reps_file = checkpoints.parse_mgnify_metadata.get().output.representatives
-        if os.path.exists(reps_file):
-            with open(reps_file) as f:
-                return sorted([line.strip() for line in f if line.strip()])
+        with open(reps_file) as f:
+            return sorted([line.strip() for line in f if line.strip()])
     genomes = []
     for ext in ("fa", "fna", "fasta"):
         for f in glob.glob(os.path.join(HAPID_DIR, f"*.{ext}")):
