@@ -25,9 +25,9 @@ run_name:
 # Which search-space method to use. Options:
 #   ncbi_taxonomy_id     user-provided NCBI taxon IDs → UniProt proteomes
 #   uniprot_proteome_id  user-provided UniProt proteome IDs
-#   peptidotyping        UMGAP-LCA peptide-based species detection
-#   unipept_hapid        HAPiID-style GO-filtered first-pass
-#   genome_peptidotyping peptidotyping on user-provided genomes (no UniProt)
+#   unipept_peptidotyping  UMGAP-LCA peptide-based species detection
+#   unipept_hapid          HAPiID-style GO-filtered first-pass
+#   genome_peptidotyping   peptidotyping on user-provided genomes (no UniProt)
 #   metaphlan            MetaPhlAn profiling → NCBI taxon IDs
 #   MAGs                 all user-provided MAGs, no selection
 #   hapid                HAPiID marker-gene profiling → greedy genome selection
@@ -84,7 +84,7 @@ eggnog_db_url:       "http://eggnog6.embl.de/download/eggnog_5.0/e5.og_annotatio
 
 # =============================================================================
 #  PEPTIDOTYPING FAMILY
-#  Used by: peptidotyping · unipept_hapid · genome_peptidotyping
+#  Used by: unipept_peptidotyping · unipept_hapid · genome_peptidotyping
 # =============================================================================
 # Location of UMGAP-derived sequences.tsv.lz4 + taxons.tsv.lz4 (~170 GB combined).
 # For per-machine off-repo storage, set PEPTIDOTYPING_RESOURCE_DIR env var when

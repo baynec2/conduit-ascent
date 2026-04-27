@@ -43,7 +43,7 @@ rule build_sequence_index:
         export TMPDIR=$(realpath {params.temp_outdir})
 
         # Build UMGAP peptidotyping tables
-        modules/search_space/peptidotyping/scripts/unipept-database/scripts/generate_umgap_tables.sh tryptic \
+        modules/search_space/unipept_peptidotyping/scripts/unipept-database/scripts/generate_umgap_tables.sh tryptic \
           --output-dir {params.outdir} \
           --database-sources swissprot,trembl \
           --temp-dir {params.temp_outdir} \

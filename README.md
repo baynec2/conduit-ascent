@@ -125,7 +125,7 @@ These point to the Docker/Apptainer images used for each tool. You generally do 
 
 | Parameter | Description |
 |-----------|-------------|
-| `search_space_method` | **Required.** Strategy used to define the protein search space. Options: `ncbi_taxonomy_id`, `uniprot_proteome_id`, `peptidotyping`, `MAGs`, `metaphlan`. See details below. |
+| `search_space_method` | **Required.** Strategy used to define the protein search space. Options: `ncbi_taxonomy_id`, `uniprot_proteome_id`, `unipept_peptidotyping`, `MAGs`, `metaphlan`. See details below. |
 
 #### `ncbi_taxonomy_id`
 Builds the database from UniProt proteomes matching the provided NCBI taxon IDs. Requires `experiments/{experiment}/input/ncbi_taxa_ids.txt`.
@@ -133,11 +133,11 @@ Builds the database from UniProt proteomes matching the provided NCBI taxon IDs.
 #### `uniprot_proteome_id`
 Builds the database from a user-supplied list of UniProt proteome IDs. Requires `experiments/{experiment}/input/proteome_ids.txt`.
 
-#### `peptidotyping`
-Performs a first-pass DIA-NN search using species-specific peptides to identify which taxa are present in the sample, then builds a refined database from the detected taxa. See peptidotyping-specific parameters below.
+#### `unipept_peptidotyping`
+Performs a first-pass DIA-NN search using species-specific peptides (derived from Unipept's UMGAP LCA index) to identify which taxa are present in the sample, then builds a refined database from the detected taxa. See peptidotyping-specific parameters below.
 
 #### `MAGs`
-Uses metagenome-assembled genomes provided by the user. Bakta annotates the MAGs and the predicted proteins form the search space. Requires `experiments/{experiment}/input/MAG_files/`.
+Accepts user-provided genome FASTAs — either metagenome-assembled genomes (MAGs) or reference genomes. Bakta annotates each FASTA and the predicted proteins form the search space. Requires `experiments/{experiment}/input/MAG_files/`.
 
 #### `metaphlan`
 Runs MetaPhlAn on shotgun metagenomic FASTQ files to profile the community, then builds a database from the detected taxa. Requires `experiments/{experiment}/input/fastq_files/`.

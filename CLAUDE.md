@@ -9,7 +9,7 @@ conduit-ascent is a Snakemake workflow for DIA (Data-Independent Acquisition) me
 ```
 modules/
 ├── search_space/          # How organisms are selected (one method per subdirectory)
-│   ├── peptidotyping/     # UMGAP-based tiered search (see below)
+│   ├── unipept_peptidotyping/  # UMGAP-based tiered search (see below)
 │   ├── ncbi_taxonomy/     # User-supplied NCBI taxon IDs → UniProt proteomes
 │   ├── uniprot_proteome_ids/  # User-supplied UniProt proteome IDs directly
 │   ├── metaphlan/         # MetaPhlAn profiling output → NCBI taxon IDs
@@ -25,7 +25,7 @@ tests/                     # Integration tests
 
 ## Peptidotyping — Approach and Design
 
-Peptidotyping is the flagship search-space method. It identifies which organisms are present in a sample before downloading proteomes, using UMGAP-derived LCA (Lowest Common Ancestor) peptides from all of UniProt (SwissProt + TrEMBL).
+The `unipept_peptidotyping` method is the flagship search-space method. It identifies which organisms are present in a sample before downloading proteomes, using UMGAP-derived LCA (Lowest Common Ancestor) peptides from all of UniProt (SwissProt + TrEMBL).
 
 ### Core Idea
 
@@ -52,7 +52,7 @@ Every tryptic peptide in UniProt is assigned its LCA taxon by UMGAP. Peptides un
 
 | File | Purpose |
 |------|---------|
-| `modules/search_space/peptidotyping/peptidotyping.smk` | All Snakemake rules |
+| `modules/search_space/unipept_peptidotyping/unipept_peptidotyping.smk` | All Snakemake rules |
 | `scripts/infer_family_presence.R` | Pass 1 FDR inference (extracts `FAM=` tag) |
 | `scripts/infer_species_strain_presence.R` | Pass 2 FDR inference (extracts `OX=` tag) |
 | `scripts/unipept-database/scripts/generate_umgap_tables.sh` | Builds UMGAP sequence index from UniProt |

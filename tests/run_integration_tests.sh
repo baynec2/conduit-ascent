@@ -5,7 +5,7 @@
 #   bash tests/run_integration_tests.sh [method]
 #
 #   method: preflight | ncbi_taxonomy_id | uniprot_proteome_id | MAGs | metaphlan
-#           | peptidotyping | all
+#           | unipept_peptidotyping | all
 #   Defaults to "all" if not specified.
 #
 # The "preflight" target runs DIA-NN against tests/data/sample1.raw with a trivial
@@ -27,7 +27,7 @@
 #
 # Without a host profile, the portable base-config defaults apply — fine
 # for ncbi_taxonomy_id / uniprot_proteome_id / MAGs / metaphlan / hapid,
-# insufficient for peptidotyping family (those methods require the ~170 GB
+# insufficient for unipept_peptidotyping family (those methods require the ~170 GB
 # UMGAP index, which lives off-repo on most machines).
 #
 # The metaphlan method mocks the MetaPhlAn database + profiling steps via --omit-from.
@@ -41,7 +41,7 @@
 # .mzML are both accepted by DIA-NN. For integration tests this directory
 # contains a symlink to tests/data/sample1.mzML.
 #
-# The peptidotyping method requires a pre-built sequence index at:
+# The unipept_peptidotyping method requires a pre-built sequence index at:
 #   resources/peptidotyping/  (or wherever the host profile's
 #   peptidotyping_resource_dir points)
 
@@ -74,7 +74,7 @@ if [ -d "$_host_profile" ] && [ -f "$_host_profile/config.yaml" ]; then
 fi
 
 # ── Peptidotyping resource pre-check ──────────────────────────────────────────
-# Skip peptidotyping-family tests with a helpful message when the index is
+# Skip unipept_peptidotyping-family tests with a helpful message when the index is
 # unavailable. With a host profile active, trust the profile (it's responsible
 # for pointing at the right path); otherwise check the portable default.
 if [ ${#PROFILE_ARGS[@]} -eq 0 ]; then
@@ -258,26 +258,26 @@ run_metaphlan() {
     run_integration_test metaphlan \
         "--omit-from download_metaphlan_resources run_metaphlan merge_profiles"
 }
-run_peptidotyping() {
+run_unipept_peptidotyping() {
     if [ -n "$PEPTIDOTYPING_INDEX" ] && [ ! -f "$PEPTIDOTYPING_INDEX" ]; then
-        echo "SKIP: peptidotyping — sequence index not found at resources/peptidotyping/"
+        echo "SKIP: unipept_peptidotyping — sequence index not found at resources/peptidotyping/"
         echo "      Run the build_sequence_index rule first to generate this resource."
         return
     fi
-    run_integration_test peptidotyping
+    run_integration_test unipept_peptidotyping
 }
 run_genome_peptidotyping() {
-    # Shares the peptidotyping sequence-index prerequisite.
+    # Shares the unipept_peptidotyping sequence-index prerequisite.
     if [ -n "$PEPTIDOTYPING_INDEX" ] && [ ! -f "$PEPTIDOTYPING_INDEX" ]; then
-        echo "SKIP: genome_peptidotyping — peptidotyping sequence index not found."
+        echo "SKIP: genome_peptidotyping — unipept_peptidotyping sequence index not found."
         return
     fi
     run_integration_test genome_peptidotyping
 }
 run_unipept_hapid() {
-    # Shares the peptidotyping sequence-index prerequisite.
+    # Shares the unipept_peptidotyping sequence-index prerequisite.
     if [ -n "$PEPTIDOTYPING_INDEX" ] && [ ! -f "$PEPTIDOTYPING_INDEX" ]; then
-        echo "SKIP: unipept_hapid — peptidotyping sequence index not found."
+        echo "SKIP: unipept_hapid — unipept_peptidotyping sequence index not found."
         return
     fi
     run_integration_test unipept_hapid
@@ -307,7 +307,7 @@ case "$METHOD" in
     uniprot_proteome_id) run_uniprot_proteome_id ;;
     MAGs)                run_MAGs ;;
     metaphlan)           run_metaphlan ;;
-    peptidotyping)       run_peptidotyping ;;
+    unipept_peptidotyping) run_unipept_peptidotyping ;;
     genome_peptidotyping) run_genome_peptidotyping ;;
     unipept_hapid)       run_unipept_hapid ;;
     hapid)               run_hapid ;;
@@ -324,7 +324,7 @@ case "$METHOD" in
         run_uniprot_proteome_id
         run_MAGs
         run_metaphlan
-        run_peptidotyping
+        run_unipept_peptidotyping
         run_genome_peptidotyping
         run_unipept_hapid
         run_hapid
@@ -334,7 +334,7 @@ case "$METHOD" in
     *)
         echo "Unknown method: $METHOD"
         echo "Valid options: preflight | ncbi_taxonomy_id | uniprot_proteome_id | MAGs | metaphlan"
-        echo "             | peptidotyping | genome_peptidotyping | unipept_hapid | hapid"
+        echo "             | unipept_peptidotyping | genome_peptidotyping | unipept_hapid | hapid"
         echo "             | mgnify_MAGs | mgnify_hapid | all"
         exit 1
         ;;

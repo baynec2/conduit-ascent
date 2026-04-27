@@ -1,6 +1,6 @@
-# Integration test: peptidotyping
+# Integration test: unipept_peptidotyping
 # Requires the ~170 GB UMGAP index; the per-host profile points
 # peptidotyping_resource_dir at its actual on-disk location.
 experiment: integration_test
-run_name: peptidotyping
-search_space_method: peptidotyping
+run_name: unipept_peptidotyping
+search_space_method: unipept_peptidotyping

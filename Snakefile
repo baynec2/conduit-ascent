@@ -49,7 +49,7 @@ if not config.get("search_space_method"):
 ALLOWED_METHODS = [
     "ncbi_taxonomy_id",
     "uniprot_proteome_id",
-    "peptidotyping",
+    "unipept_peptidotyping",
     "unipept_hapid",
     "MAGs",
     "metaphlan",
@@ -120,13 +120,13 @@ module setup:
 module metaphlan:
   snakefile: "modules/search_space/metaphlan/metaphlan.smk"
   config: config
-module peptidotyping:
-  snakefile: "modules/search_space/peptidotyping/peptidotyping.smk"
+module unipept_peptidotyping:
+  snakefile: "modules/search_space/unipept_peptidotyping/unipept_peptidotyping.smk"
   config: config
 module unipept_hapid:
   snakefile: "modules/search_space/unipept_hapid/unipept_hapid.smk"
   config: config
-# Shared Unipept resource build (used by both peptidotyping and unipept_hapid).
+# Shared Unipept resource build (used by both unipept_peptidotyping and unipept_hapid).
 module shared_unipept_resources:
   snakefile: "modules/search_space/_shared/unipept_resources.smk"
   config: config
@@ -215,10 +215,10 @@ if config["search_space_method"] == "uniprot_proteome_id":
     use rule * from eggnogmapper_annotation
     use rule * from external_annotation
 
-# Peptidotyping: family-level first-pass with genus fallback, then species/strain second pass
-if config["search_space_method"] == "peptidotyping":
+# unipept_peptidotyping: family-level first-pass with genus fallback, then species/strain second pass
+if config["search_space_method"] == "unipept_peptidotyping":
     use rule * from shared_unipept_resources
-    use rule * from peptidotyping
+    use rule * from unipept_peptidotyping
     use rule * from ncbi_search_space
     use rule * from uniprot_proteome_ids_search_space
     use rule * from database_processing
