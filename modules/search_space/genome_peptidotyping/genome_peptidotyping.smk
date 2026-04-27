@@ -316,7 +316,7 @@ rule infer_genome_peptidotyping_first_pass_presence:
     container:
         config["containers"]["conduitr"]
     script:
-        "../peptidotyping/scripts/infer_family_presence.R"
+        "../unipept_peptidotyping/scripts/infer_family_presence.R"
 
 rule map_genome_peptidotyping_families_to_species:
     input:
@@ -402,7 +402,7 @@ rule infer_genome_peptidotyping_second_pass_presence:
     container:
         config["containers"]["conduitr"]
     script:
-        "../peptidotyping/scripts/infer_species_strain_presence.R"
+        "../unipept_peptidotyping/scripts/infer_species_strain_presence.R"
 
 ################################################################################
 # Phase E: Genome Selection Checkpoint
