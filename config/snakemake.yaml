@@ -53,8 +53,11 @@ containers:
 diann_spectral_library_base_config: config/diann_spectral_library_base.cfg
 # Shared flags for library-based DIA-NN searches (HAPiID-style).
 diann_library_search_base_config: config/diann_library_search_base.cfg
-# Main DIA-NN search config. The setup rule selects run_diann_infinidia.cfg automatically
-# when diann_search_mode == "infinidia".
+# Main DIA-NN search mode. Options:
+#   standard   use run_diann_config below
+#   infinidia  use config/run_diann_infinidia.cfg (--pre-search --pre-filter)
+diann_search_mode: "standard"
+# Main DIA-NN search config. Used when diann_search_mode == "standard".
 run_diann_config: config/run_diann.cfg
 
 # --- Host / target filtering (optional; applies to every method) ---
