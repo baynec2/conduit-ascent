@@ -42,31 +42,47 @@ REQUIRED_BAKTA_FILES = (
     "orit.fna",
 )
 
+# Static dispatch to the upstream-emitted genome list. Each upstream selector
+# is responsible for writing a one-genome-per-line file at a known path; from
+# here we only see file paths, never peer modules' checkpoint proxies (which
+# Snakemake 9 scopes per-module).
+def _selected_genomes_source():
+    method = config.get("search_space_method")
+    if method == "genome_peptidotyping":
+        return os.path.join(RUN_DIR, "database_resources/genome_peptidotyping/detected_genomes.txt")
+    if method == "hapid":
+        return os.path.join(RUN_DIR, "database_resources/hapid/selected_genomes.txt")
+    if config.get("genome_download_source") == "mgnify":
+        return os.path.join(RUN_DIR, "genome_download/mgnify/species_representatives.txt")
+    return None
+
+# When a selection method is in play, route everything through a checkpoint
+# defined IN this module — this is what lets get_mag_list() use checkpoints.X
+# without crossing module boundaries. The upstream dependency is a plain file
+# path, so checkpoint-aware DAG re-evaluation propagates correctly.
+if _selected_genomes_source() is not None:
+    checkpoint canonicalize_selected_genomes:
+        input:
+            _selected_genomes_source()
+        output:
+            os.path.join(DB_OUT_ROOT, "selected_genomes.txt")
+        log:
+            os.path.join(RUN_DIR, "logs/search_space/MAGs/canonicalize_selected_genomes.log")
+        shell:
+            "mkdir -p $(dirname {log}) && cp {input} {output} 2> {log}"
+
 # Get MAG names (basenames without extension) for wildcards
 def get_mag_list():
-    # genome_peptidotyping: use only the genomes selected by peptidotyping detection
-    if config.get("search_space_method") == "genome_peptidotyping":
-        selected_file = checkpoints.select_genomes_by_peptidotyping.get().output.detected_genomes
-        with open(selected_file) as f:
-            return sorted([line.strip() for line in f if line.strip()])
-    # hapid: use only the genomes selected by greedy genome selection
-    if config.get("search_space_method") == "hapid":
-        chk = checkpoints.run_greedy_genome_selection.get().output[0]
-        df = pd.read_csv(chk, sep="\t")
-        pct = config.get("hapid_percent_spectra", 80)
-        above = df[df["cumulative_pct"] >= pct]
-        cutoff = (above.index[0] + 1) if not above.empty else len(df)
-        return df["genome"].tolist()[:cutoff]
-    # MAGs method (no selection): use all available genomes
-    if config.get("genome_download_source") == "mgnify":
-        reps_file = checkpoints.parse_mgnify_metadata.get().output.representatives
-        with open(reps_file) as f:
-            return sorted([line.strip() for line in f if line.strip()])
+    if _selected_genomes_source() is not None:
+        list_file = checkpoints.canonicalize_selected_genomes.get().output[0]
+        with open(list_file) as fh:
+            return sorted([line.strip() for line in fh if line.strip()])
+    # Plain MAGs method: use all user-provided FASTAs in MAG_DIR.
     mags = []
     for ext in ("fa", "fna", "fasta"):
         for f in glob.glob(os.path.join(MAG_DIR, f"*.{ext}")):
             mags.append(os.path.splitext(os.path.basename(f))[0])
-    return sorted(list(set(mags)))
+    return sorted(set(mags))
 
 # Get full path to MAG file given a MAG name (wildcard). MGnify-sourced
 # genomes live in the shared cache; user-provided MAGs live in MAG_DIR.

@@ -23,14 +23,30 @@ def _mgnify_genome_path(genome):
 # Helper functions
 # ==============================================================================
 
+# Re-import MGnify's representatives file through a checkpoint defined in this
+# module — Snakemake 9 scopes the checkpoint proxy per-module, so we can't
+# reach checkpoints.parse_mgnify_metadata directly from here. The input is the
+# upstream file as a static path; checkpoint-aware DAG re-evaluation
+# propagates correctly through it.
+if config.get("genome_download_source") == "mgnify":
+    checkpoint hapid_import_mgnify_genomes:
+        input:
+            os.path.join(RUN_DIR, "genome_download/mgnify/species_representatives.txt")
+        output:
+            os.path.join(HAPID_OUT_ROOT, "all_hapid_genomes.txt")
+        log:
+            os.path.join(RUN_DIR, "logs/search_space/hapid/import_mgnify_genomes.log")
+        shell:
+            "mkdir -p $(dirname {log}) && cp {input} {output} 2> {log}"
+
 def get_all_hapid_genomes():
     """Genome IDs — from MGnify representatives when source=mgnify, else from
     user-provided FASTAs in HAPID_DIR. The mgnify branch must NOT fall through
     to the local scan: doing so caused atcc_25922 to be queued for MGnify
     download (404 → corrupt cache file) when the checkpoint hadn't fired yet."""
     if config.get("genome_download_source") == "mgnify":
-        reps_file = checkpoints.parse_mgnify_metadata.get().output.representatives
-        with open(reps_file) as f:
+        list_file = checkpoints.hapid_import_mgnify_genomes.get().output[0]
+        with open(list_file) as f:
             return sorted([line.strip() for line in f if line.strip()])
     genomes = []
     for ext in ("fa", "fna", "fasta"):
@@ -306,3 +322,24 @@ checkpoint run_greedy_genome_selection:
             {input} {output} \
             > {log} 2>&1
         """
+
+
+# Apply the hapid_percent_spectra cutoff and emit a one-genome-per-line list.
+# Lives in this module so it has in-scope access to the greedy-selection
+# checkpoint output; downstream MAGs rules consume the resulting file purely
+# as a static input path.
+rule hapid_filter_selected_genomes:
+    input:
+        os.path.join(HAPID_OUT_ROOT, "hapid_greedy_selection.tsv")
+    output:
+        os.path.join(HAPID_OUT_ROOT, "selected_genomes.txt")
+    params:
+        pct = config.get("hapid_percent_spectra", 80)
+    run:
+        import pandas as pd
+        df = pd.read_csv(input[0], sep="\t")
+        above = df[df["cumulative_pct"] >= params.pct]
+        cutoff = (above.index[0] + 1) if not above.empty else len(df)
+        with open(output[0], "w") as fh:
+            for g in df["genome"].tolist()[:cutoff]:
+                fh.write(f"{g}\n")
