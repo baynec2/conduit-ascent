@@ -40,12 +40,12 @@ output_dir: output/
 # --- Container images ---
 # Moving tags like :alpha / :develop are OK for active dev; pin to @sha256:... for reproducibility.
 containers:
-  conduitr:     "docker://baynec2/conduitr:f0dbc03"
-  diann:        "docker://baynec2/diann:184ad86"
+  conduitr:     "docker://baynec2/conduitr:0ae9adc"
+  diann:        "docker://baynec2/diann:f31253d"
   bakta:        "docker://baynec2/bakta:alpha"
   metaphlan:    "docker://baynec2/metaphlan:alpha"
   eggnogmapper: "docker://baynec2/eggnogmapper:2.1.12"
-  umgap:        "docker://baynec2/umgap:alpha"
+  umgap:        "docker://baynec2/umgap:fbe2434"
   taxonkit:     "docker://quay.io/biocontainers/taxonkit:0.20.0--h9ee0642_1"
 
 # --- DIA-NN cfg-file pointers (rarely changed per-experiment) ---

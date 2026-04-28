@@ -104,7 +104,33 @@ Signature: `calc_taxon_fdr(pep, taxon, decoy, peptide = NULL, fdr_threshold = 0.
 
 ### Container Strategy
 
-All R rules use `docker://baynec2/conduitr:develop` (set in `config/snakemake.yaml`). The `:develop` image contains the current conduitR with `calc_taxon_fdr` and all other required exports.
+All container images are pinned to short-SHA tags in `config/snakemake.yaml` under the `containers:` block. Two CI workflows publish them:
+
+- **conduitR** (`baynec2/conduitr`): published by `conduitR/.github/workflows/docker-publish.yml` on every push to `main`/`develop`. Tags emitted: `:latest` (main), `:develop` (develop), and `:<short-sha>` (immutable).
+- **In-repo containers** (diann, bakta, metaphlan, eggnogmapper, umgap, fraggenescan_hmmer): published by `.github/workflows/build-container-images.yml` on push to `main`/`develop` when a `containers/*/Dockerfile` changes. Only the immutable `:<short-sha>` tag is emitted (no rolling tag).
+
+**Pin to a SHA, not a moving tag like `:develop`/`:alpha`.** Apptainer caches images by URI in `.snakemake/singularity/`, so a moving tag won't auto-refresh once cached — you'd silently keep running an old image. A SHA pin makes the URI change explicit so the new image gets pulled. Bump intentionally when you want an upstream change.
+
+### Pre-flight: bump container tags before starting a workflow
+
+During active dev, container Dockerfiles change often. Before kicking off any non-trivial workflow run, verify the tags in `config/snakemake.yaml` match the latest CI-published SHA for each image:
+
+```bash
+# Latest in-repo Dockerfile commit per container (must match :<sha> in config/snakemake.yaml)
+for tool in bakta diann eggnogmapper fraggenescan_hmmer metaphlan umgap; do
+  printf "%-22s %s\n" "$tool" "$(git log develop --format='%h' -1 -- "containers/${tool}/Dockerfile")"
+done
+
+# Latest CI-published runs (the SHA you should pin to is the latest "success" headSha)
+gh run list --workflow=build-container-images.yml --limit 5 --json conclusion,headSha,displayTitle
+
+# Latest conduitR develop SHA (for the conduitr container)
+git -C /home/nanopore-catalyst/conduitR log --oneline develop -1
+```
+
+Bump any tag in `config/snakemake.yaml` whose SHA differs from the latest CI-published one. (Once things stabilize and Dockerfiles aren't changing, this becomes a rare check.)
+
+If a Dockerfile commit predates the CI workflow being added (`184ad867`, 2026-04-06) and has no SHA-tagged image on Docker Hub — bakta, eggnogmapper, metaphlan, fraggenescan_hmmer at time of writing — either leave the existing manual tag (`:alpha`, `:2.1.12`) or trigger a CI rebuild by making a no-op change to the Dockerfile.
 
 ## conduitR Package
 
