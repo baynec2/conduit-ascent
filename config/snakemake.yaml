@@ -41,11 +41,12 @@ output_dir: output/
 # Moving tags like :alpha / :develop are OK for active dev; pin to @sha256:... for reproducibility.
 containers:
   conduitr:     "docker://baynec2/conduitr:0ae9adc"
-  diann:        "docker://baynec2/diann:f31253d"
-  bakta:        "docker://baynec2/bakta:alpha"
-  metaphlan:    "docker://baynec2/metaphlan:alpha"
-  eggnogmapper: "docker://baynec2/eggnogmapper:2.1.12"
-  umgap:        "docker://baynec2/umgap:fbe2434"
+  diann:        "docker://baynec2/diann:f5f961d"
+  bakta:        "docker://baynec2/bakta:f5f961d"
+  metaphlan:    "docker://baynec2/metaphlan:f5f961d"
+  eggnogmapper: "docker://baynec2/eggnogmapper:f5f961d"
+  umgap:        "docker://baynec2/umgap:f5f961d"
+  fraggenescan_hmmer: "docker://baynec2/fraggenescan_hmmer:f5f961d"
   taxonkit:     "docker://quay.io/biocontainers/taxonkit:0.20.0--h9ee0642_1"
 
 # --- DIA-NN cfg-file pointers (rarely changed per-experiment) ---
@@ -111,8 +112,6 @@ hapid_hmm_profiles: "resources/hapid/ribP_elonF_profiles_refined_manually.hmm"
 # Greedy genome-selection cutoff — take the smallest set of genomes that covers this
 # fraction of marker-gene-annotated spectra.
 hapid_percent_spectra: 80
-# Container for FragGeneScan + HMMER (ORF prediction + marker-gene matching).
-hapid_fgs_hmmer_container: "docker://baynec2/fraggenescan_hmmer:alpha"
 
 
 # =============================================================================

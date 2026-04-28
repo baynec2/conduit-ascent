@@ -94,7 +94,7 @@ rule press_hapid_hmm_profiles:
     log:
         os.path.join(RUN_DIR, "logs/search_space/hapid/press_hmm_profiles.log")
     container:
-        config["hapid_fgs_hmmer_container"]
+        config["containers"]["fraggenescan_hmmer"]
     shell:
         """
         mkdir -p $(dirname {log})
@@ -115,7 +115,7 @@ rule predict_orfs_with_fraggenescan:
         os.path.join(RUN_DIR, "logs/search_space/hapid/fgs/{genome}.log")
     threads: 1
     container:
-        config["hapid_fgs_hmmer_container"]
+        config["containers"]["fraggenescan_hmmer"]
     shell:
         """
         WORKDIR=$(pwd)
@@ -144,7 +144,7 @@ rule identify_marker_genes_with_hmmer:
         os.path.join(RUN_DIR, "logs/search_space/hapid/hmmer/{genome}.log")
     threads: 4
     container:
-        config["hapid_fgs_hmmer_container"]
+        config["containers"]["fraggenescan_hmmer"]
     shell:
         """
         mkdir -p $(dirname {output})
@@ -174,7 +174,7 @@ rule build_hapid_marker_gene_fasta:
     log:
         os.path.join(RUN_DIR, "logs/search_space/hapid/build_marker_gene_fasta.log")
     container:
-        config["hapid_fgs_hmmer_container"]
+        config["containers"]["fraggenescan_hmmer"]
     script:
         "scripts/build_marker_gene_fasta.py"
 
@@ -189,7 +189,7 @@ rule deduplicate_marker_genes_with_cdhit:
         os.path.join(RUN_DIR, "logs/search_space/hapid/cdhit.log")
     threads: 8
     container:
-        config["hapid_fgs_hmmer_container"]
+        config["containers"]["fraggenescan_hmmer"]
     shell:
         """
         mkdir -p $(dirname {log})
@@ -213,7 +213,7 @@ rule build_protein_genome_dict:
     log:
         os.path.join(RUN_DIR, "logs/search_space/hapid/protein2genome_dict.log")
     container:
-        config["hapid_fgs_hmmer_container"]
+        config["containers"]["fraggenescan_hmmer"]
     script:
         "scripts/build_protein_genome_dict.py"
 
@@ -301,7 +301,7 @@ rule build_genome_spectrum_mapping:
     log:
         os.path.join(RUN_DIR, "logs/search_space/hapid/build_genome_spectrum_mapping.log")
     container:
-        config["hapid_fgs_hmmer_container"]
+        config["containers"]["fraggenescan_hmmer"]
     script:
         "scripts/build_genome_spectrum_mapping.py"
 
@@ -314,7 +314,7 @@ checkpoint run_greedy_genome_selection:
     log:
         os.path.join(RUN_DIR, "logs/search_space/hapid/greedy_selection.log")
     container:
-        config["hapid_fgs_hmmer_container"]
+        config["containers"]["fraggenescan_hmmer"]
     shell:
         """
         mkdir -p $(dirname {log})
