@@ -1,0 +1,10 @@
+# Integration test: genome_peptidotyping with MGnify genome download
+# Exercises the mgnify branch of get_all_genome_names() in
+# genome_peptidotyping.smk — the local genome_peptidotyping test only covers
+# the user-FASTA branch. mgnify_max_genomes is capped small for fast CI runs.
+experiment: integration_test
+run_name: mgnify_peptidotyping
+search_space_method: genome_peptidotyping
+genome_download_source: mgnify
+mgnify_catalog: "human-gut/v2.0.2"
+mgnify_max_genomes: 3

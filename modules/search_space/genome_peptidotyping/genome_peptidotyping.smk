@@ -30,12 +30,31 @@ def _taxonomy_input():
         return _mgnify_taxonomy_path()
     return os.path.join(MAG_DIR, "taxonomy.txt")
 
+# Local canonicalize-checkpoint for the MGnify representatives list.
+# Snakemake 9 scopes the `checkpoints` proxy per-module, so reaching into
+# mgnify.smk's parse_mgnify_metadata from here raises AttributeError. Each
+# module must own the checkpoints it consumes — we re-import the upstream
+# file by static path. (Same pattern as MAGs.smk canonicalize_selected_genomes,
+# commit e2960561.)
+_MGNIFY_REPS_SRC = os.path.join(RUN_DIR, "genome_download/mgnify/species_representatives.txt")
+
+if config.get("genome_download_source") == "mgnify":
+    checkpoint canonicalize_mgnify_representatives:
+        input:
+            _MGNIFY_REPS_SRC
+        output:
+            os.path.join(GP_RESOURCE_DIR, "mgnify_representatives.txt")
+        log:
+            os.path.join(RUN_DIR, "logs/genome_peptidotyping/canonicalize_mgnify_representatives.log")
+        shell:
+            "mkdir -p $(dirname {log}) && cp {input} {output} 2> {log}"
+
 # Get all genome names — from MGnify representatives when source=mgnify, else
 # from user-provided FASTAs in MAG_DIR. The mgnify branch must NOT fall through
 # to the local scan; see hapid.smk get_all_hapid_genomes() for context.
 def get_all_genome_names():
     if config.get("genome_download_source") == "mgnify":
-        reps_file = checkpoints.parse_mgnify_metadata.get().output.representatives
+        reps_file = checkpoints.canonicalize_mgnify_representatives.get().output[0]
         with open(reps_file) as f:
             return sorted([line.strip() for line in f if line.strip()])
     genomes = []
