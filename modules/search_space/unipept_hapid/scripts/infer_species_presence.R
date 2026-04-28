@@ -38,12 +38,13 @@ detected <- precursors |>
   dplyr::group_by(ncbi_taxonomy_id, detected_taxonomy) |>
   dplyr::summarise(n_peptides = dplyr::n(), .groups = "drop") |>
   dplyr::filter(n_peptides >= presence_min_peptides) |>
-  dplyr::select(ncbi_taxonomy_id, detected_taxonomy) |>
+  dplyr::select(ncbi_taxonomy_id) |>
   dplyr::distinct()
 
 conduitR::log_with_timestamp("Detected %d species/strains above threshold", nrow(detected))
 
 # Write ncbi_taxa_ids.txt — consumed by ncbi_taxonomy_id workflow
+# Canonical single-column format with header `ncbi_taxonomy_id`.
 readr::write_delim(detected, ncbi_taxa_ids_fp)
 
 # =============================================================================

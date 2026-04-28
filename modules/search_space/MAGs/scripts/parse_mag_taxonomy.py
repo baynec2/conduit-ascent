@@ -8,7 +8,7 @@ Input:  taxonomy.txt — TSV with columns:
           genome  domain  kingdom  phylum  class  order  family  genus  species
 Output: mag_taxonomy.txt — one row per genome, adds system-generated columns:
           organism_id (sequential integer, alphabetical order)
-          proteome_id, proteome_type, download_info, organism_type
+          proteome_id, proteome_type, download_info
           genome column is RETAINED for traceability and use by MAG_uniprot_headers.py
 """
 
@@ -31,7 +31,7 @@ def logprint(msg):
 OUT_COLS = [
     "genome", "organism_id", "domain", "kingdom", "phylum", "class", "order",
     "family", "genus", "species", "proteome_id", "proteome_type",
-    "download_info", "organism_type"
+    "download_info"
 ]
 
 TAXONOMY_COLS = ["domain", "kingdom", "phylum", "class", "order", "family", "genus", "species"]
@@ -52,7 +52,6 @@ tax_df["organism_id"] = range(1, len(tax_df) + 1)
 tax_df["proteome_id"]   = "NA"
 tax_df["proteome_type"] = "NA"
 tax_df["download_info"] = "user_provided"
-tax_df["organism_type"] = "microbiome"
 
 # Ensure all expected taxonomy columns exist (fill NA if absent)
 for col in TAXONOMY_COLS:

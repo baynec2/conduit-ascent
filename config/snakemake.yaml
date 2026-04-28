@@ -61,9 +61,6 @@ diann_search_mode: "standard"
 run_diann_config: config/run_diann.cfg
 
 # --- Host / target filtering (optional; applies to every method) ---
-# NCBI IDs to tag as 'host' rather than 'microbiome' (e.g., 9606 = human, 10090 = mouse).
-# Set to FALSE or [] to treat all organisms as microbiome.
-host_organism_ids: []
 # Append an extra UniProt proteome to the database (e.g., a host reference).
 # FALSE = none.  Examples: Human = UP000005640, Mouse C57/BL6 = UP000000589.
 append_additional_proteome_id: FALSE

@@ -166,7 +166,6 @@ These apply to all `search_space_method` choices.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `host_organism_ids` | `[]` | List of NCBI taxon IDs to classify as "host" rather than "microbiome". Common examples: Human = `9606`, Mouse = `10090`. Set to `[]` or `FALSE` to treat all organisms as microbiome. |
 | `append_additional_proteome_id` | `FALSE` | Optionally append a single extra UniProt proteome ID to the database (e.g., a host reference proteome). Common examples: Human = `UP000005640`, Mouse C57/BL6 = `UP000000589`. Set to `FALSE` to skip. |
 | `append_additional_ncbi_taxa_id` | `FALSE` | Optionally append a single extra NCBI taxon ID to the database (e.g., a host species). Common examples: Human = `9606`, Mouse = `10090`. Set to `FALSE` to skip. |
 | `exclude_proteome_id` | `FALSE` | Exclude a specific UniProt proteome ID from the database. Useful in peptidotyping if the first-pass incorrectly calls a contaminant. Set to `FALSE` to skip. |

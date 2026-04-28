@@ -61,20 +61,9 @@ taxa_split <- merged_profiles |>
                       dplyr::filter(relative_abundance > relative_abundance_threshold)
 
 # Dereplicating organism ids that are beyond theshold in multiple samples.
-organism_id = unique(dplyr::pull(taxa_split,species_ncbi))
-
-# Retrieve configurable host organism IDs (defaults to human and mouse if not set)
-host_organism_ids <- snakemake@config[["host_organism_ids"]]
-if (is.null(host_organism_ids) || isFALSE(host_organism_ids)) {
-  host_organism_ids <- c()
-} else {
-  host_organism_ids <- as.numeric(unlist(host_organism_ids))
-}
-
-# Constructing ncbi_taxonomy_id data frame to use as input to the next part of workflow
-ncbi_taxonomy_ids = tibble::tibble(organism_id)|>
-  dplyr::mutate(organism_type = dplyr::case_when(organism_id %in% host_organism_ids ~ "host",
-                                                 TRUE ~ "microbiome"))
+ncbi_taxonomy_ids = tibble::tibble(
+  ncbi_taxonomy_id = unique(dplyr::pull(taxa_split, species_ncbi))
+)
   
 conduitR::log_with_timestamp(
     paste0(
