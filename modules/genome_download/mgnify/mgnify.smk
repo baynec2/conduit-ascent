@@ -49,9 +49,18 @@ def mgnify_genome_path(accession):
 
 
 def mgnify_genome_url(wildcards):
-    """Build the FTP URL for a species representative genome."""
+    """Build the FTP URL for a species representative genome.
+
+    MGnify shards genomes on the FTP server by the first 11 chars of the
+    accession (`MGYG` + 7 digits). Versioned accessions like
+    `MGYG000000761.1` (15 chars) and unversioned ones like `MGYG000000761`
+    (13 chars) live under the same 11-char bucket — the previous `acc[:-2]`
+    slice happened to produce the right bucket for unversioned 13-char
+    accessions but produced a non-existent path for any versioned one,
+    causing silent 404 → HTML body saved as `.fna`.
+    """
     acc = wildcards.accession
-    prefix = acc[:-2]
+    prefix = acc[:11]
     return (
         f"{MGNIFY_FTP_BASE}/{MGNIFY_CATALOG}/"
         f"species_catalogue/{prefix}/{acc}/genome/{acc}.fna"
@@ -110,11 +119,23 @@ rule download_mgnify_genome:
     log:
         os.path.join(MGNIFY_OUT, "logs/download_{accession}.log")
     shell:
-        """
+        r"""
+        set -euo pipefail
         mkdir -p $(dirname {output.genome})
         mkdir -p $(dirname {log})
-        curl -L --retry 5 --retry-delay 10 \
-            -o {output.genome} '{params.url}' 2>&1 | tee {log}
+        # -f makes curl exit non-zero on 4xx/5xx (default behaviour writes the
+        # HTML error body to {output.genome} and FragGeneScan downstream
+        # segfaults on it). -S ensures errors are reported even with -s.
+        curl -fSL --retry 5 --retry-delay 10 \
+            -o {output.genome} '{params.url}' 2> >(tee -a {log} >&2)
+        # Validate the downloaded file is actually a FASTA — defence-in-depth
+        # in case the URL ever serves a 200 with junk content.
+        if ! head -c 1 {output.genome} | grep -q '^>'; then
+            echo "ERROR: {output.genome} does not start with '>' — not a FASTA" \
+                | tee -a {log} >&2
+            rm -f {output.genome}
+            exit 1
+        fi
         """
 
 
