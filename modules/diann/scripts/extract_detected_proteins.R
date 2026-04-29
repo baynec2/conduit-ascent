@@ -10,7 +10,7 @@ sink(zz, type = "message")  # redirect stderr/messages
 # Get input and output files from Snakemake workflow
 protein_info_df <- snakemake@input[["protein_info_df"]]
 protein_info_fasta <- snakemake@input[["protein_info_fasta"]]
-report_pg_matrix <- snakemake@input[["report_pg_matrix"]]
+diann_parquet <- snakemake@input[["diann_parquet"]]
 detected_protein_info_df <- snakemake@output[["detected_protein_info_df"]]
 detected_protein_info_fasta<- snakemake@output[["detected_protein_info_fasta"]]
 
@@ -19,7 +19,7 @@ start_time <- Sys.time()
 conduitR::log_with_timestamp("Running extract_detected_proteins.R script")
 conduitR::log_with_timestamp(paste0("Input file: ", protein_info_df))
 conduitR::log_with_timestamp(paste0("Input file: ", protein_info_fasta))
-conduitR::log_with_timestamp(paste0("Input file: ", report_pg_matrix))
+conduitR::log_with_timestamp(paste0("Input file: ", diann_parquet))
 conduitR::log_with_timestamp(paste0("Output file: ", detected_protein_info_df))
 conduitR::log_with_timestamp(paste0("Output file: ", detected_protein_info_fasta))
 
@@ -30,10 +30,16 @@ dir.create(dirname(detected_protein_info_df))
 conduitR::log_with_timestamp(paste0("Reading in protein information from ", protein_info_df))
 # Reading in protein information
 protein_info = readr::read_tsv(protein_info_df)
-conduitR::log_with_timestamp(paste0("Reading in report pg matrix from ", report_pg_matrix))
-# Determining what the detected proteins from DIA-NN were detected
-report_pg_matrix = readr::read_tsv(report_pg_matrix)
-detected_uniprot_ids = report_pg_matrix |>
+conduitR::log_with_timestamp(paste0("Reading in DIA-NN parquet report from ", diann_parquet))
+# Match how DIA-NN populates pg_matrix: keep only PSMs whose protein group passes
+# the 1% group-level FDR. Without this, low-confidence groups DIA-NN reports but
+# does not promote into the matrix would be retained.
+diann_report = arrow::read_parquet(
+  diann_parquet,
+  col_select = c("Protein.Group", "PG.Q.Value")
+)
+detected_uniprot_ids = diann_report |>
+  dplyr::filter(.data$PG.Q.Value <= 0.01) |>
   dplyr::pull("Protein.Group") |>
   strsplit(";") |>
   unlist() |>
