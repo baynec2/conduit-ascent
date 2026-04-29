@@ -23,6 +23,13 @@ qf_fp = snakemake@output[["qf"]]
 conduitR::log_with_timestamp(paste0("Reading in diann parquet file from ", diann_parquet_fp))
 conduitR::log_with_timestamp("Processing diann parquet file to qfeatures object")
 
+if (nrow(arrow::open_dataset(diann_parquet_fp)) == 0) {
+  stop(sprintf(
+    "DIA-NN parquet at %s contains 0 rows — the upstream DIA-NN search produced no peptides. Inspect the corresponding DIA-NN log under logs/ before re-running.",
+    diann_parquet_fp
+  ), call. = FALSE)
+}
+
 qf <- conduitR::diann_to_qfeatures(diann_parquet_fp)
 
 sample_annotation <- readr::read_delim(sample_annotation_fp)
