@@ -89,8 +89,10 @@ experiments/*/input/MAG_files/.smb*
 # Local baseline / scratch archives dropped during refactor work
 logs/
 
-# Local driver script (not part of the workflow itself)
+# Local driver scripts (not part of the workflow itself)
 run_all_experiments.sh
+run_s75_all_methods.sh
+run_unipept_hapid_batch.sh
 
 # Rust specific files
 .cargo/
