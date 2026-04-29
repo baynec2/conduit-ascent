@@ -30,6 +30,13 @@ conduitR::log_with_timestamp("Reading first-pass DIA-NN parquet")
 precursors <- arrow::read_parquet(first_pass_diann_parquet)
 conduitR::log_with_timestamp("Parquet rows: %d", nrow(precursors))
 
+if (nrow(precursors) == 0) {
+  stop(sprintf(
+    "DIA-NN parquet at %s contains 0 rows — the upstream DIA-NN search produced no peptides. Inspect the corresponding DIA-NN log under logs/ before re-running.",
+    first_pass_diann_parquet
+  ), call. = FALSE)
+}
+
 # =============================================================================
 # Extract family taxid and build PSM table for FDR
 # =============================================================================

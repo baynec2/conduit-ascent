@@ -26,6 +26,13 @@ conduitR::log_with_timestamp("presence_min_peptides threshold: %d", presence_min
 conduitR::log_with_timestamp("Reading HAPiID first-pass DIA-NN parquet")
 precursors <- arrow::read_parquet(hapid_diann_parquet)
 
+if (nrow(precursors) == 0) {
+  stop(sprintf(
+    "DIA-NN parquet at %s contains 0 rows — the upstream DIA-NN search produced no peptides. Inspect the corresponding DIA-NN log under logs/ before re-running.",
+    hapid_diann_parquet
+  ), call. = FALSE)
+}
+
 # UMGAP first-pass DB headers have format `umgap|{id}|{lca_il}` — DIA-NN
 # surfaces this as Protein.Group, with the trailing `|<lca_il>` carrying the
 # species/strain NCBI taxon ID. Protein.Names is the human-readable label
