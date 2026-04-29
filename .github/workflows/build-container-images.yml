@@ -5,6 +5,13 @@ on:
     branches: [main, develop]
     paths:
       - 'containers/*/Dockerfile'
+  workflow_dispatch:
+    inputs:
+      containers:
+        description: 'Which containers to (re)build. Comma-separated tool names (e.g. "bakta,metaphlan") or "all".'
+        required: true
+        default: 'all'
+        type: string
 
 jobs:
   build:
@@ -24,11 +31,41 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push changed images
+      - name: Determine which Dockerfiles to build
+        id: select
         run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            req='${{ github.event.inputs.containers }}'
+            if [ "$req" = "all" ]; then
+              files=$(ls -1 containers/*/Dockerfile)
+            else
+              files=""
+              for tool in $(echo "$req" | tr ',' ' '); do
+                f="containers/${tool}/Dockerfile"
+                if [ ! -f "$f" ]; then
+                  echo "ERROR: no Dockerfile at $f" >&2
+                  exit 1
+                fi
+                files="${files}${f}"$'\n'
+              done
+            fi
+          else
+            # push event: only rebuild Dockerfiles changed in this commit
+            files=$(git diff --name-only HEAD~1 HEAD -- 'containers/*/Dockerfile')
+          fi
+          {
+            echo 'files<<EOF'
+            echo "$files"
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push selected images
+        run: |
+          set -euo pipefail
           sha=$(git rev-parse --short HEAD)
-          changed=$(git diff --name-only HEAD~1 HEAD -- 'containers/*/Dockerfile')
-          for f in $changed; do
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
             tool=$(echo "$f" | awk -F'/' '{print $2}')
             echo "Building $tool:$sha from $f"
             docker buildx build \
@@ -36,4 +73,4 @@ jobs:
               --tag ${{ secrets.DOCKERHUB_USERNAME }}/${tool}:${sha} \
               --push \
               "containers/${tool}"
-          done
+          done <<< "${{ steps.select.outputs.files }}"

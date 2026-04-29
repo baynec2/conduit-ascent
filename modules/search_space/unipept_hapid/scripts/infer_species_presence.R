@@ -26,24 +26,27 @@ conduitR::log_with_timestamp("presence_min_peptides threshold: %d", presence_min
 conduitR::log_with_timestamp("Reading HAPiID first-pass DIA-NN parquet")
 precursors <- arrow::read_parquet(hapid_diann_parquet)
 
-# HAPiID peptides have species/strain LCA — OX= in Protein.Names gives the taxid directly.
+# UMGAP first-pass DB headers have format `umgap|{id}|{lca_il}` — DIA-NN
+# surfaces this as Protein.Group, with the trailing `|<lca_il>` carrying the
+# species/strain NCBI taxon ID. Protein.Names is the human-readable label
+# (`species_<name>`) and does NOT contain an OX= token, so don't read from it.
 detected <- precursors |>
   dplyr::filter(Proteotypic == 1) |>
   dplyr::mutate(
-    ncbi_taxonomy_id  = gsub(".*OX=([0-9]+).*", "\\1", Protein.Names),
-    detected_taxonomy = gsub(".*_", "", Protein.Names)
+    ncbi_taxonomy_id = sub(".*\\|", "", Protein.Group)
   ) |>
-  dplyr::group_by(ncbi_taxonomy_id, detected_taxonomy, Stripped.Sequence) |>
-  dplyr::summarise(sum_intensity = sum(Precursor.Normalised), .groups = "drop") |>
-  dplyr::group_by(ncbi_taxonomy_id, detected_taxonomy) |>
+  dplyr::group_by(ncbi_taxonomy_id, Stripped.Sequence) |>
+  dplyr::summarise(.groups = "drop") |>
+  dplyr::group_by(ncbi_taxonomy_id) |>
   dplyr::summarise(n_peptides = dplyr::n(), .groups = "drop") |>
   dplyr::filter(n_peptides >= presence_min_peptides) |>
-  dplyr::select(ncbi_taxonomy_id, detected_taxonomy) |>
+  dplyr::select(ncbi_taxonomy_id) |>
   dplyr::distinct()
 
 conduitR::log_with_timestamp("Detected %d species/strains above threshold", nrow(detected))
 
 # Write ncbi_taxa_ids.txt — consumed by ncbi_taxonomy_id workflow
+# Canonical single-column format with header `ncbi_taxonomy_id`.
 readr::write_delim(detected, ncbi_taxa_ids_fp)
 
 # =============================================================================

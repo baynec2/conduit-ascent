@@ -2,6 +2,9 @@
 # Run Snakemake dry-runs for all search_space_method configurations.
 # Activate the snakemake conda environment before running:
 #   conda activate snakemake && bash tests/run_dry_runs.sh
+#
+# Per-machine config via profiles/$(hostname)/config.yaml (auto-picked up).
+# See tests/run_integration_tests.sh for the full contract.
 
 set -euo pipefail
 
@@ -10,6 +13,15 @@ CONFIGS_DIR="$REPO_ROOT/tests/configs"
 
 PASSED=()
 FAILED=()
+
+# Host-matched profile, if present.
+PROFILE_ARGS=()
+_host_profile="$REPO_ROOT/profiles/$(hostname)"
+if [ -d "$_host_profile" ] && [ -f "$_host_profile/config.yaml" ]; then
+    PROFILE_ARGS+=(--profile "$_host_profile")
+fi
+
+# ── macOS AppleDouble dropout: .yaml files starting with "._" are junk metadata, skip them.
 
 run_dry_run() {
     local config_file="$1"
@@ -25,7 +37,9 @@ run_dry_run() {
         --configfile "$config_file" \
         --dry-run \
         --cores 1 \
-        --quiet 2>&1; then
+        --quiet \
+        "${PROFILE_ARGS[@]}" \
+        2>&1; then
         echo "PASS: $method"
         PASSED+=("$method")
     else
@@ -36,6 +50,8 @@ run_dry_run() {
 }
 
 for config in "$CONFIGS_DIR"/*.yaml; do
+    # Skip macOS resource-fork files (._*).
+    [[ "$(basename "$config")" == ._* ]] && continue
     run_dry_run "$config"
 done
 

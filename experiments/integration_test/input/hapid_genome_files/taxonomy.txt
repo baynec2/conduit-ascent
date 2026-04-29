@@ -1,0 +1,1 @@
+genome	domain	kingdom	phylum	class	order	family	genus	species

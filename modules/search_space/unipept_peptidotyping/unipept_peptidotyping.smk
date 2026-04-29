@@ -2,53 +2,14 @@ import glob
 import os
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR = config["run_dir"]
-RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/raw_files/*.raw"))
+RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/ms_files/*.raw"))
 
-################################################################################
-# Generating the Sequence Index
-################################################################################
-# This is needed to generate the file containing all peptides in TREMBL and SWISSPROT
-# And their LCAS. See https://github.com/unipept/unipept-database/issues/75
-rule build_sequence_index:
-    output:
-        sequences = os.path.join(config["peptidotyping_resource_dir"],"sequences.tsv.lz4"),
-        taxons    = os.path.join(config["peptidotyping_resource_dir"],"taxons.tsv.lz4")
-    params:
-        outdir = config["peptidotyping_resource_dir"],
-        temp_outdir = os.path.join(config["peptidotyping_resource_dir"],"temp")
-    log:
-        os.path.join(config["peptidotyping_resource_dir"],"logs/build_sequence_index.log")
-    container:
-        config["containers"]["umgap"]
-    shell:
-        r"""
-        set -euo pipefail
-
-        # Ensure directories exist
-        mkdir -p {params.outdir}
-        mkdir -p $(dirname {log})
-        mkdir -p {params.temp_outdir}
-
-        # Download UniProt release notes
-        curl -L \
-          -o {params.outdir}/relnotes.txt \
-          https://ftp.uniprot.org/pub/databases/uniprot/relnotes.txt
-
-        # Setting temp dir (must be absolute so cargo resolves it correctly)
-        export TMPDIR=$(realpath {params.temp_outdir})
-
-        # Build UMGAP peptidotyping tables
-        modules/search_space/peptidotyping/scripts/unipept-database/scripts/generate_umgap_tables.sh tryptic \
-          --output-dir {params.outdir} \
-          --database-sources swissprot,trembl \
-          --temp-dir {params.temp_outdir} \
-          --min-peptide-length 5 \
-          --max-peptide-length 50 \
-          >> {log} 2>&1
-        """
 ################################################################################
 # Determining Version of Uniprotkb that is being used in experiment
 ################################################################################
+# Note: build_sequence_index (which produces sequences.tsv.lz4 + taxons.tsv.lz4)
+# is shared with the unipept_hapid module and lives in
+# modules/search_space/_shared/unipept_resources.smk.
 rule check_sequence_index_version:
     input:
         relnotes = os.path.join(config["peptidotyping_resource_dir"],"relnotes.txt")
@@ -471,7 +432,7 @@ rule build_effective_detection_rank_db:
 # specific if they do not exist (as defined in uild_effective_detection_rank_db).
 rule perform_first_pass_search:
     input:
-        raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/raw_files"),
+        raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
         fasta = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
         config_file = "config/peptidotyping_infinidia.cfg"
     output:
@@ -584,7 +545,7 @@ rule generate_second_pass_db:
 # which specific species and strains are present within the detected families.
 rule perform_second_pass_search:
     input:
-        raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/raw_files"),
+        raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
         fasta         = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_database.fasta"),
         config_file   = "config/peptidotyping_infinidia.cfg"
     output:

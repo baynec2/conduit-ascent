@@ -13,9 +13,9 @@
 # first-pass search results are used directly to identify present species/strains
 # which are then handed off as ncbi_taxa_ids.txt to the ncbi_taxonomy_id workflow.
 #
-# TODO: Both this module and `peptidotyping` share the same underlying Unipept
-# resource files (sequences.tsv.lz4, taxons.tsv.lz4) via peptidotyping_resource_dir.
-# build_sequence_index is duplicated here; only one method should be active at a time.
+# Note: build_sequence_index (which produces sequences.tsv.lz4 + taxons.tsv.lz4)
+# is shared with the peptidotyping module and lives in
+# modules/search_space/_shared/unipept_resources.smk.
 #
 # Reference: HAPiID — https://pmc.ncbi.nlm.nih.gov/articles/PMC8017886/
 ################################################################################
@@ -25,44 +25,7 @@ import os
 
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR = config["run_dir"]
-RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/raw_files/*.raw"))
-
-################################################################################
-# Building the Unipept Sequence Index (shared resource with peptidotyping)
-################################################################################
-rule build_sequence_index:
-    output:
-        sequences = os.path.join(config["peptidotyping_resource_dir"],"sequences.tsv.lz4"),
-        taxons    = os.path.join(config["peptidotyping_resource_dir"],"taxons.tsv.lz4")
-    params:
-        outdir = config["peptidotyping_resource_dir"],
-        temp_outdir = os.path.join(config["peptidotyping_resource_dir"],"temp")
-    log:
-        os.path.join(config["peptidotyping_resource_dir"],"logs/build_sequence_index.log")
-    container:
-        config["containers"]["umgap"]
-    shell:
-        r"""
-        set -euo pipefail
-
-        mkdir -p {params.outdir}
-        mkdir -p $(dirname {log})
-        mkdir -p {params.temp_outdir}
-
-        curl -L \
-          -o {params.outdir}/relnotes.txt \
-          https://ftp.uniprot.org/pub/databases/uniprot/relnotes.txt
-
-        export TMPDIR={params.temp_outdir}
-
-        modules/search_space/peptidotyping/scripts/unipept-database/scripts/generate_umgap_tables.sh tryptic \
-          --output-dir {params.outdir} \
-          --database-sources swissprot,trembl \
-          --temp-dir {params.temp_outdir} \
-          --min-peptide-length 5 \
-          --max-peptide-length 50 \
-          >> {log} 2>&1
-        """
+RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/ms_files/*.raw"))
 
 ################################################################################
 # Generating the HAPiID-style peptide database
@@ -86,7 +49,10 @@ rule generate_hapid_database:
     params:
         taxon_ranks_str = "species,strain",
         go_terms        = "GO:0005840,GO:0006412,GO:0003746"
-    container: config["containers"]["conduitr"]
+    # Needs lz4 + awk + bash. Older conduitr:alpha had lz4; the rebuilt
+    # conduitr (:f0dbc03 / :0ae9adc) dropped it. umgap has lz4 since it
+    # produces these .lz4 indices, so use it here until conduitr regains lz4.
+    container: config["containers"]["umgap"]
     log: os.path.join(config["peptidotyping_resource_dir"],"logs/generate_hapid_database.log")
     shell:
         r"""
@@ -208,7 +174,7 @@ rule generate_hapid_database:
 rule generate_hapid_spectral_library:
     input:
         fasta       = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping_db.fasta"),
-        config_file = "config/peptidotyping_firstpass_diann_spectral_library.cfg"
+        config_file = config["diann_spectral_library_base_config"]
     output:
         os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping.predicted.speclib")
     # DIA-NN appends .predicted.speclib to the --out-lib path
@@ -220,7 +186,12 @@ rule generate_hapid_spectral_library:
         diann --cfg {input.config_file} \
         --fasta {input.fasta} \
         --threads {threads} \
-        --out-lib {config[peptidotyping_resource_dir]}hapid_peptidotyping >> {log} 2>&1
+        --out-lib {config[peptidotyping_resource_dir]}hapid_peptidotyping \
+        --cut "" \
+        --missed-cleavages 0 \
+        --min-pep-len 5 \
+        --max-pep-len 50 \
+        --species-ids >> {log} 2>&1
         """
 
 ################################################################################
@@ -228,10 +199,10 @@ rule generate_hapid_spectral_library:
 ################################################################################
 rule perform_hapid_first_pass_search:
     input:
-        raw_files_dir    = os.path.join(EXPERIMENT_DIR,"input/raw_files"),
+        raw_files_dir    = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
         spectral_library = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping.predicted.speclib"),
         fasta            = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping_db.fasta"),
-        config_file      = "config/peptidotyping_firstpass_diann.cfg"
+        config_file      = config["diann_library_search_base_config"]
     output:
         hapid_diann_parquet = os.path.join(RUN_DIR,"database_resources/unipept_hapid/hapid_first_pass_diann.parquet")
     log: os.path.join(RUN_DIR,"logs/unipept_hapid/perform_hapid_first_pass_search.log")
@@ -244,6 +215,10 @@ rule perform_hapid_first_pass_search:
         --out  {RUN_DIR}/database_resources/unipept_hapid/hapid_first_pass_diann \
         --dir {input.raw_files_dir} \
         --lib {input.spectral_library} \
+        --cut "" \
+        --missed-cleavages 0 \
+        --min-pep-len 5 \
+        --max-pep-len 50 \
         --threads {threads} --verbose 1 >> {log} 2>&1
         """
 

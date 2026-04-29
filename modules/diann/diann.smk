@@ -2,14 +2,14 @@ import glob
 import os
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR = config["run_dir"]
-RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/raw_files/*.raw"))
+RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/ms_files/*.raw"))
 #################################################################################
 # Generating Spectral Library
 #################################################################################
 rule generate_diann_spectral_library:
     input:
         fasta = os.path.join(RUN_DIR,"database_resources/database.fasta"),
-        config_file = os.path.join(RUN_DIR,"config/generate_diann_spectral_library.cfg")
+        config_file = os.path.join(RUN_DIR,"config/diann_spectral_library_base.cfg")
     output:
         os.path.join(RUN_DIR,"database_resources/database.predicted.speclib")
     params:
@@ -23,6 +23,11 @@ rule generate_diann_spectral_library:
         diann --cfg {input.config_file} \
         --fasta {input.fasta} \
         --out-lib {params.out_lib} \
+        --met-excision \
+        --cut "K*,R*" \
+        --missed-cleavages 1 \
+        --min-pep-len 7 \
+        --max-pep-len 30 \
         --threads {threads} >> {log} 2>&1
         """
 ################################################################################
@@ -30,7 +35,7 @@ rule generate_diann_spectral_library:
 ################################################################################
 rule run_diann:
     input:
-        raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/raw_files"),
+        raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
         spectral_library = lambda w: (
             os.path.join(RUN_DIR,"database_resources/database.predicted.speclib")
             if config.get("diann_search_mode", "standard") == "standard"

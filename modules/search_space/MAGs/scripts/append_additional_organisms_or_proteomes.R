@@ -114,6 +114,10 @@ if (is_missing(additional_proteome_id) && is_missing(additional_ncbi_taxa_id)) {
 ## Write outputs --------------------------------------------------------------
 conduitR::log_with_timestamp("Writing updated FASTA and taxonomy files, unless unchaged")
 
+# Drop 'genome' column if present — it is an internal traceability column used
+# during database construction but is not part of the conduit taxonomy.txt format.
+taxonomy <- taxonomy |> dplyr::select(-dplyr::any_of("genome"))
+
 Biostrings::writeXStringSet(fasta, fasta_fp)
 readr::write_delim(taxonomy, taxonomy_fp)
 

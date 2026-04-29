@@ -1,0 +1,5 @@
+# Integration test: hapid (marker-gene profiling)
+# Requires resources/hapid/ribP_elonF_profiles_refined_manually.hmm.
+experiment: integration_test
+run_name: hapid
+search_space_method: hapid

@@ -9,7 +9,7 @@ conduit-ascent is a Snakemake workflow for DIA (Data-Independent Acquisition) me
 ```
 modules/
 ├── search_space/          # How organisms are selected (one method per subdirectory)
-│   ├── peptidotyping/     # UMGAP-based tiered search (see below)
+│   ├── unipept_peptidotyping/  # UMGAP-based tiered search (see below)
 │   ├── ncbi_taxonomy/     # User-supplied NCBI taxon IDs → UniProt proteomes
 │   ├── uniprot_proteome_ids/  # User-supplied UniProt proteome IDs directly
 │   ├── metaphlan/         # MetaPhlAn profiling output → NCBI taxon IDs
@@ -19,13 +19,13 @@ modules/
 ├── annotation/            # UniProt, eggNOG-mapper, external annotations
 └── build_conduit/         # Final conduit object construction (uses conduitR)
 config/                    # DIA-NN and tool config files
-experiments/               # Per-experiment input dirs (raw files, config YAML)
+experiments/               # Per-experiment input dirs (ms_files/*.raw|*.mzML, config YAML)
 tests/                     # Integration tests
 ```
 
 ## Peptidotyping — Approach and Design
 
-Peptidotyping is the flagship search-space method. It identifies which organisms are present in a sample before downloading proteomes, using UMGAP-derived LCA (Lowest Common Ancestor) peptides from all of UniProt (SwissProt + TrEMBL).
+The `unipept_peptidotyping` method is the flagship search-space method. It identifies which organisms are present in a sample before downloading proteomes, using UMGAP-derived LCA (Lowest Common Ancestor) peptides from all of UniProt (SwissProt + TrEMBL).
 
 ### Core Idea
 
@@ -52,7 +52,7 @@ Every tryptic peptide in UniProt is assigned its LCA taxon by UMGAP. Peptides un
 
 | File | Purpose |
 |------|---------|
-| `modules/search_space/peptidotyping/peptidotyping.smk` | All Snakemake rules |
+| `modules/search_space/unipept_peptidotyping/unipept_peptidotyping.smk` | All Snakemake rules |
 | `scripts/infer_family_presence.R` | Pass 1 FDR inference (extracts `FAM=` tag) |
 | `scripts/infer_species_strain_presence.R` | Pass 2 FDR inference (extracts `OX=` tag) |
 | `scripts/unipept-database/scripts/generate_umgap_tables.sh` | Builds UMGAP sequence index from UniProt |
@@ -104,7 +104,33 @@ Signature: `calc_taxon_fdr(pep, taxon, decoy, peptide = NULL, fdr_threshold = 0.
 
 ### Container Strategy
 
-All R rules use `docker://baynec2/conduitr:develop` (set in `config/snakemake.yaml`). The `:develop` image contains the current conduitR with `calc_taxon_fdr` and all other required exports.
+All container images are pinned to short-SHA tags in `config/snakemake.yaml` under the `containers:` block. Two CI workflows publish them:
+
+- **conduitR** (`baynec2/conduitr`): published by `conduitR/.github/workflows/docker-publish.yml` on every push to `main`/`develop`. Tags emitted: `:latest` (main), `:develop` (develop), and `:<short-sha>` (immutable).
+- **In-repo containers** (diann, bakta, metaphlan, eggnogmapper, umgap, fraggenescan_hmmer): published by `.github/workflows/build-container-images.yml` on push to `main`/`develop` when a `containers/*/Dockerfile` changes. Only the immutable `:<short-sha>` tag is emitted (no rolling tag).
+
+**Pin to a SHA, not a moving tag like `:develop`/`:alpha`.** Apptainer caches images by URI in `.snakemake/singularity/`, so a moving tag won't auto-refresh once cached — you'd silently keep running an old image. A SHA pin makes the URI change explicit so the new image gets pulled. Bump intentionally when you want an upstream change.
+
+### Pre-flight: bump container tags before starting a workflow
+
+During active dev, container Dockerfiles change often. Before kicking off any non-trivial workflow run, verify the tags in `config/snakemake.yaml` match the latest CI-published SHA for each image:
+
+```bash
+# Latest in-repo Dockerfile commit per container (must match :<sha> in config/snakemake.yaml)
+for tool in bakta diann eggnogmapper fraggenescan_hmmer metaphlan umgap; do
+  printf "%-22s %s\n" "$tool" "$(git log develop --format='%h' -1 -- "containers/${tool}/Dockerfile")"
+done
+
+# Latest CI-published runs (the SHA you should pin to is the latest "success" headSha)
+gh run list --workflow=build-container-images.yml --limit 5 --json conclusion,headSha,displayTitle
+
+# Latest conduitR develop SHA (for the conduitr container)
+git -C /home/nanopore-catalyst/conduitR log --oneline develop -1
+```
+
+Bump any tag in `config/snakemake.yaml` whose SHA differs from the latest CI-published one. (Once things stabilize and Dockerfiles aren't changing, this becomes a rare check.)
+
+If a Dockerfile commit predates the CI workflow being added (`184ad867`, 2026-04-06) and has no SHA-tagged image on Docker Hub — bakta, eggnogmapper, metaphlan, fraggenescan_hmmer at time of writing — either leave the existing manual tag (`:alpha`, `:2.1.12`) or trigger a CI rebuild by making a no-op change to the Dockerfile.
 
 ## conduitR Package
 

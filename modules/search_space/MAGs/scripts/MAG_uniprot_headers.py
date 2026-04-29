@@ -8,12 +8,12 @@ import re
 # -----------------------------
 # Snakemake bindings
 # -----------------------------
-BAKTA_DIRS = snakemake.input.bakta_dirs
-MAG_METADATA_PATH = snakemake.params.mag_metadata
+BAKTA_DIRS    = snakemake.input.bakta_dirs
+TAXONOMY_PATH = snakemake.params.taxonomy   # mag_taxonomy.txt (has genome + organism_id cols)
 
 FASTA_OUT = snakemake.output.fasta
-GO_OUT = snakemake.output.go
-KEGG_OUT = snakemake.output.kegg
+GO_OUT    = snakemake.output.go
+KEGG_OUT  = snakemake.output.kegg
 
 LOG = snakemake.log[0]
 
@@ -28,10 +28,20 @@ def logprint(msg):
     print(msg, file=log)
 
 # -----------------------------
-# Determine base bakta directory
+# Map MAG name -> its bakta output dir, directly from the snakemake input.
+# Avoids reconstructing paths from a derived BASE_DIR, which broke for the
+# 1-MAG case (commonpath returns the dir itself, not its parent) and for the
+# 0-MAG case (IndexError on BAKTA_DIRS[0]).
 # -----------------------------
-BASE_DIR = os.path.commonpath(BAKTA_DIRS)
+MAG_DIR_BY_NAME = {os.path.basename(d): d for d in BAKTA_DIRS}
 
+# -----------------------------
+# Load taxonomy lookup (genome → species_name, organism_id)
+# -----------------------------
+tax_df = pd.read_csv(TAXONOMY_PATH, sep="\t")
+GENOME_SPECIES   = dict(zip(tax_df["genome"].astype(str), tax_df["species"].astype(str)))
+GENOME_ORG_ID    = dict(zip(tax_df["genome"].astype(str), tax_df["organism_id"].astype(str)))
+logprint(f"Loaded taxonomy for {len(GENOME_SPECIES)} genomes from {TAXONOMY_PATH}")
 
 # -----------------------------
 # Helper functions
@@ -76,7 +86,6 @@ def preprocess_bakta_annotations(MAG_dir, MAG):
     return faa_clean_path, cds_tsv_path
 
 
-
 def extract_go_kegg(dbxref_string):
     """
     Extract GO:xxxxxxx and KEGG K numbers.
@@ -90,10 +99,10 @@ def extract_go_kegg(dbxref_string):
     return gos, keggs
 
 
-
-def format_uniprot_metadata(MAG_dir, MAG, MAG_info):
+def format_uniprot_metadata(MAG_dir, MAG):
     """
     Creates a dataframe with UniProt-style metadata and GO/KEGG lists.
+    organism_id is looked up from the taxonomy file (not computed from the genome name).
     """
     cds_tsv_path = os.path.join(MAG_dir, f"{MAG}_cds.tsv")
 
@@ -106,25 +115,21 @@ def format_uniprot_metadata(MAG_dir, MAG, MAG_info):
 
     df = pd.DataFrame(index=locus_tags)
     df["Product"] = cds_meta.set_index("Locus Tag")["Product"].reindex(locus_tags).fillna("NA")
-    df["Gene"] = cds_meta.set_index("Locus Tag")["Gene"].reindex(locus_tags).fillna("NA")
+    df["Gene"]    = cds_meta.set_index("Locus Tag")["Gene"].reindex(locus_tags).fillna("NA")
 
-    # Species info
-    mag_row = MAG_info[MAG_info["mag"] == MAG]
-    if not mag_row.empty:
-        species_name = mag_row["species_name"].values[0]
-        org_id = str(mag_row["organism_id"].values[0])
-        parts = species_name.split(" ")
-        genus = parts[0]
-        species = parts[1] if len(parts) > 1 else ""
-    else:
-        genus = species = species_name = org_id = "Unknown"
+    species_name = GENOME_SPECIES.get(MAG, "Unknown species")
+    org_id       = GENOME_ORG_ID.get(MAG, "0")
 
-    genus_abbr = genus[:3].upper() if genus else "UNK"
+    parts = species_name.split(" ")
+    genus   = parts[0] if len(parts) > 0 else "UNK"
+    species = parts[1] if len(parts) > 1 else "UNK"
+
+    genus_abbr   = genus[:3].upper() if genus else "UNK"
     species_abbr = species[:2].upper() if species else "UNK"
 
-    df["Species_Locus_Tag"] = [f"{lt}_{genus_abbr}{species_abbr}" for lt in locus_tags]
-    df["Species_Name"] = species_name
-    df["Organism_Identifier"] = org_id
+    df["Species_Locus_Tag"]  = [f"{lt}_{genus_abbr}{species_abbr}" for lt in locus_tags]
+    df["Species_Name"]       = species_name
+    df["Organism_Identifier"] = org_id  # from taxonomy lookup
 
     # GO & KEGG extraction
     go_terms = []
@@ -136,14 +141,13 @@ def format_uniprot_metadata(MAG_dir, MAG, MAG_info):
             go_terms.append(gos)
             kegg_terms.append(keggs)
     else:
-        go_terms = [[] for _ in locus_tags]
+        go_terms   = [[] for _ in locus_tags]
         kegg_terms = [[] for _ in locus_tags]
 
-    df["GO_Terms"] = go_terms
+    df["GO_Terms"]   = go_terms
     df["KEGG_Terms"] = kegg_terms
 
     return df
-
 
 
 def replace_faa_headers(MAG_dir, MAG, df):
@@ -153,7 +157,7 @@ def replace_faa_headers(MAG_dir, MAG, df):
     if df is None:
         return None
 
-    faa_in = os.path.join(MAG_dir, f"{MAG}_cds.faa")
+    faa_in  = os.path.join(MAG_dir, f"{MAG}_cds.faa")
     faa_out = os.path.join(MAG_dir, f"{MAG}_uniprot.faa")
 
     if not os.path.exists(faa_in):
@@ -167,8 +171,6 @@ def replace_faa_headers(MAG_dir, MAG, df):
         if r.id in df.index:
             meta = df.loc[r.id]
             header = (
-                # Even though the database is not actually tr, DIA-NN can't parse it if bakta is added there
-                # Tricking it into working using tr for simplicity, even though it is not strictly speaking correct. 
                 f"tr|{r.id}|{meta['Species_Locus_Tag']} "
                 f"{meta['Product']} OS={meta['Species_Name']} "
                 f"OX={meta['Organism_Identifier']} GN={meta['Gene']}"
@@ -183,20 +185,20 @@ def replace_faa_headers(MAG_dir, MAG, df):
     return faa_out
 
 
-
-def concatenate_uniprot_fastas(base_dir, output_path):
+def concatenate_uniprot_fastas(mag_dirs_by_name, output_path):
     """
-    Combines all MAG uniprot fastas into one file.
+    Combines all MAG uniprot fastas into one file. mag_dirs_by_name is the
+    {basename: full_path} mapping of bakta output dirs.
     """
     files = []
-
-    for MAG in os.listdir(base_dir):
-        f = os.path.join(base_dir, MAG, f"{MAG}_uniprot.faa")
+    for MAG, d in mag_dirs_by_name.items():
+        f = os.path.join(d, f"{MAG}_uniprot.faa")
         if os.path.exists(f):
             files.append(f)
 
     if not files:
-        logprint("No uniprot FASTAs found.")
+        logprint("No uniprot FASTAs found — writing empty combined FASTA.")
+        open(output_path, "w").close()
         return
 
     with open(output_path, "w") as out:
@@ -205,7 +207,6 @@ def concatenate_uniprot_fastas(base_dir, output_path):
                 out.write(inp.read())
 
     logprint(f"Wrote combined FASTA → {output_path}")
-
 
 
 def write_go_kegg_annotation_files(df):
@@ -219,26 +220,24 @@ def write_go_kegg_annotation_files(df):
     logprint(f"Wrote KEGG annotations → {KEGG_OUT}")
 
 
-
 # -----------------------------
 # MAIN
 # -----------------------------
 def main():
-    MAG_info = pd.read_csv(MAG_METADATA_PATH, sep="\t")
-    MAG_list = MAG_info["mag"].tolist()
+    MAG_list = list(GENOME_SPECIES.keys())
 
     all_meta = []
 
     for MAG in MAG_list:
-        MAG_dir = os.path.join(BASE_DIR, MAG)
-        if not os.path.isdir(MAG_dir):
-            logprint(f"[{MAG}] Skipping (missing bakta directory)")
+        MAG_dir = MAG_DIR_BY_NAME.get(MAG)
+        if not MAG_dir or not os.path.isdir(MAG_dir):
+            logprint(f"[{MAG}] Skipping (no bakta directory in inputs)")
             continue
 
         logprint(f"Processing {MAG}")
 
         preprocess_bakta_annotations(MAG_dir, MAG)
-        df = format_uniprot_metadata(MAG_dir, MAG, MAG_info)
+        df = format_uniprot_metadata(MAG_dir, MAG)
         replace_faa_headers(MAG_dir, MAG, df)
 
         if df is not None:
@@ -246,23 +245,22 @@ def main():
             all_meta.append(df)
 
     if not all_meta:
-        logprint("No MAG metadata found — nothing to export.")
+        # Snakemake requires every declared output to exist on completion.
+        # Touch empties so the rule succeeds; downstream rules will surface
+        # the "no proteins found" condition more clearly than us crashing here.
+        logprint("No MAG metadata found — writing empty outputs.")
+        for path in (FASTA_OUT, GO_OUT, KEGG_OUT):
+            open(path, "w").close()
         log.close()
         return
 
     full_df = pd.concat(all_meta)
 
-    # Write annotation TSVs
     write_go_kegg_annotation_files(full_df)
-
-    # Combine FASTAs
-    concatenate_uniprot_fastas(BASE_DIR, FASTA_OUT)
+    concatenate_uniprot_fastas(MAG_DIR_BY_NAME, FASTA_OUT)
 
     logprint("MAG UniProt + GO/KEGG processing complete.")
     log.close()
 
 
-
-if __name__ == "__main__":
-    main()
-
+main()

@@ -1,0 +1,28 @@
+# Snakemake profile for barnacle2 (UCSD HPC cluster).
+#
+# Pattern: a single SBATCH job runs Snakemake inline (see run_conduit_barnacle2.slurm
+# for the wrapper). This profile sets the SNAKEMAKE flags; SBATCH directives
+# (time, memory, cpus-per-task, account, etc.) live in the wrapper itself.
+#
+# Usage from the SLURM wrapper:
+#   snakemake --profile profiles/barnacle2 \
+#             --configfile experiments/<exp>/config/<method>.yaml \
+#             --cores ${SLURM_CPUS_PER_TASK}
+#
+# This profile deliberately does NOT hardcode:
+#   - cores          -> pass from SLURM_CPUS_PER_TASK at job submission
+#   - --cache        -> user-specific scratch path; set in the wrapper via
+#                       $SNAKEMAKE_OUTPUT_CACHE on the CLI
+#   - user scratch dirs (/ddn_scratch/<user>/…) -> set in the wrapper
+# …so the profile is portable across barnacle2 users.
+
+use-singularity: true
+rerun-incomplete: true
+
+# /ddn_scratch is the cluster scratch filesystem that holds TMPDIR,
+# XDG_CACHE_HOME, and Snakemake's output cache on barnacle2. Apptainer /
+# Singularity doesn't auto-bind it, so containers can't see files under
+# /ddn_scratch without this bind. The wrapper sets env-var paths under
+# /ddn_scratch; this exposes the whole tree so those paths resolve inside
+# rule containers.
+singularity-args: "--bind /ddn_scratch"

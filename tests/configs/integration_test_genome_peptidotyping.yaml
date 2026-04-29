@@ -1,0 +1,5 @@
+# Integration test: genome_peptidotyping
+# Uses user-provided genomes in experiments/integration_test/input/MAG_files/.
+experiment: integration_test
+run_name: genome_peptidotyping
+search_space_method: genome_peptidotyping

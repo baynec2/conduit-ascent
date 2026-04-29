@@ -1,5 +1,6 @@
 import os
 import glob
+import pandas as pd
 
 # Experiment specific directories
 EXPERIMENT_DIR = config["experiment_dir"]
@@ -10,6 +11,24 @@ BAKTA_DIR = config["bakta_db_dir"]
 # Database specific output
 BAKTA_OUT_ROOT = os.path.join(RUN_DIR,"database_resources/bakta")
 DB_OUT_ROOT = os.path.join(RUN_DIR,"database_resources")
+
+# MGnify shared cache paths (see modules/genome_download/mgnify/mgnify.smk).
+# Duplicated here rather than imported because Snakemake modules don't share
+# Python helpers across snakefiles; the logic is three lines.
+_MGNIFY_CACHE_DIR    = config.get("mgnify_cache_dir",
+                                  "resources/genome_databases/mgnify")
+_MGNIFY_CATALOG_SLUG = config.get("mgnify_catalog", "").replace("/", "_")
+_MGNIFY_CATALOG_ROOT = (os.path.join(_MGNIFY_CACHE_DIR, _MGNIFY_CATALOG_SLUG)
+                        if _MGNIFY_CATALOG_SLUG else "")
+
+def _mgnify_genome_path(mag):
+    return os.path.join(_MGNIFY_CATALOG_ROOT, "genomes", f"{mag}.fna")
+
+def _mgnify_taxonomy_path():
+    # Per-run, NOT shared — the file is a filtered projection by per-run
+    # mgnify_taxonomy_filter / mgnify_max_genomes, so two runs with different
+    # filters would clobber each other in a shared location.
+    return os.path.join(RUN_DIR, "genome_download/mgnify/taxonomy.txt")
 
 # Files that should be included in Bakta database
 REQUIRED_BAKTA_FILES = (
@@ -23,16 +42,53 @@ REQUIRED_BAKTA_FILES = (
     "orit.fna",
 )
 
+# Static dispatch to the upstream-emitted genome list. Each upstream selector
+# is responsible for writing a one-genome-per-line file at a known path; from
+# here we only see file paths, never peer modules' checkpoint proxies (which
+# Snakemake 9 scopes per-module).
+def _selected_genomes_source():
+    method = config.get("search_space_method")
+    if method == "genome_peptidotyping":
+        return os.path.join(RUN_DIR, "database_resources/genome_peptidotyping/detected_genomes.txt")
+    if method == "hapid":
+        return os.path.join(RUN_DIR, "database_resources/hapid/selected_genomes.txt")
+    if config.get("genome_download_source") == "mgnify":
+        return os.path.join(RUN_DIR, "genome_download/mgnify/species_representatives.txt")
+    return None
+
+# When a selection method is in play, route everything through a checkpoint
+# defined IN this module — this is what lets get_mag_list() use checkpoints.X
+# without crossing module boundaries. The upstream dependency is a plain file
+# path, so checkpoint-aware DAG re-evaluation propagates correctly.
+if _selected_genomes_source() is not None:
+    checkpoint canonicalize_selected_genomes:
+        input:
+            _selected_genomes_source()
+        output:
+            os.path.join(DB_OUT_ROOT, "selected_genomes.txt")
+        log:
+            os.path.join(RUN_DIR, "logs/search_space/MAGs/canonicalize_selected_genomes.log")
+        shell:
+            "mkdir -p $(dirname {log}) && cp {input} {output} 2> {log}"
+
 # Get MAG names (basenames without extension) for wildcards
 def get_mag_list():
+    if _selected_genomes_source() is not None:
+        list_file = checkpoints.canonicalize_selected_genomes.get().output[0]
+        with open(list_file) as fh:
+            return sorted([line.strip() for line in fh if line.strip()])
+    # Plain MAGs method: use all user-provided FASTAs in MAG_DIR.
     mags = []
     for ext in ("fa", "fna", "fasta"):
         for f in glob.glob(os.path.join(MAG_DIR, f"*.{ext}")):
             mags.append(os.path.splitext(os.path.basename(f))[0])
-    return sorted(list(set(mags)))
+    return sorted(set(mags))
 
-# Get full path to MAG file given a MAG name (wildcard)
+# Get full path to MAG file given a MAG name (wildcard). MGnify-sourced
+# genomes live in the shared cache; user-provided MAGs live in MAG_DIR.
 def mag_fasta_path(wildcards):
+    if config.get("genome_download_source") == "mgnify":
+        return _mgnify_genome_path(wildcards.mag)
     for ext in ("fa", "fna", "fasta"):
         candidate = os.path.join(MAG_DIR, f"{wildcards.mag}.{ext}")
         if os.path.exists(candidate):
@@ -41,7 +97,9 @@ def mag_fasta_path(wildcards):
 
 rule check_mag_fastas:
     input:
-        MAG_DIR
+        MAG_DIR,
+        *([os.path.join(RUN_DIR, "genome_download/mgnify/.mgnify_download_complete")]
+          if config.get("genome_download_source") == "mgnify" else [])
     output:
         touch(os.path.join(MAG_DIR, ".fastas_checked"))
     log:
@@ -66,7 +124,7 @@ rule check_mag_fastas:
         touch {output}
         """
 
-bakta_db_final = os.path.join(f"{BAKTA_DIR}-{config['bakta_db_type']}")
+bakta_db_final = os.path.join(BAKTA_DIR, f"db-{config['bakta_db_type']}")
 
 # Download the bakta resources if they do not exist at the user specified resource path.
 rule download_bakta_resources:
@@ -143,36 +201,43 @@ rule annotate_mags_with_bakta:
         echo "Finished {wildcards.mag}" >> {log}
         """
 
+def _mag_taxonomy_input():
+    """Taxonomy source: shared cache when mgnify, experiment-local otherwise."""
+    if config.get("genome_download_source") == "mgnify":
+        return _mgnify_taxonomy_path()
+    return os.path.join(MAG_DIR, "taxonomy.txt")
+
+rule parse_mag_taxonomy:
+    input:
+        taxonomy = _mag_taxonomy_input()
+    output:
+        os.path.join(DB_OUT_ROOT, "mag_taxonomy.txt")
+    log:
+        os.path.join(RUN_DIR, "logs/search_space/MAGs/parse_mag_taxonomy.log")
+    container:
+        config["containers"]["bakta"]
+    script:
+        "scripts/parse_mag_taxonomy.py"
+
 rule create_uniprot_style_database:
     input:
         bakta_dirs = lambda wildcards: [
             os.path.join(BAKTA_OUT_ROOT, mag) for mag in get_mag_list()
-        ]
+        ],
+        taxonomy = os.path.join(DB_OUT_ROOT, "mag_taxonomy.txt")
     output:
         fasta = os.path.join(DB_OUT_ROOT, "mag_database.fasta"),
         go = os.path.join(DB_OUT_ROOT, "go_annotations.txt"),
         kegg = os.path.join(DB_OUT_ROOT, "kegg_annotations.txt")
     params:
-        mag_metadata = os.path.join(MAG_DIR, "MAG_metadata.txt")
+        taxonomy = os.path.join(DB_OUT_ROOT, "mag_taxonomy.txt")
     log:
-        os.path.join(RUN_DIR,"logs/search_space/MAGs/create_uniprot_sytle_database.log")
+        os.path.join(RUN_DIR,"logs/search_space/MAGs/create_uniprot_style_database.log")
     container:
         config["containers"]["bakta"]
     script:
         "scripts/MAG_uniprot_headers.py"
 
-rule get_mag_taxonomy:
-    input:
-        # File containing ncbi organism ids
-        mag_metadata = os.path.join(EXPERIMENT_DIR,"input/MAG_files/MAG_metadata.txt")
-    output:
-        taxonomy = os.path.join(RUN_DIR,"database_resources/mag_taxonomy.txt")
-    log: os.path.join(RUN_DIR,"logs/search_space/MAGs/get_mag_taxonomy.log")
-    container: config["containers"]["conduitr"]
-    script:
-      "scripts/get_mag_taxonomy.R"
-
-# This will allow us to integrate 
 rule append_additional_organisms_or_proteomes:
     input:
         # Modifying the mag database to also have uniprot information. 

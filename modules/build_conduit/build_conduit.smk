@@ -31,7 +31,7 @@ rule build_conduit:
     database=os.path.join(RUN_DIR,"database_resources/protein_info.txt"),
     annotations= os.path.join(RUN_DIR,"database_resources/detected_protein_resources/conduit_annotations.txt"),
     taxonomy = os.path.join(RUN_DIR,"database_resources/taxonomy.txt"),
-    diann_spectral_lib_config = config["generate_diann_spectral_library_config"],
+    diann_spectral_lib_config = config["diann_spectral_library_base_config"],
     diann_run_config          = config["run_diann_config"]
   params:
     workflow_version  = open("VERSION").read().strip(),

@@ -12,6 +12,9 @@ RUN_DIR = config["run_dir"]
 # For the metaphlan method: ncbi_taxa_ids.txt is generated directly into RUN_DIR
 # by the metaphlan module.
 if config["search_space_method"] == "ncbi_taxonomy_id":
+    # Pure I/O seed rule — no container, no heavy compute.
+    localrules: seed_ncbi_taxa_ids
+
     rule seed_ncbi_taxa_ids:
         input: os.path.join(EXPERIMENT_DIR, "input/ncbi_taxa_ids.txt")
         output: os.path.join(RUN_DIR, "ncbi_taxa_ids.txt")
