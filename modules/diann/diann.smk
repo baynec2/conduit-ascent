@@ -45,8 +45,7 @@ rule run_diann:
         config_file = os.path.join(RUN_DIR,"config/run_diann.cfg")
     output:
         diann_stats = os.path.join(RUN_DIR,"diann_output/diann.stats.tsv"),
-        diann_parquet = os.path.join(RUN_DIR,"diann_output/diann.parquet"),
-        diann_pg_matrix = os.path.join(RUN_DIR,"diann_output/diann.pg_matrix.tsv")
+        diann_parquet = os.path.join(RUN_DIR,"diann_output/diann.parquet")
     params:
         out = lambda w, output: os.path.join(os.path.dirname(output.diann_stats), "diann"),
         lib_flag = lambda w: (
@@ -74,7 +73,7 @@ rule extract_detected_proteins:
   input:
     protein_info_df=os.path.join(RUN_DIR,"database_resources/protein_info.txt"),
     protein_info_fasta =os.path.join(RUN_DIR,"database_resources/database.fasta"),
-    report_pg_matrix=os.path.join(RUN_DIR,"diann_output/diann.pg_matrix.tsv")
+    diann_parquet=os.path.join(RUN_DIR,"diann_output/diann.parquet")
   output:
     detected_protein_info_df = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/detected_protein_info.txt"),
     detected_protein_info_fasta = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/detected_protein.fasta")
