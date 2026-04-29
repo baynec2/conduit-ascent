@@ -61,6 +61,17 @@ diann_search_mode: "standard"
 # Main DIA-NN search config. Used when diann_search_mode == "standard".
 run_diann_config: config/run_diann.cfg
 
+# Per-method search mode for multi-pass search-space DIA-NN searches.
+# Independent of diann_search_mode (which controls only the main search).
+# Options for each:  standard | infinidia
+#   standard   build a predicted spectral library first, then search with --lib
+#   infinidia  search FASTA directly with --pre-search --pre-filter
+# Defaults preserve historical behavior of each method.
+unipept_peptidotyping_search_mode: "infinidia"
+genome_peptidotyping_search_mode:  "infinidia"
+unipept_hapid_search_mode:         "standard"
+hapid_search_mode:                 "standard"
+
 # --- Host / target filtering (optional; applies to every method) ---
 # Append an extra UniProt proteome to the database (e.g., a host reference).
 # FALSE = none.  Examples: Human = UP000005640, Mouse C57/BL6 = UP000000589.

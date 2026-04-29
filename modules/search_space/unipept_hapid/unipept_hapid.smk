@@ -200,11 +200,25 @@ rule generate_hapid_spectral_library:
 rule perform_hapid_first_pass_search:
     input:
         raw_files_dir    = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
-        spectral_library = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping.predicted.speclib"),
+        spectral_library = (
+            [os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping.predicted.speclib")]
+            if config.get("unipept_hapid_search_mode", "standard") == "standard"
+            else []
+        ),
         fasta            = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping_db.fasta"),
-        config_file      = config["diann_library_search_base_config"]
+        config_file      = (
+            "config/hapid_infinidia.cfg"
+            if config.get("unipept_hapid_search_mode", "standard") == "infinidia"
+            else config["diann_library_search_base_config"]
+        )
     output:
         hapid_diann_parquet = os.path.join(RUN_DIR,"database_resources/unipept_hapid/hapid_first_pass_diann.parquet")
+    params:
+        lib_flag = (
+            f"--lib {os.path.join(config['peptidotyping_resource_dir'], 'hapid_peptidotyping.predicted.speclib')}"
+            if config.get("unipept_hapid_search_mode", "standard") == "standard"
+            else ""
+        )
     log: os.path.join(RUN_DIR,"logs/unipept_hapid/perform_hapid_first_pass_search.log")
     container: config["containers"]["diann"]
     threads: workflow.cores
@@ -214,7 +228,7 @@ rule perform_hapid_first_pass_search:
         --fasta {input.fasta} \
         --out  {RUN_DIR}/database_resources/unipept_hapid/hapid_first_pass_diann \
         --dir {input.raw_files_dir} \
-        --lib {input.spectral_library} \
+        {params.lib_flag} \
         --cut "" \
         --missed-cleavages 0 \
         --min-pep-len 5 \

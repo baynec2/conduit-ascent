@@ -298,16 +298,85 @@ rule build_genome_peptidotyping_effective_detection_rank_db:
 # Phase D: Two-Pass DIA-NN Search
 ################################################################################
 
+################################################################################
+# Generate predicted spectral libraries (used only when search_mode == "standard")
+################################################################################
+rule generate_genome_peptidotyping_first_pass_speclib:
+    input:
+        fasta = os.path.join(GP_RESOURCE_DIR, "effective_first_pass_database.fasta"),
+        config_file = os.path.join(RUN_DIR, "config/diann_spectral_library_base.cfg")
+    output:
+        os.path.join(GP_RESOURCE_DIR, "first_pass_database.predicted.speclib")
+    params:
+        out_lib = lambda w, output: os.path.splitext(os.path.splitext(output[0])[0])[0]
+    log:
+        os.path.join(RUN_DIR, "logs/genome_peptidotyping/generate_first_pass_speclib.log")
+    container:
+        config["containers"]["diann"]
+    threads: workflow.cores
+    shell:
+        """
+        mkdir -p $(dirname {log})
+        diann --cfg {input.config_file} \
+            --fasta {input.fasta} \
+            --out-lib {params.out_lib} \
+            --cut "" \
+            --missed-cleavages 0 \
+            --min-pep-len 7 \
+            --max-pep-len 30 \
+            --threads {threads} >> {log} 2>&1
+        """
+
+rule generate_genome_peptidotyping_second_pass_speclib:
+    input:
+        fasta = os.path.join(GP_RESOURCE_DIR, "second_pass_database.fasta"),
+        config_file = os.path.join(RUN_DIR, "config/diann_spectral_library_base.cfg")
+    output:
+        os.path.join(GP_RESOURCE_DIR, "second_pass_database.predicted.speclib")
+    params:
+        out_lib = lambda w, output: os.path.splitext(os.path.splitext(output[0])[0])[0]
+    log:
+        os.path.join(RUN_DIR, "logs/genome_peptidotyping/generate_second_pass_speclib.log")
+    container:
+        config["containers"]["diann"]
+    threads: workflow.cores
+    shell:
+        """
+        mkdir -p $(dirname {log})
+        diann --cfg {input.config_file} \
+            --fasta {input.fasta} \
+            --out-lib {params.out_lib} \
+            --cut "" \
+            --missed-cleavages 0 \
+            --min-pep-len 7 \
+            --max-pep-len 30 \
+            --threads {threads} >> {log} 2>&1
+        """
+
 rule perform_genome_peptidotyping_first_pass_search:
     input:
         raw_files_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files"),
         fasta = os.path.join(GP_RESOURCE_DIR, "effective_first_pass_database.fasta"),
-        config_file = "config/peptidotyping_infinidia.cfg"
+        spectral_library = (
+            [os.path.join(GP_RESOURCE_DIR, "first_pass_database.predicted.speclib")]
+            if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard"
+            else []
+        ),
+        config_file = (
+            "config/peptidotyping_standard.cfg"
+            if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard"
+            else "config/peptidotyping_infinidia.cfg"
+        )
     output:
         first_pass_diann_parquet = os.path.join(GP_RESOURCE_DIR, "first_pass_diann.parquet"),
         first_pass_diann_protein_description = os.path.join(GP_RESOURCE_DIR, "first_pass_diann.protein_description.tsv")
     params:
-        out_prefix = os.path.join(GP_RESOURCE_DIR, "first_pass_diann")
+        out_prefix = os.path.join(GP_RESOURCE_DIR, "first_pass_diann"),
+        lib_flag = (
+            f"--lib {os.path.join(GP_RESOURCE_DIR, 'first_pass_database.predicted.speclib')}"
+            if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard"
+            else ""
+        )
     log:
         os.path.join(RUN_DIR, "logs/genome_peptidotyping/first_pass_search.log")
     container:
@@ -320,6 +389,7 @@ rule perform_genome_peptidotyping_first_pass_search:
             --fasta {input.fasta} \
             --out {params.out_prefix} \
             --dir {input.raw_files_dir} \
+            {params.lib_flag} \
             --threads {threads} --verbose 1 >> {log} 2>&1
         """
 
@@ -389,12 +459,26 @@ rule perform_genome_peptidotyping_second_pass_search:
     input:
         raw_files_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files"),
         fasta         = os.path.join(GP_RESOURCE_DIR, "second_pass_database.fasta"),
-        config_file   = "config/peptidotyping_infinidia.cfg"
+        spectral_library = (
+            [os.path.join(GP_RESOURCE_DIR, "second_pass_database.predicted.speclib")]
+            if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard"
+            else []
+        ),
+        config_file = (
+            "config/peptidotyping_standard.cfg"
+            if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard"
+            else "config/peptidotyping_infinidia.cfg"
+        )
     output:
         second_pass_diann_parquet             = os.path.join(GP_RESOURCE_DIR, "second_pass_diann.parquet"),
         second_pass_diann_protein_description = os.path.join(GP_RESOURCE_DIR, "second_pass_diann.protein_description.tsv")
     params:
-        out_prefix = os.path.join(GP_RESOURCE_DIR, "second_pass_diann")
+        out_prefix = os.path.join(GP_RESOURCE_DIR, "second_pass_diann"),
+        lib_flag = (
+            f"--lib {os.path.join(GP_RESOURCE_DIR, 'second_pass_database.predicted.speclib')}"
+            if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard"
+            else ""
+        )
     log:
         os.path.join(RUN_DIR, "logs/genome_peptidotyping/second_pass_search.log")
     container:
@@ -407,6 +491,7 @@ rule perform_genome_peptidotyping_second_pass_search:
             --fasta {input.fasta} \
             --out {params.out_prefix} \
             --dir {input.raw_files_dir} \
+            {params.lib_flag} \
             --threads {threads} --verbose 1 >> {log} 2>&1
         """
 

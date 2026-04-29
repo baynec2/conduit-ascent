@@ -424,20 +424,86 @@ rule build_effective_detection_rank_db:
         log_ts "Effective first-pass database built: $TOTAL entries"
         """
 ################################################################################
+# Generate predicted spectral libraries (used only when search_mode == "standard")
+################################################################################
+rule generate_first_pass_speclib:
+    input:
+        fasta = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
+        config_file = os.path.join(RUN_DIR,"config/diann_spectral_library_base.cfg")
+    output:
+        os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_database.predicted.speclib")
+    params:
+        out_lib = lambda w, output: os.path.splitext(os.path.splitext(output[0])[0])[0]
+    log: os.path.join(RUN_DIR,"logs/peptidotyping/generate_first_pass_speclib.log")
+    container:
+        config["containers"]["diann"]
+    threads: workflow.cores
+    shell:
+        """
+        diann --cfg {input.config_file} \
+        --fasta {input.fasta} \
+        --out-lib {params.out_lib} \
+        --cut "" \
+        --missed-cleavages 0 \
+        --min-pep-len 7 \
+        --max-pep-len 30 \
+        --threads {threads} >> {log} 2>&1
+        """
+
+rule generate_second_pass_speclib:
+    input:
+        fasta = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_database.fasta"),
+        config_file = os.path.join(RUN_DIR,"config/diann_spectral_library_base.cfg")
+    output:
+        os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_database.predicted.speclib")
+    params:
+        out_lib = lambda w, output: os.path.splitext(os.path.splitext(output[0])[0])[0]
+    log: os.path.join(RUN_DIR,"logs/peptidotyping/generate_second_pass_speclib.log")
+    container:
+        config["containers"]["diann"]
+    threads: workflow.cores
+    shell:
+        """
+        diann --cfg {input.config_file} \
+        --fasta {input.fasta} \
+        --out-lib {params.out_lib} \
+        --cut "" \
+        --missed-cleavages 0 \
+        --min-pep-len 7 \
+        --max-pep-len 30 \
+        --threads {threads} >> {log} 2>&1
+        """
+
+################################################################################
 # Performing the First Pass Search, Find Broad Taxonomic Levels
 ################################################################################
-# Searching our first pass spectral library with Diann on infinidia mode. 
-# The database searched is mostly family level peptides, but in the case that no
-# family level peptides for a family exists, fallback to genus or species/strain
-# specific if they do not exist (as defined in uild_effective_detection_rank_db).
+# Searches the first-pass family-level diagnostic-peptide database with DIA-NN.
+# The mode (infinidia | standard) is selected by config["unipept_peptidotyping_search_mode"].
+# The database is mostly family-level peptides, with genus/species fallbacks
+# (see build_effective_detection_rank_db).
 rule perform_first_pass_search:
     input:
         raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
         fasta = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
-        config_file = "config/peptidotyping_infinidia.cfg"
+        spectral_library = (
+            [os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_database.predicted.speclib")]
+            if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard"
+            else []
+        ),
+        config_file = (
+            "config/peptidotyping_standard.cfg"
+            if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard"
+            else "config/peptidotyping_infinidia.cfg"
+        )
     output:
         first_pass_diann_parquet = os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_diann.parquet"),
         first_pass_diann_protein_description =  os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_diann.protein_description.tsv")
+    params:
+        lib_flag = (
+            f"--lib {os.path.join(RUN_DIR, 'database_resources/peptidotyping/first_pass_database.predicted.speclib')}"
+            if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard"
+            else ""
+        )
     log: os.path.join(RUN_DIR,"logs/peptidotyping/perfrom_first_pass_search.log")
     container:
         config["containers"]["diann"]
@@ -448,6 +514,7 @@ rule perform_first_pass_search:
         --fasta {input.fasta} \
         --out  {RUN_DIR}/database_resources/peptidotyping/first_pass_diann \
         --dir {input.raw_files_dir} \
+        {params.lib_flag} \
         --threads {threads} --verbose 1 >> {log} 2>&1
         """
 ################################################################################
@@ -547,10 +614,25 @@ rule perform_second_pass_search:
     input:
         raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
         fasta         = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_database.fasta"),
-        config_file   = "config/peptidotyping_infinidia.cfg"
+        spectral_library = (
+            [os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_database.predicted.speclib")]
+            if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard"
+            else []
+        ),
+        config_file = (
+            "config/peptidotyping_standard.cfg"
+            if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard"
+            else "config/peptidotyping_infinidia.cfg"
+        )
     output:
         second_pass_diann_parquet             = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_diann.parquet"),
         second_pass_diann_protein_description = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_diann.protein_description.tsv")
+    params:
+        lib_flag = (
+            f"--lib {os.path.join(RUN_DIR, 'database_resources/peptidotyping/second_pass_database.predicted.speclib')}"
+            if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard"
+            else ""
+        )
     log: os.path.join(RUN_DIR,"logs/peptidotyping/perform_second_pass_search.log")
     container: config["containers"]["diann"]
     threads: workflow.cores
@@ -560,6 +642,7 @@ rule perform_second_pass_search:
             --fasta {input.fasta} \
             --out  {RUN_DIR}/database_resources/peptidotyping/second_pass_diann \
             --dir  {input.raw_files_dir} \
+            {params.lib_flag} \
             --threads {threads} --verbose 1 >> {log} 2>&1
         """
 

@@ -256,13 +256,26 @@ rule create_hapid_profiling_spectral_library:
 rule perform_hapid_profiling_search:
     input:
         raw_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files"),
-        speclib = os.path.join(HAPID_OUT_ROOT, "marker_gene.predicted.speclib"),
+        speclib = (
+            [os.path.join(HAPID_OUT_ROOT, "marker_gene.predicted.speclib")]
+            if config.get("hapid_search_mode", "standard") == "standard"
+            else []
+        ),
         fasta   = marker_gene_db_path,
-        cfg     = config["diann_library_search_base_config"]
+        cfg     = (
+            "config/hapid_infinidia.cfg"
+            if config.get("hapid_search_mode", "standard") == "infinidia"
+            else config["diann_library_search_base_config"]
+        )
     output:
         os.path.join(HAPID_OUT_ROOT, "marker_gene_profiling_report.parquet")
     params:
-        out_prefix = lambda wildcards, output: output[0].replace(".parquet", "")
+        out_prefix = lambda wildcards, output: output[0].replace(".parquet", ""),
+        lib_flag = (
+            f"--lib {os.path.join(HAPID_OUT_ROOT, 'marker_gene.predicted.speclib')}"
+            if config.get("hapid_search_mode", "standard") == "standard"
+            else ""
+        )
     log:
         os.path.join(RUN_DIR, "logs/search_space/hapid/profiling_search.log")
     threads: workflow.cores
@@ -277,7 +290,7 @@ rule perform_hapid_profiling_search:
             --fasta {input.fasta} \
             --out {params.out_prefix} \
             --dir {input.raw_dir} \
-            --lib {input.speclib} \
+            {params.lib_flag} \
             --cut "K*,R*" \
             --missed-cleavages 1 \
             --min-pep-len 7 \
