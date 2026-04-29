@@ -331,7 +331,7 @@ checkpoint run_greedy_genome_selection:
     shell:
         """
         mkdir -p $(dirname {log})
-        python {workflow.basedir}/modules/search_space/hapid/scripts/coverAllSpectra_greedy.py \
+        python {workflow.basedir}/modules/search_space/_shared/scripts/coverAllSpectra_greedy.py \
             {input} {output} \
             > {log} 2>&1
         """

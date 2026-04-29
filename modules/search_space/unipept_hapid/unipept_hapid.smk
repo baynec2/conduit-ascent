@@ -237,17 +237,66 @@ rule perform_hapid_first_pass_search:
         """
 
 ################################################################################
-# Inferring species/strain presence from HAPiID first-pass results
+# Greedy HAPiID-style species/strain selection from first-pass results
 ################################################################################
-# Since hapid peptides already have species/strain-level LCA, presence is
-# inferred directly at the species/strain level — no family→species mapping needed.
-rule infer_species_presence:
+# Mirrors the genome-based hapid module (modules/search_space/hapid):
+#   1. Build a taxon → {spectrum_ids} dict (spectrum = Run||Precursor.Id).
+#   2. Greedy set-cover: at each step pick the taxon covering the most
+#      still-uncovered spectra; emit a TSV ranked by cumulative coverage.
+#   3. Take the smallest prefix whose cumulative_pct ≥ hapid_percent_spectra
+#      and write it to ncbi_taxa_ids.txt for the ncbi_taxonomy_id workflow.
+#
+# The greedy script lives in modules/search_space/_shared/scripts/ and is
+# reused as-is across the genome-based hapid module and this one.
+rule build_taxon_spectrum_mapping:
     input:
-        hapid_diann = os.path.join(RUN_DIR,"database_resources/unipept_hapid/hapid_first_pass_diann.parquet")
+        parquet = os.path.join(RUN_DIR, "database_resources/unipept_hapid/hapid_first_pass_diann.parquet")
     output:
-        ncbi_taxa_ids = os.path.join(RUN_DIR,"ncbi_taxa_ids.txt")
+        os.path.join(RUN_DIR, "database_resources/unipept_hapid/taxon2spectrum_dic.json")
+    log: os.path.join(RUN_DIR, "logs/unipept_hapid/build_taxon_spectrum_mapping.log")
+    container: config["containers"]["fraggenescan_hmmer"]
+    script: "scripts/build_taxon_spectrum_mapping.py"
+
+
+checkpoint run_greedy_taxon_selection:
+    input:
+        os.path.join(RUN_DIR, "database_resources/unipept_hapid/taxon2spectrum_dic.json")
+    output:
+        os.path.join(RUN_DIR, "database_resources/unipept_hapid/unipept_hapid_greedy_selection.tsv")
+    log: os.path.join(RUN_DIR, "logs/unipept_hapid/greedy_taxon_selection.log")
+    container: config["containers"]["fraggenescan_hmmer"]
+    shell:
+        """
+        mkdir -p $(dirname {log})
+        python {workflow.basedir}/modules/search_space/_shared/scripts/coverAllSpectra_greedy.py \
+            {input} {output} > {log} 2>&1
+        """
+
+
+# Apply the hapid_percent_spectra cutoff and emit ncbi_taxa_ids.txt.
+# The shared greedy script writes its key column literally as `genome`; here
+# the keys are NCBI taxon IDs, and we rename only at this output boundary.
+rule unipept_hapid_filter_selected_taxa:
+    input:
+        os.path.join(RUN_DIR, "database_resources/unipept_hapid/unipept_hapid_greedy_selection.tsv")
+    output:
+        os.path.join(RUN_DIR, "ncbi_taxa_ids.txt")
     params:
-        threshold = config["presence_min_peptides"]
-    log: os.path.join(RUN_DIR,"logs/unipept_hapid/infer_species_presence.log")
-    container: config["containers"]["conduitr"]
-    script: "scripts/infer_species_presence.R"
+        pct = config.get("hapid_percent_spectra", 80)
+    log: os.path.join(RUN_DIR, "logs/unipept_hapid/filter_selected_taxa.log")
+    run:
+        import pandas as pd
+        df = pd.read_csv(input[0], sep="\t")
+        above = df[df["cumulative_pct"] >= params.pct]
+        cutoff = (above.index[0] + 1) if not above.empty else len(df)
+        selected = df["genome"].tolist()[:cutoff]
+        os.makedirs(os.path.dirname(output[0]), exist_ok=True)
+        with open(output[0], "w") as fh:
+            fh.write("ncbi_taxonomy_id\n")
+            for t in selected:
+                fh.write(f"{t}\n")
+        with open(log[0], "w") as lh:
+            lh.write(
+                f"Selected {len(selected)} of {len(df)} taxa "
+                f"(cumulative_pct ≥ {params.pct}); written to {output[0]}\n"
+            )

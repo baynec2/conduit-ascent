@@ -106,10 +106,6 @@ peptidotyping_resource_dir: "resources/peptidotyping/"
 # peptidotyping_resource_dir (CLAUDE.md); the test runner derives it from
 # PEPTIDOTYPING_RESOURCE_DIR if TAXONKIT_DB_DIR isn't set.
 taxonkit_db_dir: "resources/peptidotyping/taxonkit"
-# Minimum unique peptides to call a species present.
-presence_min_peptides: 3
-# Minimum coverage to call a species present (0 = no coverage filter).
-presence_min_coverage: 0
 # Minimum diagnostic peptides per taxon required for it to enter the search database.
 min_taxon_db_peptides: 10
 
