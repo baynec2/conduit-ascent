@@ -144,6 +144,21 @@ hapid_percent_spectra: 80
 bakta_db_dir:  "resources/bakta/db"
 bakta_db_type: "light"
 
+# =============================================================================
+#  Shared genome-derived resource caches
+#  Used by: MAGs · hapid · genome_peptidotyping (when source == "mgnify")
+# =============================================================================
+# Sharing only kicks in when genome_download_source == "mgnify" — MGnify accessions
+# are globally unique. For local MAGs we keep per-run paths; local names aren't
+# guaranteed unique across experiments.
+#
+# Per-genome artifacts (Prodigal/FGS FAA, HMMER tblout, bakta annotations).
+# Layout: {genome_resource_dir}/{catalog_slug}/{tool}/{genome_id}/
+genome_resource_dir: "resources/genome_databases/derived"
+# Per-genome-set aggregates (LCA peptide DBs, hapid speclib + dedup marker DB).
+# Layout: {genome_set_resource_dir}/{catalog_slug}__filter-{filter}__max{n}/{module}/
+genome_set_resource_dir: "resources/genome_databases/derived_sets"
+
 
 # =============================================================================
 #  MetaPhlAn

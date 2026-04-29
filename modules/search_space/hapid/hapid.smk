@@ -1,12 +1,22 @@
 import os
 import glob
 
+include: "../_shared/genome_cache.smk"
+
 # ==============================================================================
 # Paths
 # ==============================================================================
 EXPERIMENT_DIR  = config["experiment_dir"]
 RUN_DIR         = config["run_dir"]
 HAPID_DIR       = os.path.join(EXPERIMENT_DIR, "input/MAG_files")
+# Three tiers of cacheability — see _shared/genome_cache.smk:
+#   HAPID_FGS_DIR    — per-genome (FragGeneScan FAA depends only on a single genome)
+#   HAPID_HMMER_DIR  — per-genome (HMMER tblout depends only on FAA + HMM profiles)
+#   HAPID_SET_DIR    — per-genome-set (deduped marker DB + speclib + protein2genome dict)
+#   HAPID_OUT_ROOT   — per-run (DIA-NN profiling + greedy selection, MS-data-dependent)
+HAPID_FGS_DIR   = per_genome_cache_root("hapid_fgs")
+HAPID_HMMER_DIR = per_genome_cache_root("hapid_hmmer")
+HAPID_SET_DIR   = per_genome_set_cache_root("hapid")
 HAPID_OUT_ROOT  = os.path.join(RUN_DIR, "database_resources/hapid")
 
 # MGnify shared cache (see modules/genome_download/mgnify/mgnify.smk).
@@ -69,17 +79,17 @@ def hapid_fasta_path(wildcards):
 
 def marker_gene_db_path(wildcards=None):
     """Deduplicated marker gene FASTA."""
-    return os.path.join(HAPID_OUT_ROOT, "marker_gene_db.fasta")
+    return os.path.join(HAPID_SET_DIR, "marker_gene_db.fasta")
 
 
 def marker_gene_clstr_path(wildcards=None):
     """CD-HIT cluster file."""
-    return os.path.join(HAPID_OUT_ROOT, "marker_gene_db.fasta.clstr")
+    return os.path.join(HAPID_SET_DIR, "marker_gene_db.fasta.clstr")
 
 
 def protein2genome_dic_path(wildcards=None):
     """protein2genome JSON path."""
-    return os.path.join(HAPID_OUT_ROOT, "protein2genome_dic.json")
+    return os.path.join(HAPID_SET_DIR, "protein2genome_dic.json")
 
 
 # ==============================================================================
@@ -108,7 +118,7 @@ rule predict_orfs_with_fraggenescan:
         genome_fa = hapid_fasta_path,
         fastas_ok = os.path.join(HAPID_DIR, ".fastas_checked")
     output:
-        os.path.join(HAPID_OUT_ROOT, "fgs/{genome}.faa")
+        os.path.join(HAPID_FGS_DIR, "{genome}.faa")
     params:
         prefix = lambda wildcards, output: output[0].replace(".faa", "")
     log:
@@ -134,10 +144,10 @@ rule predict_orfs_with_fraggenescan:
 
 rule identify_marker_genes_with_hmmer:
     input:
-        faa     = os.path.join(HAPID_OUT_ROOT, "fgs/{genome}.faa"),
+        faa     = os.path.join(HAPID_FGS_DIR, "{genome}.faa"),
         pressed = config["hapid_hmm_profiles"] + ".pressed"
     output:
-        os.path.join(HAPID_OUT_ROOT, "hmmer/{genome}_hmmer.txt")
+        os.path.join(HAPID_HMMER_DIR, "{genome}_hmmer.txt")
     params:
         hmm_profiles = config["hapid_hmm_profiles"]
     log:
@@ -146,6 +156,10 @@ rule identify_marker_genes_with_hmmer:
     container:
         config["containers"]["fraggenescan_hmmer"]
     shell:
+        # hmmscan stdout is the verbose human-readable per-query report — we
+        # already capture the parseable form via --tblout, so the stdout report
+        # is dead weight (≈3 MB/genome × 4744 genomes ≈ 14 GB on a full MGnify
+        # catalog). Discard it; keep stderr in {log} for real errors.
         """
         mkdir -p $(dirname {output})
         mkdir -p $(dirname {log})
@@ -155,22 +169,22 @@ rule identify_marker_genes_with_hmmer:
             --cpu {threads} \
             {params.hmm_profiles} \
             {input.faa} \
-            > {log} 2>&1
+            > /dev/null 2> {log}
         """
 
 
 rule build_hapid_marker_gene_fasta:
     input:
         hmmer_files = lambda wildcards: [
-            os.path.join(HAPID_OUT_ROOT, f"hmmer/{g}_hmmer.txt")
+            os.path.join(HAPID_HMMER_DIR, f"{g}_hmmer.txt")
             for g in get_all_hapid_genomes()
         ],
         faa_files = lambda wildcards: [
-            os.path.join(HAPID_OUT_ROOT, f"fgs/{g}.faa")
+            os.path.join(HAPID_FGS_DIR, f"{g}.faa")
             for g in get_all_hapid_genomes()
         ]
     output:
-        os.path.join(HAPID_OUT_ROOT, "all_marker_genes.fasta")
+        os.path.join(HAPID_SET_DIR, "all_marker_genes.fasta")
     log:
         os.path.join(RUN_DIR, "logs/search_space/hapid/build_marker_gene_fasta.log")
     container:
@@ -181,10 +195,10 @@ rule build_hapid_marker_gene_fasta:
 
 rule deduplicate_marker_genes_with_cdhit:
     input:
-        fasta = os.path.join(HAPID_OUT_ROOT, "all_marker_genes.fasta")
+        fasta = os.path.join(HAPID_SET_DIR, "all_marker_genes.fasta")
     output:
-        fasta = os.path.join(HAPID_OUT_ROOT, "marker_gene_db.fasta"),
-        clstr = os.path.join(HAPID_OUT_ROOT, "marker_gene_db.fasta.clstr")
+        fasta = os.path.join(HAPID_SET_DIR, "marker_gene_db.fasta"),
+        clstr = os.path.join(HAPID_SET_DIR, "marker_gene_db.fasta.clstr")
     log:
         os.path.join(RUN_DIR, "logs/search_space/hapid/cdhit.log")
     threads: 8
@@ -207,9 +221,9 @@ rule deduplicate_marker_genes_with_cdhit:
 
 rule build_protein_genome_dict:
     input:
-        fasta = os.path.join(HAPID_OUT_ROOT, "marker_gene_db.fasta")
+        fasta = os.path.join(HAPID_SET_DIR, "marker_gene_db.fasta")
     output:
-        os.path.join(HAPID_OUT_ROOT, "protein2genome_dic.json")
+        os.path.join(HAPID_SET_DIR, "protein2genome_dic.json")
     log:
         os.path.join(RUN_DIR, "logs/search_space/hapid/protein2genome_dict.log")
     container:
@@ -227,7 +241,7 @@ rule create_hapid_profiling_spectral_library:
         fasta = marker_gene_db_path,
         cfg   = config["diann_spectral_library_base_config"]
     output:
-        os.path.join(HAPID_OUT_ROOT, "marker_gene.predicted.speclib")
+        os.path.join(HAPID_SET_DIR, "marker_gene.predicted.speclib")
     params:
         out_prefix = lambda wildcards, output: output[0].replace(".predicted.speclib", "")
     log:
@@ -257,7 +271,7 @@ rule perform_hapid_profiling_search:
     input:
         raw_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files"),
         speclib = (
-            [os.path.join(HAPID_OUT_ROOT, "marker_gene.predicted.speclib")]
+            [os.path.join(HAPID_SET_DIR, "marker_gene.predicted.speclib")]
             if config.get("hapid_search_mode", "standard") == "standard"
             else []
         ),
@@ -272,7 +286,7 @@ rule perform_hapid_profiling_search:
     params:
         out_prefix = lambda wildcards, output: output[0].replace(".parquet", ""),
         lib_flag = (
-            f"--lib {os.path.join(HAPID_OUT_ROOT, 'marker_gene.predicted.speclib')}"
+            f"--lib {os.path.join(HAPID_SET_DIR, 'marker_gene.predicted.speclib')}"
             if config.get("hapid_search_mode", "standard") == "standard"
             else ""
         )

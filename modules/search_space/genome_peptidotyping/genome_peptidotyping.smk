@@ -1,14 +1,22 @@
 import glob
 import os
 
+include: "../_shared/genome_cache.smk"
+
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR = config["run_dir"]
 MAG_DIR = os.path.join(EXPERIMENT_DIR, "input/MAG_files")
 RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/ms_files/*.raw"))
 
-# Output directories for genome peptidotyping intermediate files
+# Output directories for genome peptidotyping intermediate files.
+#
+# Three tiers of cacheability — see _shared/genome_cache.smk for the layout:
+#   GP_PRODIGAL_DIR — per-genome (Prodigal FAA depends only on a single genome)
+#   GP_SET_DIR     — per-genome-set (LCA peptide DBs, derived from full genome set)
+#   GP_RESOURCE_DIR — per-run (DIA-NN search results + downstream, MS-data-dependent)
+GP_PRODIGAL_DIR = per_genome_cache_root("prodigal")
+GP_SET_DIR      = per_genome_set_cache_root("genome_peptidotyping")
 GP_RESOURCE_DIR = os.path.join(RUN_DIR, "database_resources/genome_peptidotyping")
-GP_PRODIGAL_DIR = os.path.join(GP_RESOURCE_DIR, "prodigal")
 
 # MGnify shared cache (see modules/genome_download/mgnify/mgnify.smk).
 _MGNIFY_CACHE_DIR    = config.get("mgnify_cache_dir",
@@ -91,7 +99,7 @@ rule predict_orfs_with_prodigal:
     output:
         faa = os.path.join(GP_PRODIGAL_DIR, "{genome}.faa")
     log:
-        os.path.join(GP_RESOURCE_DIR, "logs/prodigal/{genome}.log")
+        os.path.join(RUN_DIR, "logs/genome_peptidotyping/prodigal/{genome}.log")
     container:
         config["containers"]["bakta"]
     shell:
@@ -113,11 +121,11 @@ rule tryptic_digest_genomes:
         ],
         taxonomy = _taxonomy_input()
     output:
-        peptide_mapping = os.path.join(GP_RESOURCE_DIR, "peptide_genome_mapping.tsv.gz")
+        peptide_mapping = os.path.join(GP_SET_DIR, "peptide_genome_mapping.tsv.gz")
     params:
         prodigal_dir = GP_PRODIGAL_DIR
     log:
-        os.path.join(GP_RESOURCE_DIR, "logs/tryptic_digest.log")
+        os.path.join(RUN_DIR, "logs/genome_peptidotyping/tryptic_digest.log")
     container:
         config["containers"]["bakta"]
     script:
@@ -126,18 +134,18 @@ rule tryptic_digest_genomes:
 
 rule compute_peptide_lca_and_build_dbs:
     input:
-        peptide_mapping = os.path.join(GP_RESOURCE_DIR, "peptide_genome_mapping.tsv.gz"),
+        peptide_mapping = os.path.join(GP_SET_DIR, "peptide_genome_mapping.tsv.gz"),
         taxonomy = _taxonomy_input()
     output:
-        family_tsv      = os.path.join(GP_RESOURCE_DIR, "family_lca_filtered_peptides.tsv"),
-        family_fasta    = os.path.join(GP_RESOURCE_DIR, "family_peptidotyping_db.fasta"),
-        genus_tsv       = os.path.join(GP_RESOURCE_DIR, "genus_lca_filtered_peptides.tsv"),
-        genus_fasta     = os.path.join(GP_RESOURCE_DIR, "genus_peptidotyping_db.fasta"),
-        species_tsv     = os.path.join(GP_RESOURCE_DIR, "species_strain_lca_filtered_peptides.tsv"),
-        species_fasta   = os.path.join(GP_RESOURCE_DIR, "species_strain_peptidotyping_db.fasta"),
-        taxid_family_map = os.path.join(GP_RESOURCE_DIR, "taxid_to_family_genus.tsv")
+        family_tsv      = os.path.join(GP_SET_DIR, "family_lca_filtered_peptides.tsv"),
+        family_fasta    = os.path.join(GP_SET_DIR, "family_peptidotyping_db.fasta"),
+        genus_tsv       = os.path.join(GP_SET_DIR, "genus_lca_filtered_peptides.tsv"),
+        genus_fasta     = os.path.join(GP_SET_DIR, "genus_peptidotyping_db.fasta"),
+        species_tsv     = os.path.join(GP_SET_DIR, "species_strain_lca_filtered_peptides.tsv"),
+        species_fasta   = os.path.join(GP_SET_DIR, "species_strain_peptidotyping_db.fasta"),
+        taxid_family_map = os.path.join(GP_SET_DIR, "taxid_to_family_genus.tsv")
     log:
-        os.path.join(GP_RESOURCE_DIR, "logs/compute_peptide_lca.log")
+        os.path.join(RUN_DIR, "logs/genome_peptidotyping/compute_peptide_lca.log")
     container:
         config["containers"]["bakta"]
     script:
@@ -152,18 +160,18 @@ rule compute_peptide_lca_and_build_dbs:
 
 rule build_genome_peptidotyping_effective_detection_rank_db:
     input:
-        family_tsv       = os.path.join(GP_RESOURCE_DIR, "family_lca_filtered_peptides.tsv"),
-        genus_tsv        = os.path.join(GP_RESOURCE_DIR, "genus_lca_filtered_peptides.tsv"),
-        species_tsv      = os.path.join(GP_RESOURCE_DIR, "species_strain_lca_filtered_peptides.tsv"),
-        taxid_family_map = os.path.join(GP_RESOURCE_DIR, "taxid_to_family_genus.tsv")
+        family_tsv       = os.path.join(GP_SET_DIR, "family_lca_filtered_peptides.tsv"),
+        genus_tsv        = os.path.join(GP_SET_DIR, "genus_lca_filtered_peptides.tsv"),
+        species_tsv      = os.path.join(GP_SET_DIR, "species_strain_lca_filtered_peptides.tsv"),
+        taxid_family_map = os.path.join(GP_SET_DIR, "taxid_to_family_genus.tsv")
     output:
-        first_pass_fasta = os.path.join(GP_RESOURCE_DIR, "effective_first_pass_database.fasta"),
-        rank_mapping     = os.path.join(GP_RESOURCE_DIR, "effective_detection_rank_mapping.tsv")
+        first_pass_fasta = os.path.join(GP_SET_DIR, "effective_first_pass_database.fasta"),
+        rank_mapping     = os.path.join(GP_SET_DIR, "effective_detection_rank_mapping.tsv")
     params:
         min_peptides = config["min_taxon_db_peptides"],
-        resource_dir = GP_RESOURCE_DIR
+        resource_dir = GP_SET_DIR
     log:
-        os.path.join(GP_RESOURCE_DIR, "logs/build_effective_detection_rank_db.log")
+        os.path.join(RUN_DIR, "logs/genome_peptidotyping/build_effective_detection_rank_db.log")
     container:
         config["containers"]["taxonkit"]
     shell:
@@ -303,10 +311,10 @@ rule build_genome_peptidotyping_effective_detection_rank_db:
 ################################################################################
 rule generate_genome_peptidotyping_first_pass_speclib:
     input:
-        fasta = os.path.join(GP_RESOURCE_DIR, "effective_first_pass_database.fasta"),
+        fasta = os.path.join(GP_SET_DIR, "effective_first_pass_database.fasta"),
         config_file = os.path.join(RUN_DIR, "config/diann_spectral_library_base.cfg")
     output:
-        os.path.join(GP_RESOURCE_DIR, "first_pass_database.predicted.speclib")
+        os.path.join(GP_SET_DIR, "first_pass_database.predicted.speclib")
     params:
         out_lib = lambda w, output: os.path.splitext(os.path.splitext(output[0])[0])[0]
     log:
@@ -356,9 +364,9 @@ rule generate_genome_peptidotyping_second_pass_speclib:
 rule perform_genome_peptidotyping_first_pass_search:
     input:
         raw_files_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files"),
-        fasta = os.path.join(GP_RESOURCE_DIR, "effective_first_pass_database.fasta"),
+        fasta = os.path.join(GP_SET_DIR, "effective_first_pass_database.fasta"),
         spectral_library = (
-            [os.path.join(GP_RESOURCE_DIR, "first_pass_database.predicted.speclib")]
+            [os.path.join(GP_SET_DIR, "first_pass_database.predicted.speclib")]
             if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard"
             else []
         ),
@@ -373,7 +381,7 @@ rule perform_genome_peptidotyping_first_pass_search:
     params:
         out_prefix = os.path.join(GP_RESOURCE_DIR, "first_pass_diann"),
         lib_flag = (
-            f"--lib {os.path.join(GP_RESOURCE_DIR, 'first_pass_database.predicted.speclib')}"
+            f"--lib {os.path.join(GP_SET_DIR, 'first_pass_database.predicted.speclib')}"
             if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard"
             else ""
         )
@@ -396,7 +404,7 @@ rule perform_genome_peptidotyping_first_pass_search:
 rule infer_genome_peptidotyping_first_pass_presence:
     input:
         first_pass_diann = os.path.join(GP_RESOURCE_DIR, "first_pass_diann.parquet"),
-        taxid_family_map = os.path.join(GP_RESOURCE_DIR, "taxid_to_family_genus.tsv")
+        taxid_family_map = os.path.join(GP_SET_DIR, "taxid_to_family_genus.tsv")
     output:
         ncbi_taxonomy_id = os.path.join(GP_RESOURCE_DIR, "detected_family_taxa_ids.txt"),
         fdr_results      = os.path.join(GP_RESOURCE_DIR, "first_pass_fdr_results.tsv")
@@ -422,7 +430,7 @@ rule map_genome_peptidotyping_families_to_species:
 
 rule generate_genome_peptidotyping_second_pass_db:
     input:
-        species_tsv            = os.path.join(GP_RESOURCE_DIR, "species_strain_lca_filtered_peptides.tsv"),
+        species_tsv            = os.path.join(GP_SET_DIR, "species_strain_lca_filtered_peptides.tsv"),
         families_to_species    = os.path.join(GP_RESOURCE_DIR, "families_to_species.txt")
     output:
         second_pass_fasta = os.path.join(GP_RESOURCE_DIR, "second_pass_database.fasta")

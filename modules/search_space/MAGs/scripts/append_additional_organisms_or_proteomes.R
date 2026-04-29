@@ -41,9 +41,11 @@ mag_fasta_fp <- snakemake@input[["mag_fasta"]]
 mag_taxonomy_fp <- snakemake@input[["mag_taxonomy"]]
 
 ## Outputs --------------------------------------------------------------------
-uniprot_fasta_dir <- snakemake@output[["uniprot_fasta_dir"]]
 fasta_fp <- snakemake@output[["fasta"]]
 taxonomy_fp <- snakemake@output[["taxonomy"]]
+# Scratch dir for downloaded UniProt FASTAs — only used on append branches.
+# Sibling of fasta_fp so it lives next to the database it augments.
+uniprot_fasta_dir <- file.path(dirname(fasta_fp), "uniprot_database")
 
 ## Config ---------------------------------------------------------------------
 additional_proteome_id <- snakemake@config[["append_additional_proteome_id"]]
@@ -63,8 +65,7 @@ fasta <- Biostrings::readAAStringSet(mag_fasta_fp)
 
 # Taxonomy table
 taxonomy <- readr::read_delim(mag_taxonomy_fp, col_types = readr::cols())
-conduitR::log_with_timestamp("Creating directory for uniprot fasta file")
-dir.create(uniprot_fasta_dir)
+
 ## Control flow ---------------------------------------------------------------
 if (is_missing(additional_proteome_id) && is_missing(additional_ncbi_taxa_id)) {
   conduitR::log_with_timestamp(
@@ -75,6 +76,7 @@ if (is_missing(additional_proteome_id) && is_missing(additional_ncbi_taxa_id)) {
   conduitR::log_with_timestamp(
     paste0("Appending UniProt proteome ID(s): ", additional_proteome_id)
   )
+  dir.create(uniprot_fasta_dir, recursive = TRUE, showWarnings = FALSE)
   res <- append_proteomes(
     fasta_set = fasta,
     taxonomy = taxonomy,
@@ -92,9 +94,10 @@ if (is_missing(additional_proteome_id) && is_missing(additional_ncbi_taxa_id)) {
 
   proteome_ids <- conduitR::get_proteome_ids_from_organism_ids(
     additional_ncbi_taxa_id
-  ) |> 
+  ) |>
   dplyr::pull(proteome_id)
 
+  dir.create(uniprot_fasta_dir, recursive = TRUE, showWarnings = FALSE)
   res <- append_proteomes(
     fasta_set = fasta,
     taxonomy = taxonomy,
