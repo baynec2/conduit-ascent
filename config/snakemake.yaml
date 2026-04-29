@@ -113,6 +113,18 @@ presence_min_coverage: 0
 # Minimum diagnostic peptides per taxon required for it to enter the search database.
 min_taxon_db_peptides: 10
 
+# Score-coverage filter applied AFTER taxonomic FDR (q ≤ 0.01) on each pass.
+# For each pass, set EXACTLY ONE of *_score_fraction_threshold / *_max_taxa —
+# setting both for the same pass is an error. Set both to null to disable.
+#   *_score_fraction_threshold: keep the smallest top-by-score prefix of
+#       FDR-passing taxa whose cumulative score reaches the given fraction
+#       of the total score (HAPiID-style coverage filter).
+#   *_max_taxa: keep the top-N FDR-passing taxa by score.
+peptidotyping_first_pass_score_fraction_threshold: 0.90
+peptidotyping_first_pass_max_taxa: null
+peptidotyping_second_pass_score_fraction_threshold: 0.90
+peptidotyping_second_pass_max_taxa: null
+
 
 # =============================================================================
 #  HAPiID
