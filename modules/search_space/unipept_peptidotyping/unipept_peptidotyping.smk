@@ -462,6 +462,10 @@ rule infer_first_pass_presence:
     output:
         ncbi_taxonomy_id = os.path.join(RUN_DIR,"database_resources/peptidotyping/detected_family_taxa_ids.txt"),
         fdr_results      = os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_fdr_results.tsv")
+    params:
+        score_fraction_threshold = config.get("peptidotyping_first_pass_score_fraction_threshold", 0.90),
+        max_taxa                 = config.get("peptidotyping_first_pass_max_taxa", None),
+        pass_label               = "first_pass"
     log: os.path.join(RUN_DIR,"logs/peptidotyping/infer_family_presence.log")
     container: config["containers"]["conduitr"]
     script: "scripts/infer_family_presence.R"
@@ -573,6 +577,10 @@ rule infer_second_pass_presence:
     output:
         detected_species_strains = os.path.join(RUN_DIR,"database_resources/peptidotyping/detected_species_strain_taxa_ids.txt"),
         fdr_results              = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_fdr_results.tsv")
+    params:
+        score_fraction_threshold = config.get("peptidotyping_second_pass_score_fraction_threshold", 0.90),
+        max_taxa                 = config.get("peptidotyping_second_pass_max_taxa", None),
+        pass_label               = "second_pass"
     log: os.path.join(RUN_DIR,"logs/peptidotyping/infer_species_strain_presence.log")
     container: config["containers"]["conduitr"]
     script: "scripts/infer_species_strain_presence.R"
