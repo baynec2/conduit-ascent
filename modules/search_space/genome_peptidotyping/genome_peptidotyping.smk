@@ -376,8 +376,7 @@ rule perform_genome_peptidotyping_first_pass_search:
             else "config/peptidotyping_infinidia.cfg"
         )
     output:
-        first_pass_diann_parquet = os.path.join(GP_RESOURCE_DIR, "first_pass_diann.parquet"),
-        first_pass_diann_protein_description = os.path.join(GP_RESOURCE_DIR, "first_pass_diann.protein_description.tsv")
+        first_pass_diann_parquet = os.path.join(GP_RESOURCE_DIR, "first_pass_diann.parquet")
     params:
         out_prefix = os.path.join(GP_RESOURCE_DIR, "first_pass_diann"),
         lib_flag = (
@@ -478,8 +477,7 @@ rule perform_genome_peptidotyping_second_pass_search:
             else "config/peptidotyping_infinidia.cfg"
         )
     output:
-        second_pass_diann_parquet             = os.path.join(GP_RESOURCE_DIR, "second_pass_diann.parquet"),
-        second_pass_diann_protein_description = os.path.join(GP_RESOURCE_DIR, "second_pass_diann.protein_description.tsv")
+        second_pass_diann_parquet = os.path.join(GP_RESOURCE_DIR, "second_pass_diann.parquet")
     params:
         out_prefix = os.path.join(GP_RESOURCE_DIR, "second_pass_diann"),
         lib_flag = (

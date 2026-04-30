@@ -496,8 +496,7 @@ rule perform_first_pass_search:
             else "config/peptidotyping_infinidia.cfg"
         )
     output:
-        first_pass_diann_parquet = os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_diann.parquet"),
-        first_pass_diann_protein_description =  os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_diann.protein_description.tsv")
+        first_pass_diann_parquet = os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_diann.parquet")
     params:
         lib_flag = (
             f"--lib {os.path.join(RUN_DIR, 'database_resources/peptidotyping/first_pass_database.predicted.speclib')}"
@@ -629,8 +628,7 @@ rule perform_second_pass_search:
             else "config/peptidotyping_infinidia.cfg"
         )
     output:
-        second_pass_diann_parquet             = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_diann.parquet"),
-        second_pass_diann_protein_description = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_diann.protein_description.tsv")
+        second_pass_diann_parquet = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_diann.parquet")
     params:
         lib_flag = (
             f"--lib {os.path.join(RUN_DIR, 'database_resources/peptidotyping/second_pass_database.predicted.speclib')}"
