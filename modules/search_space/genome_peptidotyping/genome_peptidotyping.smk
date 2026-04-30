@@ -407,6 +407,10 @@ rule infer_genome_peptidotyping_first_pass_presence:
     output:
         ncbi_taxonomy_id = os.path.join(GP_RESOURCE_DIR, "detected_family_taxa_ids.txt"),
         fdr_results      = os.path.join(GP_RESOURCE_DIR, "first_pass_fdr_results.tsv")
+    params:
+        score_fraction_threshold = config.get("peptidotyping_first_pass_score_fraction_threshold", 0.90),
+        max_taxa                 = config.get("peptidotyping_first_pass_max_taxa", None),
+        pass_label               = "first_pass"
     log:
         os.path.join(RUN_DIR, "logs/genome_peptidotyping/infer_family_presence.log")
     container:
@@ -507,6 +511,10 @@ rule infer_genome_peptidotyping_second_pass_presence:
     output:
         detected_species_strains = os.path.join(GP_RESOURCE_DIR, "detected_species_strain_taxa_ids.txt"),
         fdr_results              = os.path.join(GP_RESOURCE_DIR, "second_pass_fdr_results.tsv")
+    params:
+        score_fraction_threshold = config.get("peptidotyping_second_pass_score_fraction_threshold", 0.90),
+        max_taxa                 = config.get("peptidotyping_second_pass_max_taxa", None),
+        pass_label               = "second_pass"
     log:
         os.path.join(RUN_DIR, "logs/genome_peptidotyping/infer_species_strain_presence.log")
     container:
