@@ -198,6 +198,23 @@ non_candidates <- fdr_result$results |>
 
 augmented_results <- dplyr::bind_rows(candidates, non_candidates)
 
+# Pull a human-readable name for each family taxid from DIA-NN's Protein.Names
+# column (sourced from the FASTA "{rank}_{name}" description field). The join
+# only resolves a family name when the FASTA contains family-rank peptides for
+# that family; families detected purely via genus/species fallback peptides get
+# NA.
+name_map <- precursors |>
+  dplyr::transmute(
+    taxon      = stringr::str_extract(Protein.Ids, "(?<=\\|)[^|]+$"),
+    taxon_name = stringr::str_remove(Protein.Names, "^(family_|genus_|species_|strain_)")
+  ) |>
+  dplyr::filter(!is.na(taxon), !is.na(taxon_name), taxon_name != "") |>
+  dplyr::distinct(taxon, .keep_all = TRUE)
+
+augmented_results <- augmented_results |>
+  dplyr::left_join(name_map, by = "taxon") |>
+  dplyr::relocate(taxon_name, .after = taxon)
+
 # =============================================================================
 # Write output
 # =============================================================================
