@@ -127,18 +127,25 @@ rule predict_orfs_with_fraggenescan:
     container:
         config["containers"]["fraggenescan_hmmer"]
     shell:
+        # FragGeneScan reads training files relative to its install dir, so we
+        # must `cd` into it first. Resolve all paths to absolute form *before*
+        # the cd so they survive (works whether {output} is a per-run relative
+        # path or an absolute mgnify-cache path).
         """
-        WORKDIR=$(pwd)
-        mkdir -p $WORKDIR/$(dirname {output})
-        mkdir -p $WORKDIR/$(dirname {log})
-        cd $(dirname $(which FragGeneScan))
+        INPUT_FA=$(realpath -m {input.genome_fa})
+        OUTPUT=$(realpath -m {output})
+        PREFIX=$(realpath -m {params.prefix})
+        LOG=$(realpath -m {log})
+        mkdir -p "$(dirname "$OUTPUT")"
+        mkdir -p "$(dirname "$LOG")"
+        cd "$(dirname "$(which FragGeneScan)")"
         FragGeneScan \
-            -s $WORKDIR/{input.genome_fa} \
-            -o $WORKDIR/{params.prefix} \
+            -s "$INPUT_FA" \
+            -o "$PREFIX" \
             -w 0 \
             -t complete \
             -p {threads} \
-            > $WORKDIR/{log} 2>&1
+            > "$LOG" 2>&1
         """
 
 
