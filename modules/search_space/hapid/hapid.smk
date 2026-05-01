@@ -257,20 +257,27 @@ rule create_hapid_profiling_spectral_library:
     container:
         config["containers"]["diann"]
     shell:
+        # cd + basename for --out-lib so dots in the parent dir (catalog slug) don't get parsed as extensions.
         """
-        mkdir -p $(dirname {output})
-        mkdir -p $(dirname {log})
+        INPUT_FA=$(realpath -m {input.fasta})
+        CFG=$(realpath -m {input.cfg})
+        LOG=$(realpath -m {log})
+        OUT_DIR=$(dirname $(realpath -m {output}))
+        OUT_BASE=$(basename {params.out_prefix})
+        mkdir -p "$OUT_DIR"
+        mkdir -p "$(dirname "$LOG")"
+        cd "$OUT_DIR"
         diann \
-            --cfg {input.cfg} \
-            --fasta {input.fasta} \
+            --cfg "$CFG" \
+            --fasta "$INPUT_FA" \
             --threads {threads} \
-            --out-lib {params.out_prefix} \
+            --out-lib "$OUT_BASE" \
             --cut "K*,R*" \
             --missed-cleavages 1 \
             --min-pep-len 7 \
             --max-pep-len 30 \
             --species-ids \
-            > {log} 2>&1
+            > "$LOG" 2>&1
         """
 
 
