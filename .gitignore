@@ -93,6 +93,7 @@ logs/
 run_all_experiments.sh
 run_s75_all_methods.sh
 run_singles_all_methods.sh
+run_food_all_methods.sh
 run_unipept_hapid_batch.sh
 
 # Rust specific files
