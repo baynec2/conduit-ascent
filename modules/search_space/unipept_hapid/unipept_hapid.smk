@@ -22,10 +22,24 @@
 
 import glob
 import os
+import sys
 
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR = config["run_dir"]
-RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/ms_files/*.raw"))
+
+sys.path.insert(0, os.path.join(workflow.basedir, "modules", "_shared"))
+from diann_staging import (
+    list_raw_files,
+    list_samples,
+    raw_path_for_sample,
+    stage3_symlink_commands,
+)
+
+RAW_FILEPATHS = list_raw_files(EXPERIMENT_DIR)
+SAMPLES = list_samples(EXPERIMENT_DIR)
+
+UH_OUT = os.path.join(RUN_DIR, "database_resources/unipept_hapid")
+UH_QUANTS = os.path.join(UH_OUT, "first_pass_quant_files")
 
 ################################################################################
 # Generating the HAPiID-style peptide database
@@ -197,44 +211,147 @@ rule generate_hapid_spectral_library:
 ################################################################################
 # Performing the HAPiID First Pass Search
 ################################################################################
-rule perform_hapid_first_pass_search:
-    input:
-        raw_files_dir    = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
-        spectral_library = (
-            [os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping.predicted.speclib")]
-            if config.get("unipept_hapid_search_mode", "standard") == "standard"
-            else []
-        ),
-        fasta            = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping_db.fasta"),
-        config_file      = (
-            "config/hapid_infinidia.cfg"
-            if config.get("unipept_hapid_search_mode", "standard") == "infinidia"
-            else config["diann_library_search_base_config"]
-        )
-    output:
-        hapid_diann_parquet = os.path.join(RUN_DIR,"database_resources/unipept_hapid/hapid_first_pass_diann.parquet")
-    params:
-        lib_flag = (
-            f"--lib {os.path.join(config['peptidotyping_resource_dir'], 'hapid_peptidotyping.predicted.speclib')}"
-            if config.get("unipept_hapid_search_mode", "standard") == "standard"
-            else ""
-        )
-    log: os.path.join(RUN_DIR,"logs/unipept_hapid/perform_hapid_first_pass_search.log")
-    container: config["containers"]["diann"]
-    threads: workflow.cores
-    shell:
-        """
-        diann --cfg {input.config_file} \
-        --fasta {input.fasta} \
-        --out  {RUN_DIR}/database_resources/unipept_hapid/hapid_first_pass_diann \
-        --dir {input.raw_files_dir} \
-        {params.lib_flag} \
-        --cut "" \
-        --missed-cleavages 0 \
-        --min-pep-len 5 \
-        --max-pep-len 50 \
-        --threads {threads} --verbose 1 >> {log} 2>&1
-        """
+# Standard: 3-stage split. InfinDIA: monolithic. See modules/diann/diann.smk for rationale.
+if config.get("unipept_hapid_search_mode", "standard") == "standard":
+
+    rule unipept_hapid_build_empirical_lib:
+        input:
+            raw_files_dir    = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
+            spectral_library = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping.predicted.speclib"),
+            fasta            = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping_db.fasta"),
+            config_file      = config["diann_library_search_base_config"]
+        output:
+            empirical_lib = os.path.join(UH_OUT, "hapid_first_pass_empirical.parquet")
+        params:
+            out_lib = os.path.join(UH_OUT, "hapid_first_pass_empirical"),
+        log: os.path.join(RUN_DIR,"logs/unipept_hapid/build_empirical_lib.log")
+        container: config["containers"]["diann"]
+        threads: workflow.cores
+        shell:
+            """
+            mkdir -p $(dirname {log}) $(dirname {output.empirical_lib})
+            diann --cfg {input.config_file} \
+            --fasta {input.fasta} \
+            --dir {input.raw_files_dir} \
+            --lib {input.spectral_library} \
+            --gen-spec-lib \
+            --rt-profiling \
+            --out-lib {params.out_lib} \
+            --cut "" \
+            --missed-cleavages 0 \
+            --min-pep-len 5 \
+            --max-pep-len 50 \
+            --threads {threads} --verbose 1 >> {log} 2>&1
+            """
+
+    rule unipept_hapid_search_one_raw:
+        input:
+            empirical_lib = os.path.join(UH_OUT, "hapid_first_pass_empirical.parquet"),
+            fasta = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping_db.fasta"),
+            config_file = config["diann_library_search_base_config"],
+            raw = lambda w: raw_path_for_sample(EXPERIMENT_DIR, w.sample)
+        output:
+            quant = os.path.join(UH_QUANTS, "{sample}.quant")
+        params:
+            tmpdir = lambda w: os.path.join(UH_OUT, "first_pass_quant_tmp", w.sample)
+        log: os.path.join(RUN_DIR,"logs/unipept_hapid/search_one_raw.{sample}.log")
+        container: config["containers"]["diann"]
+        threads: min(8, workflow.cores)
+        shell:
+            """
+            mkdir -p $(dirname {log})
+            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir} $(dirname {output.quant})
+            diann --cfg {input.config_file} \
+            --f {input.raw} \
+            --lib {input.empirical_lib} \
+            --fasta {input.fasta} \
+            --temp {params.tmpdir} \
+            --out {params.tmpdir}/per_run_report \
+            --cut "" \
+            --missed-cleavages 0 \
+            --min-pep-len 5 \
+            --max-pep-len 50 \
+            --threads {threads} --verbose 1 >> {log} 2>&1
+            mv {params.tmpdir}/*.quant {output.quant}
+            rm -rf {params.tmpdir}
+            """
+
+    rule unipept_hapid_combine:
+        input:
+            quants = expand(
+                os.path.join(UH_QUANTS, "{sample}.quant"),
+                sample=SAMPLES
+            ),
+            empirical_lib = os.path.join(UH_OUT, "hapid_first_pass_empirical.parquet"),
+            fasta = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping_db.fasta"),
+            config_file = config["diann_library_search_base_config"],
+            raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files")
+        output:
+            hapid_diann_parquet = os.path.join(UH_OUT, "hapid_first_pass_diann.parquet")
+        params:
+            tmpdir = os.path.join(UH_OUT, "first_pass_combine_tmp"),
+            out_prefix = os.path.join(UH_OUT, "hapid_first_pass_diann"),
+            symlink_cmds = stage3_symlink_commands(
+                os.path.join(UH_OUT, "first_pass_combine_tmp"),
+                RAW_FILEPATHS,
+                UH_QUANTS
+            )
+        log: os.path.join(RUN_DIR,"logs/unipept_hapid/combine.log")
+        container: config["containers"]["diann"]
+        threads: workflow.cores
+        shell:
+            """
+            mkdir -p $(dirname {log})
+            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
+            {params.symlink_cmds}
+            diann --cfg {input.config_file} \
+            --dir {input.raw_files_dir} \
+            --lib {input.empirical_lib} \
+            --fasta {input.fasta} \
+            --temp {params.tmpdir} \
+            --use-quant \
+            --out {params.out_prefix} \
+            --cut "" \
+            --missed-cleavages 0 \
+            --min-pep-len 5 \
+            --max-pep-len 50 \
+            --threads {threads} --verbose 1 >> {log} 2>&1
+            rm -rf {params.tmpdir}
+            """
+
+else:  # infinidia — monolithic
+
+    rule unipept_hapid_monolithic:
+        input:
+            raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
+            fasta         = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping_db.fasta"),
+            config_file   = "config/hapid_infinidia.cfg"
+        output:
+            hapid_diann_parquet = os.path.join(UH_OUT, "hapid_first_pass_diann.parquet")
+        params:
+            out_prefix = os.path.join(UH_OUT, "hapid_first_pass_diann"),
+            tmpdir = os.path.join(UH_OUT, "monolithic_quant_files"),
+        log: os.path.join(RUN_DIR,"logs/unipept_hapid/monolithic.log")
+        container: config["containers"]["diann"]
+        threads: workflow.cores
+        shell:
+            """
+            mkdir -p $(dirname {log}) $(dirname {output.hapid_diann_parquet})
+            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
+            diann --cfg {input.config_file} \
+            --fasta {input.fasta} \
+            --dir {input.raw_files_dir} \
+            --temp {params.tmpdir} \
+            --pre-search --pre-filter \
+            --gen-spec-lib \
+            --rt-profiling \
+            --out {params.out_prefix} \
+            --cut "" \
+            --missed-cleavages 0 \
+            --min-pep-len 5 \
+            --max-pep-len 50 \
+            --threads {threads} --verbose 1 >> {log} 2>&1
+            """
 
 ################################################################################
 # Greedy HAPiID-style species/strain selection from first-pass results
