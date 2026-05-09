@@ -100,6 +100,7 @@ run_singles_all_methods.sh
 run_food_all_methods.sh
 run_unipept_hapid_batch.sh
 run_unipept_peptidotyping_infinidia_batch.sh
+run_pool_pilot_all_methods.sh
 
 # Rust specific files
 .cargo/
