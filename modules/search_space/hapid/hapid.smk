@@ -309,6 +309,7 @@ if config.get("hapid_search_mode", "standard") == "standard":
             empirical_lib = os.path.join(HAPID_OUT_ROOT, "marker_gene_empirical.parquet")
         params:
             out_lib = os.path.join(HAPID_OUT_ROOT, "marker_gene_empirical"),
+            tmpdir = os.path.join(HAPID_OUT_ROOT, "build_empirical_quant_files"),
         log:
             os.path.join(RUN_DIR, "logs/search_space/hapid/build_empirical_lib.log")
         threads: workflow.cores
@@ -318,10 +319,12 @@ if config.get("hapid_search_mode", "standard") == "standard":
             """
             mkdir -p $(dirname {output.empirical_lib})
             mkdir -p $(dirname {log})
+            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
             diann \
                 --cfg {input.cfg} \
                 --fasta {input.fasta} \
                 --dir {input.raw_dir} \
+                --temp {params.tmpdir} \
                 --lib {input.speclib} \
                 --gen-spec-lib \
                 --rt-profiling \

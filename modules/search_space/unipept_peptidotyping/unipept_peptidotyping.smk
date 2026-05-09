@@ -509,6 +509,7 @@ if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard":
             empirical_lib = os.path.join(PT_OUT, "first_pass_empirical.parquet")
         params:
             out_lib = os.path.join(PT_OUT, "first_pass_empirical"),
+            tmpdir = os.path.join(PT_OUT, "first_pass_build_empirical_quant_files"),
         log: os.path.join(RUN_DIR,"logs/peptidotyping/first_pass_build_empirical_lib.log")
         container:
             config["containers"]["diann"]
@@ -516,9 +517,11 @@ if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard":
         shell:
             """
             mkdir -p $(dirname {log}) $(dirname {output.empirical_lib})
+            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
             diann --cfg {input.config_file} \
             --fasta {input.fasta} \
             --dir {input.raw_files_dir} \
+            --temp {params.tmpdir} \
             --lib {input.spectral_library} \
             --gen-spec-lib \
             --rt-profiling \
@@ -733,15 +736,18 @@ if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard":
             empirical_lib = os.path.join(PT_OUT, "second_pass_empirical.parquet")
         params:
             out_lib = os.path.join(PT_OUT, "second_pass_empirical"),
+            tmpdir = os.path.join(PT_OUT, "second_pass_build_empirical_quant_files"),
         log: os.path.join(RUN_DIR,"logs/peptidotyping/second_pass_build_empirical_lib.log")
         container: config["containers"]["diann"]
         threads: workflow.cores
         shell:
             """
             mkdir -p $(dirname {log}) $(dirname {output.empirical_lib})
+            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
             diann --cfg {input.config_file} \
             --fasta {input.fasta} \
             --dir {input.raw_files_dir} \
+            --temp {params.tmpdir} \
             --lib {input.spectral_library} \
             --gen-spec-lib \
             --rt-profiling \

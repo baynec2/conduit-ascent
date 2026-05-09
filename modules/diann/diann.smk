@@ -72,21 +72,26 @@ if config.get("diann_search_mode", "standard") == "standard":
             empirical_lib = os.path.join(DIANN_OUT, "empirical.parquet")
         params:
             out_lib = os.path.join(DIANN_OUT, "empirical"),
+            tmpdir = os.path.join(DIANN_OUT, "build_empirical_quant_files"),
         log: os.path.join(RUN_DIR,"logs/diann/run_diann_build_empirical_lib.log")
         container:
             config["containers"]["diann"]
         threads: workflow.cores
         shell:
+            # --temp keeps DIA-NN's per-run .quant intermediates inside the run
+            # directory; without it DIA-NN writes them next to the raw files in
+            # the user's input dir (every DIA-NN search with --dir does this,
+            # MBR or not). The .quant files are kept (not cleaned up) for
+            # forensics. Note: these are searches against the predicted library,
+            # NOT reusable for stage 2's --use-quant (which expects searches
+            # against the empirical library).
             """
             mkdir -p $(dirname {log}) $(dirname {output.empirical_lib})
-            # --gen-spec-lib + --out-lib gives us the empirical library;
-            # --rt-profiling writes empirically-aligned RTs into it (quality
-            # knob, no extra pass). No --reanalyse: it would only add a
-            # second pass that re-searches the raws against this library,
-            # exactly what stage 2 does per-file.
+            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
             diann --cfg {input.config_file} \
             --fasta {input.fasta} \
             --dir {input.raw_files_dir} \
+            --temp {params.tmpdir} \
             --lib {input.spectral_library} \
             --gen-spec-lib \
             --rt-profiling \

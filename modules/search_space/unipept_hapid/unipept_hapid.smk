@@ -224,15 +224,18 @@ if config.get("unipept_hapid_search_mode", "standard") == "standard":
             empirical_lib = os.path.join(UH_OUT, "hapid_first_pass_empirical.parquet")
         params:
             out_lib = os.path.join(UH_OUT, "hapid_first_pass_empirical"),
+            tmpdir = os.path.join(UH_OUT, "build_empirical_quant_files"),
         log: os.path.join(RUN_DIR,"logs/unipept_hapid/build_empirical_lib.log")
         container: config["containers"]["diann"]
         threads: workflow.cores
         shell:
             """
             mkdir -p $(dirname {log}) $(dirname {output.empirical_lib})
+            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
             diann --cfg {input.config_file} \
             --fasta {input.fasta} \
             --dir {input.raw_files_dir} \
+            --temp {params.tmpdir} \
             --lib {input.spectral_library} \
             --gen-spec-lib \
             --rt-profiling \
