@@ -32,7 +32,11 @@ if (nrow(arrow::open_dataset(diann_parquet_fp)) == 0) {
 
 qf <- conduitR::diann_to_qfeatures(diann_parquet_fp)
 
-sample_annotation <- readr::read_delim(sample_annotation_fp)
+# read_tsv (not read_delim) so vroom doesn't try to auto-detect the
+# delimiter -- auto-detect picks the wrong one when sample_annotation has
+# few columns and a free-text column with embedded commas (e.g. a
+# known_taxa list of comma-separated species names).
+sample_annotation <- readr::read_tsv(sample_annotation_fp)
 
 conduitR::log_with_timestamp("Adding colData to QFeatures")
 
