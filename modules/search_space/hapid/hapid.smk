@@ -484,7 +484,7 @@ checkpoint run_greedy_genome_selection:
     input:
         os.path.join(HAPID_OUT_ROOT, "genome2spectrum_dic.json")
     output:
-        os.path.join(HAPID_OUT_ROOT, "hapid_greedy_selection.tsv")
+        os.path.join(HAPID_OUT_ROOT, "hapid_greedy_selection_raw.tsv")
     log:
         os.path.join(RUN_DIR, "logs/search_space/hapid/greedy_selection.log")
     container:
@@ -496,6 +496,51 @@ checkpoint run_greedy_genome_selection:
             {input} {output} \
             > {log} 2>&1
         """
+
+
+# Enrich the greedy TSV with a `taxon_name` column. For MGnify-sourced
+# genomes the per-run taxonomy.txt already maps each accession to its GTDB
+# species; for user-supplied genomes no taxonomy source exists so taxon_name
+# is left blank.
+def _hapid_annotate_inputs(wildcards=None):
+    inputs = {"raw": os.path.join(HAPID_OUT_ROOT, "hapid_greedy_selection_raw.tsv")}
+    if config.get("genome_download_source") == "mgnify":
+        inputs["taxonomy"] = os.path.join(RUN_DIR, "genome_download/mgnify/taxonomy.txt")
+    return inputs
+
+
+rule annotate_hapid_greedy_selection:
+    input:
+        unpack(_hapid_annotate_inputs)
+    output:
+        os.path.join(HAPID_OUT_ROOT, "hapid_greedy_selection.tsv")
+    log:
+        os.path.join(RUN_DIR, "logs/search_space/hapid/annotate_greedy_selection.log")
+    run:
+        import pandas as pd
+        os.makedirs(os.path.dirname(log[0]), exist_ok=True)
+        raw = pd.read_csv(input.raw, sep="\t", dtype={"genome": str})
+        taxonomy_path = getattr(input, "taxonomy", None)
+        if taxonomy_path:
+            # taxonomy.txt columns: genome, domain, kingdom, phylum, class, order, family, genus, species.
+            # GTDB sometimes resolves only to genus (or higher) — fall back through
+            # ranks so the user always sees the most-specific available name.
+            rank_cols = ["species", "genus", "family", "order", "class", "phylum", "kingdom", "domain"]
+            tax = pd.read_csv(taxonomy_path, sep="\t", dtype=str)
+            tax["taxon_name"] = tax[rank_cols].bfill(axis=1).iloc[:, 0]
+            merged = raw.merge(tax[["genome", "taxon_name"]], on="genome", how="left")
+        else:
+            merged = raw.copy()
+            merged["taxon_name"] = ""
+        merged = merged[["genome", "taxon_name", "nSpectraCovered", "cumulative_pct"]]
+        merged.to_csv(output[0], sep="\t", index=False)
+        with open(log[0], "w") as lh:
+            n_missing = merged["taxon_name"].isna().sum() + (merged["taxon_name"] == "").sum()
+            lh.write(
+                f"Annotated {len(merged)} genomes with taxon_name "
+                f"(source={'mgnify taxonomy.txt' if taxonomy_path else 'none'}, "
+                f"{n_missing} blank).\n"
+            )
 
 
 # Apply the hapid_percent_spectra cutoff and emit a one-genome-per-line list.

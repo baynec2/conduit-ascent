@@ -382,7 +382,7 @@ checkpoint run_greedy_taxon_selection:
     input:
         os.path.join(RUN_DIR, "database_resources/unipept_hapid/taxon2spectrum_dic.json")
     output:
-        os.path.join(RUN_DIR, "database_resources/unipept_hapid/unipept_hapid_greedy_selection.tsv")
+        os.path.join(RUN_DIR, "database_resources/unipept_hapid/unipept_hapid_greedy_selection_raw.tsv")
     log: os.path.join(RUN_DIR, "logs/unipept_hapid/greedy_taxon_selection.log")
     container: config["containers"]["fraggenescan_hmmer"]
     shell:
@@ -391,6 +391,36 @@ checkpoint run_greedy_taxon_selection:
         python {workflow.basedir}/modules/search_space/_shared/scripts/coverAllSpectra_greedy.py \
             {input} {output} > {log} 2>&1
         """
+
+
+# Enrich the greedy TSV with NCBI scientific names. The `genome` column is an
+# NCBI taxid (lca_il); the name is already in hapid_lca_filtered_peptides.tsv
+# from the database-build step, so we just dedupe + join — no taxonkit needed.
+rule annotate_unipept_hapid_greedy_selection:
+    input:
+        raw     = os.path.join(RUN_DIR, "database_resources/unipept_hapid/unipept_hapid_greedy_selection_raw.tsv"),
+        lca_tsv = os.path.join(config["peptidotyping_resource_dir"], "hapid_lca_filtered_peptides.tsv")
+    output:
+        os.path.join(RUN_DIR, "database_resources/unipept_hapid/unipept_hapid_greedy_selection.tsv")
+    log: os.path.join(RUN_DIR, "logs/unipept_hapid/annotate_greedy_selection.log")
+    run:
+        import pandas as pd
+        os.makedirs(os.path.dirname(log[0]), exist_ok=True)
+        raw = pd.read_csv(input.raw, sep="\t", dtype={"genome": str})
+        names = (
+            pd.read_csv(input.lca_tsv, sep="\t", usecols=["lca_il", "name"], dtype={"lca_il": str})
+              .drop_duplicates(subset=["lca_il"])
+              .rename(columns={"lca_il": "genome", "name": "taxon_name"})
+        )
+        merged = raw.merge(names, on="genome", how="left")
+        merged = merged[["genome", "taxon_name", "nSpectraCovered", "cumulative_pct"]]
+        merged.to_csv(output[0], sep="\t", index=False)
+        with open(log[0], "w") as lh:
+            n_missing = merged["taxon_name"].isna().sum()
+            lh.write(
+                f"Annotated {len(merged)} taxa with scientific names "
+                f"({n_missing} missing).\n"
+            )
 
 
 # Apply the hapid_percent_spectra cutoff and emit ncbi_taxa_ids.txt.
