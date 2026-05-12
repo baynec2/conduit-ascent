@@ -1,23 +1,8 @@
 import glob
 import os
-import sys
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR = config["run_dir"]
-
-sys.path.insert(0, os.path.join(workflow.basedir, "modules", "_shared"))
-from diann_staging import (
-    list_raw_files,
-    list_samples,
-    raw_path_for_sample,
-    stage3_symlink_commands,
-)
-
-RAW_FILEPATHS = list_raw_files(EXPERIMENT_DIR)
-SAMPLES = list_samples(EXPERIMENT_DIR)
-
-PT_OUT = os.path.join(RUN_DIR, "database_resources/peptidotyping")
-PT_FIRST_QUANTS = os.path.join(PT_OUT, "first_pass_quant_files")
-PT_SECOND_QUANTS = os.path.join(PT_OUT, "second_pass_quant_files")
+RAW_FILEPATHS = glob.glob(os.path.join(EXPERIMENT_DIR, "input/ms_files/*.raw"))
 
 ################################################################################
 # Determining Version of Uniprotkb that is being used in experiment
@@ -439,195 +424,32 @@ rule build_effective_detection_rank_db:
         log_ts "Effective first-pass database built: $TOTAL entries"
         """
 ################################################################################
-# Generate predicted spectral libraries (used only when search_mode == "standard")
-################################################################################
-rule generate_first_pass_speclib:
-    input:
-        fasta = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
-        config_file = os.path.join(RUN_DIR,"config/diann_spectral_library_base.cfg")
-    output:
-        os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_database.predicted.speclib")
-    params:
-        out_lib = lambda w, output: os.path.splitext(os.path.splitext(output[0])[0])[0]
-    log: os.path.join(RUN_DIR,"logs/peptidotyping/generate_first_pass_speclib.log")
-    container:
-        config["containers"]["diann"]
-    threads: workflow.cores
-    shell:
-        """
-        diann --cfg {input.config_file} \
-        --fasta {input.fasta} \
-        --out-lib {params.out_lib} \
-        --cut "" \
-        --missed-cleavages 0 \
-        --min-pep-len 7 \
-        --max-pep-len 30 \
-        --threads {threads} >> {log} 2>&1
-        """
-
-rule generate_second_pass_speclib:
-    input:
-        fasta = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_database.fasta"),
-        config_file = os.path.join(RUN_DIR,"config/diann_spectral_library_base.cfg")
-    output:
-        os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_database.predicted.speclib")
-    params:
-        out_lib = lambda w, output: os.path.splitext(os.path.splitext(output[0])[0])[0]
-    log: os.path.join(RUN_DIR,"logs/peptidotyping/generate_second_pass_speclib.log")
-    container:
-        config["containers"]["diann"]
-    threads: workflow.cores
-    shell:
-        """
-        diann --cfg {input.config_file} \
-        --fasta {input.fasta} \
-        --out-lib {params.out_lib} \
-        --cut "" \
-        --missed-cleavages 0 \
-        --min-pep-len 7 \
-        --max-pep-len 30 \
-        --threads {threads} >> {log} 2>&1
-        """
-
-################################################################################
 # Performing the First Pass Search, Find Broad Taxonomic Levels
 ################################################################################
-# Standard mode: 3-stage split (build empirical library, per-raw search, combine).
-# InfinDIA mode: monolithic — DIA-NN's --pre-search internally runs all phases
-# and there's no flag to stop after the empirical library is written, so a 3-stage
-# split would pay the second-pass cost twice. See modules/diann/diann.smk for the
-# full rationale.
-if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard":
-
-    rule peptidotyping_first_pass_build_empirical_lib:
-        input:
-            raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
-            fasta = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
-            spectral_library = os.path.join(PT_OUT, "first_pass_database.predicted.speclib"),
-            config_file = "config/peptidotyping_standard.cfg"
-        output:
-            empirical_lib = os.path.join(PT_OUT, "first_pass_empirical.parquet")
-        params:
-            out_lib = os.path.join(PT_OUT, "first_pass_empirical"),
-            tmpdir = os.path.join(PT_OUT, "first_pass_build_empirical_quant_files"),
-        log: os.path.join(RUN_DIR,"logs/peptidotyping/first_pass_build_empirical_lib.log")
-        container:
-            config["containers"]["diann"]
-        threads: workflow.cores
-        shell:
-            """
-            mkdir -p $(dirname {log}) $(dirname {output.empirical_lib})
-            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
-            diann --cfg {input.config_file} \
-            --fasta {input.fasta} \
-            --dir {input.raw_files_dir} \
-            --temp {params.tmpdir} \
-            --lib {input.spectral_library} \
-            --gen-spec-lib \
-            --rt-profiling \
-            --out-lib {params.out_lib} \
-            --threads {threads} --verbose 1 >> {log} 2>&1
-            """
-
-    rule peptidotyping_first_pass_search_one_raw:
-        input:
-            empirical_lib = os.path.join(PT_OUT, "first_pass_empirical.parquet"),
-            fasta = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
-            config_file = "config/peptidotyping_standard.cfg",
-            raw = lambda w: raw_path_for_sample(EXPERIMENT_DIR, w.sample)
-        output:
-            quant = os.path.join(PT_FIRST_QUANTS, "{sample}.quant")
-        params:
-            tmpdir = lambda w: os.path.join(PT_OUT, "first_pass_quant_tmp", w.sample)
-        log: os.path.join(RUN_DIR,"logs/peptidotyping/first_pass_search_one_raw.{sample}.log")
-        container:
-            config["containers"]["diann"]
-        threads: min(8, workflow.cores)
-        shell:
-            """
-            mkdir -p $(dirname {log})
-            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir} $(dirname {output.quant})
-            diann --cfg {input.config_file} \
-            --f {input.raw} \
-            --lib {input.empirical_lib} \
-            --fasta {input.fasta} \
-            --temp {params.tmpdir} \
-            --out {params.tmpdir}/per_run_report \
-            --threads {threads} --verbose 1 >> {log} 2>&1
-            mv {params.tmpdir}/*.quant {output.quant}
-            rm -rf {params.tmpdir}
-            """
-
-    rule peptidotyping_first_pass_combine:
-        input:
-            quants = expand(
-                os.path.join(PT_FIRST_QUANTS, "{sample}.quant"),
-                sample=SAMPLES
-            ),
-            empirical_lib = os.path.join(PT_OUT, "first_pass_empirical.parquet"),
-            fasta = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
-            config_file = "config/peptidotyping_standard.cfg",
-            raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files")
-        output:
-            first_pass_diann_parquet = os.path.join(PT_OUT, "first_pass_diann.parquet")
-        params:
-            tmpdir = os.path.join(PT_OUT, "first_pass_combine_tmp"),
-            out_prefix = os.path.join(PT_OUT, "first_pass_diann"),
-            symlink_cmds = stage3_symlink_commands(
-                os.path.join(PT_OUT, "first_pass_combine_tmp"),
-                RAW_FILEPATHS,
-                PT_FIRST_QUANTS
-            )
-        log: os.path.join(RUN_DIR,"logs/peptidotyping/first_pass_combine.log")
-        container:
-            config["containers"]["diann"]
-        threads: workflow.cores
-        shell:
-            """
-            mkdir -p $(dirname {log})
-            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
-            {params.symlink_cmds}
-            diann --cfg {input.config_file} \
-            --dir {input.raw_files_dir} \
-            --lib {input.empirical_lib} \
-            --fasta {input.fasta} \
-            --temp {params.tmpdir} \
-            --use-quant \
-            --out {params.out_prefix} \
-            --threads {threads} --verbose 1 >> {log} 2>&1
-            rm -rf {params.tmpdir}
-            """
-
-else:  # infinidia — monolithic
-
-    rule peptidotyping_first_pass_monolithic:
-        input:
-            raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
-            fasta = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
-            config_file = "config/peptidotyping_infinidia.cfg"
-        output:
-            first_pass_diann_parquet = os.path.join(PT_OUT, "first_pass_diann.parquet")
-        params:
-            out_prefix = os.path.join(PT_OUT, "first_pass_diann"),
-            tmpdir = os.path.join(PT_OUT, "first_pass_monolithic_quant_files"),
-        log: os.path.join(RUN_DIR,"logs/peptidotyping/first_pass_monolithic.log")
-        container:
-            config["containers"]["diann"]
-        threads: workflow.cores
-        shell:
-            """
-            mkdir -p $(dirname {log}) $(dirname {output.first_pass_diann_parquet})
-            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
-            diann --cfg {input.config_file} \
-            --fasta {input.fasta} \
-            --dir {input.raw_files_dir} \
-            --temp {params.tmpdir} \
-            --pre-search --pre-filter \
-            --gen-spec-lib \
-            --rt-profiling \
-            --out {params.out_prefix} \
-            --threads {threads} --verbose 1 >> {log} 2>&1
-            """
+# Searching our first pass spectral library with Diann on infinidia mode. 
+# The database searched is mostly family level peptides, but in the case that no
+# family level peptides for a family exists, fallback to genus or species/strain
+# specific if they do not exist (as defined in uild_effective_detection_rank_db).
+rule perform_first_pass_search:
+    input:
+        raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
+        fasta = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
+        config_file = "config/peptidotyping_infinidia.cfg"
+    output:
+        first_pass_diann_parquet = os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_diann.parquet"),
+        first_pass_diann_protein_description =  os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_diann.protein_description.tsv")
+    log: os.path.join(RUN_DIR,"logs/peptidotyping/perfrom_first_pass_search.log")
+    container:
+        config["containers"]["diann"]
+    threads: workflow.cores
+    shell:
+        """
+        diann --cfg {input.config_file} \
+        --fasta {input.fasta} \
+        --out  {RUN_DIR}/database_resources/peptidotyping/first_pass_diann \
+        --dir {input.raw_files_dir} \
+        --threads {threads} --verbose 1 >> {log} 2>&1
+        """
 ################################################################################
 # Determine what families are present based on the first pass results
 ################################################################################
@@ -640,10 +462,6 @@ rule infer_first_pass_presence:
     output:
         ncbi_taxonomy_id = os.path.join(RUN_DIR,"database_resources/peptidotyping/detected_family_taxa_ids.txt"),
         fdr_results      = os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_fdr_results.tsv")
-    params:
-        score_fraction_threshold = config.get("peptidotyping_first_pass_score_fraction_threshold", 0.90),
-        max_taxa                 = config.get("peptidotyping_first_pass_max_taxa", None),
-        pass_label               = "first_pass"
     log: os.path.join(RUN_DIR,"logs/peptidotyping/infer_family_presence.log")
     container: config["containers"]["conduitr"]
     script: "scripts/infer_family_presence.R"
@@ -723,134 +541,27 @@ rule generate_second_pass_db:
 ################################################################################
 # Performing the Second Pass Search, Resolve Species/Strains
 ################################################################################
-# Standard mode: 3-stage split. InfinDIA mode: monolithic. See first-pass block above.
-if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard":
-
-    rule peptidotyping_second_pass_build_empirical_lib:
-        input:
-            raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
-            fasta         = os.path.join(PT_OUT, "second_pass_database.fasta"),
-            spectral_library = os.path.join(PT_OUT, "second_pass_database.predicted.speclib"),
-            config_file = "config/peptidotyping_standard.cfg"
-        output:
-            empirical_lib = os.path.join(PT_OUT, "second_pass_empirical.parquet")
-        params:
-            out_lib = os.path.join(PT_OUT, "second_pass_empirical"),
-            tmpdir = os.path.join(PT_OUT, "second_pass_build_empirical_quant_files"),
-        log: os.path.join(RUN_DIR,"logs/peptidotyping/second_pass_build_empirical_lib.log")
-        container: config["containers"]["diann"]
-        threads: workflow.cores
-        shell:
-            """
-            mkdir -p $(dirname {log}) $(dirname {output.empirical_lib})
-            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
-            diann --cfg {input.config_file} \
+# Search the filtered species/strain database with DIA-NN InfiniDIA to resolve
+# which specific species and strains are present within the detected families.
+rule perform_second_pass_search:
+    input:
+        raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
+        fasta         = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_database.fasta"),
+        config_file   = "config/peptidotyping_infinidia.cfg"
+    output:
+        second_pass_diann_parquet             = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_diann.parquet"),
+        second_pass_diann_protein_description = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_diann.protein_description.tsv")
+    log: os.path.join(RUN_DIR,"logs/peptidotyping/perform_second_pass_search.log")
+    container: config["containers"]["diann"]
+    threads: workflow.cores
+    shell:
+        """
+        diann --cfg {input.config_file} \
             --fasta {input.fasta} \
-            --dir {input.raw_files_dir} \
-            --temp {params.tmpdir} \
-            --lib {input.spectral_library} \
-            --gen-spec-lib \
-            --rt-profiling \
-            --out-lib {params.out_lib} \
+            --out  {RUN_DIR}/database_resources/peptidotyping/second_pass_diann \
+            --dir  {input.raw_files_dir} \
             --threads {threads} --verbose 1 >> {log} 2>&1
-            """
-
-    rule peptidotyping_second_pass_search_one_raw:
-        input:
-            empirical_lib = os.path.join(PT_OUT, "second_pass_empirical.parquet"),
-            fasta = os.path.join(PT_OUT, "second_pass_database.fasta"),
-            config_file = "config/peptidotyping_standard.cfg",
-            raw = lambda w: raw_path_for_sample(EXPERIMENT_DIR, w.sample)
-        output:
-            quant = os.path.join(PT_SECOND_QUANTS, "{sample}.quant")
-        params:
-            tmpdir = lambda w: os.path.join(PT_OUT, "second_pass_quant_tmp", w.sample)
-        log: os.path.join(RUN_DIR,"logs/peptidotyping/second_pass_search_one_raw.{sample}.log")
-        container: config["containers"]["diann"]
-        threads: min(8, workflow.cores)
-        shell:
-            """
-            mkdir -p $(dirname {log})
-            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir} $(dirname {output.quant})
-            diann --cfg {input.config_file} \
-            --f {input.raw} \
-            --lib {input.empirical_lib} \
-            --fasta {input.fasta} \
-            --temp {params.tmpdir} \
-            --out {params.tmpdir}/per_run_report \
-            --threads {threads} --verbose 1 >> {log} 2>&1
-            mv {params.tmpdir}/*.quant {output.quant}
-            rm -rf {params.tmpdir}
-            """
-
-    rule peptidotyping_second_pass_combine:
-        input:
-            quants = expand(
-                os.path.join(PT_SECOND_QUANTS, "{sample}.quant"),
-                sample=SAMPLES
-            ),
-            empirical_lib = os.path.join(PT_OUT, "second_pass_empirical.parquet"),
-            fasta = os.path.join(PT_OUT, "second_pass_database.fasta"),
-            config_file = "config/peptidotyping_standard.cfg",
-            raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files")
-        output:
-            second_pass_diann_parquet = os.path.join(PT_OUT, "second_pass_diann.parquet")
-        params:
-            tmpdir = os.path.join(PT_OUT, "second_pass_combine_tmp"),
-            out_prefix = os.path.join(PT_OUT, "second_pass_diann"),
-            symlink_cmds = stage3_symlink_commands(
-                os.path.join(PT_OUT, "second_pass_combine_tmp"),
-                RAW_FILEPATHS,
-                PT_SECOND_QUANTS
-            )
-        log: os.path.join(RUN_DIR,"logs/peptidotyping/second_pass_combine.log")
-        container: config["containers"]["diann"]
-        threads: workflow.cores
-        shell:
-            """
-            mkdir -p $(dirname {log})
-            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
-            {params.symlink_cmds}
-            diann --cfg {input.config_file} \
-            --dir {input.raw_files_dir} \
-            --lib {input.empirical_lib} \
-            --fasta {input.fasta} \
-            --temp {params.tmpdir} \
-            --use-quant \
-            --out {params.out_prefix} \
-            --threads {threads} --verbose 1 >> {log} 2>&1
-            rm -rf {params.tmpdir}
-            """
-
-else:  # infinidia — monolithic
-
-    rule peptidotyping_second_pass_monolithic:
-        input:
-            raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
-            fasta         = os.path.join(PT_OUT, "second_pass_database.fasta"),
-            config_file = "config/peptidotyping_infinidia.cfg"
-        output:
-            second_pass_diann_parquet = os.path.join(PT_OUT, "second_pass_diann.parquet")
-        params:
-            out_prefix = os.path.join(PT_OUT, "second_pass_diann"),
-            tmpdir = os.path.join(PT_OUT, "second_pass_monolithic_quant_files"),
-        log: os.path.join(RUN_DIR,"logs/peptidotyping/second_pass_monolithic.log")
-        container: config["containers"]["diann"]
-        threads: workflow.cores
-        shell:
-            """
-            mkdir -p $(dirname {log}) $(dirname {output.second_pass_diann_parquet})
-            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
-            diann --cfg {input.config_file} \
-            --fasta {input.fasta} \
-            --dir {input.raw_files_dir} \
-            --temp {params.tmpdir} \
-            --pre-search --pre-filter \
-            --gen-spec-lib \
-            --rt-profiling \
-            --out {params.out_prefix} \
-            --threads {threads} --verbose 1 >> {log} 2>&1
-            """
+        """
 
 ################################################################################
 # Infer the presence of species and strains based on the second pass search
@@ -862,10 +573,6 @@ rule infer_second_pass_presence:
     output:
         detected_species_strains = os.path.join(RUN_DIR,"database_resources/peptidotyping/detected_species_strain_taxa_ids.txt"),
         fdr_results              = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_fdr_results.tsv")
-    params:
-        score_fraction_threshold = config.get("peptidotyping_second_pass_score_fraction_threshold", 0.90),
-        max_taxa                 = config.get("peptidotyping_second_pass_max_taxa", None),
-        pass_label               = "second_pass"
     log: os.path.join(RUN_DIR,"logs/peptidotyping/infer_species_strain_presence.log")
     container: config["containers"]["conduitr"]
     script: "scripts/infer_species_strain_presence.R"

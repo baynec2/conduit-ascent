@@ -40,7 +40,7 @@ output_dir: output/
 # --- Container images ---
 # Moving tags like :alpha / :develop are OK for active dev; pin to @sha256:... for reproducibility.
 containers:
-  conduitr:     "docker://baynec2/conduitr:136dbe9"
+  conduitr:     "docker://baynec2/conduitr:0ae9adc"
   diann:        "docker://baynec2/diann:f5f961d"
   bakta:        "docker://baynec2/bakta:f5f961d"
   metaphlan:    "docker://baynec2/metaphlan:f5f961d"
@@ -60,17 +60,6 @@ diann_library_search_base_config: config/diann_library_search_base.cfg
 diann_search_mode: "standard"
 # Main DIA-NN search config. Used when diann_search_mode == "standard".
 run_diann_config: config/run_diann.cfg
-
-# Per-method search mode for multi-pass search-space DIA-NN searches.
-# Independent of diann_search_mode (which controls only the main search).
-# Options for each:  standard | infinidia
-#   standard   build a predicted spectral library first, then search with --lib
-#   infinidia  search FASTA directly with --pre-search --pre-filter
-# Defaults preserve historical behavior of each method.
-unipept_peptidotyping_search_mode: "infinidia"
-genome_peptidotyping_search_mode:  "infinidia"
-unipept_hapid_search_mode:         "standard"
-hapid_search_mode:                 "standard"
 
 # --- Host / target filtering (optional; applies to every method) ---
 # Append an extra UniProt proteome to the database (e.g., a host reference).
@@ -106,20 +95,12 @@ peptidotyping_resource_dir: "resources/peptidotyping/"
 # peptidotyping_resource_dir (CLAUDE.md); the test runner derives it from
 # PEPTIDOTYPING_RESOURCE_DIR if TAXONKIT_DB_DIR isn't set.
 taxonkit_db_dir: "resources/peptidotyping/taxonkit"
+# Minimum unique peptides to call a species present.
+presence_min_peptides: 3
+# Minimum coverage to call a species present (0 = no coverage filter).
+presence_min_coverage: 0
 # Minimum diagnostic peptides per taxon required for it to enter the search database.
 min_taxon_db_peptides: 10
-
-# Score-coverage filter applied AFTER taxonomic FDR (q ≤ 0.01) on each pass.
-# For each pass, set EXACTLY ONE of *_score_fraction_threshold / *_max_taxa —
-# setting both for the same pass is an error. Set both to null to disable.
-#   *_score_fraction_threshold: keep the smallest top-by-score prefix of
-#       FDR-passing taxa whose cumulative score reaches the given fraction
-#       of the total score (HAPiID-style coverage filter).
-#   *_max_taxa: keep the top-N FDR-passing taxa by score.
-peptidotyping_first_pass_score_fraction_threshold: 0.90
-peptidotyping_first_pass_max_taxa: null
-peptidotyping_second_pass_score_fraction_threshold: 0.90
-peptidotyping_second_pass_max_taxa: null
 
 
 # =============================================================================
@@ -143,21 +124,6 @@ hapid_percent_spectra: 80
 # bacterial-MAG workflows; use full only when you need plasmid/viral DBs.
 bakta_db_dir:  "resources/bakta/db"
 bakta_db_type: "light"
-
-# =============================================================================
-#  Shared genome-derived resource caches
-#  Used by: MAGs · hapid · genome_peptidotyping (when source == "mgnify")
-# =============================================================================
-# Sharing only kicks in when genome_download_source == "mgnify" — MGnify accessions
-# are globally unique. For local MAGs we keep per-run paths; local names aren't
-# guaranteed unique across experiments.
-#
-# Per-genome artifacts (Prodigal/FGS FAA, HMMER tblout, bakta annotations).
-# Layout: {genome_resource_dir}/{catalog_slug}/{tool}/{genome_id}/
-genome_resource_dir: "resources/genome_databases/derived"
-# Per-genome-set aggregates (LCA peptide DBs, hapid speclib + dedup marker DB).
-# Layout: {genome_set_resource_dir}/{catalog_slug}__filter-{filter}__max{n}/{module}/
-genome_set_resource_dir: "resources/genome_databases/derived_sets"
 
 
 # =============================================================================

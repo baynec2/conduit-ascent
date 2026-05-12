@@ -18,37 +18,10 @@ taxid_family_map_fp      <- snakemake@input[["taxid_family_map"]]
 ncbi_taxonomy_id_fp      <- snakemake@output[["ncbi_taxonomy_id"]]
 fdr_results_fp           <- snakemake@output[["fdr_results"]]
 
-# Score-coverage filter params (see config/snakemake.yaml).
-score_fraction_threshold <- snakemake@params[["score_fraction_threshold"]]
-max_taxa                 <- snakemake@params[["max_taxa"]]
-
-normalize_param <- function(x) {
-  if (is.null(x) || length(x) == 0) return(NA_real_)
-  if (is.character(x) && (x %in% c("", "NA", "null", "None"))) return(NA_real_)
-  suppressWarnings(as.numeric(x))
-}
-score_fraction_threshold <- normalize_param(score_fraction_threshold)
-max_taxa                 <- normalize_param(max_taxa)
-
-if (!is.na(score_fraction_threshold) && !is.na(max_taxa)) {
-  stop(sprintf(
-    paste0(
-      "Both peptidotyping_first_pass_score_fraction_threshold (%s) and ",
-      "peptidotyping_first_pass_max_taxa (%s) are set in the config. ",
-      "Set exactly one per pass (or both null to disable)."
-    ),
-    format(score_fraction_threshold), format(max_taxa)
-  ))
-}
-
 conduitR::log_with_timestamp("Input parquet:      %s", first_pass_diann_parquet)
 conduitR::log_with_timestamp("taxid→family map:   %s", taxid_family_map_fp)
 conduitR::log_with_timestamp("Output (detected):  %s", ncbi_taxonomy_id_fp)
 conduitR::log_with_timestamp("Output (FDR table): %s", fdr_results_fp)
-conduitR::log_with_timestamp(
-  "Score-coverage filter: score_fraction_threshold=%s, max_taxa=%s",
-  format(score_fraction_threshold), format(max_taxa)
-)
 
 # =============================================================================
 # Read first-pass DIA-NN results
@@ -56,13 +29,6 @@ conduitR::log_with_timestamp(
 conduitR::log_with_timestamp("Reading first-pass DIA-NN parquet")
 precursors <- arrow::read_parquet(first_pass_diann_parquet)
 conduitR::log_with_timestamp("Parquet rows: %d", nrow(precursors))
-
-if (nrow(precursors) == 0) {
-  stop(sprintf(
-    "DIA-NN parquet at %s contains 0 rows — the upstream DIA-NN search produced no peptides. Inspect the corresponding DIA-NN log under logs/ before re-running.",
-    first_pass_diann_parquet
-  ), call. = FALSE)
-}
 
 # =============================================================================
 # Extract family taxid and build PSM table for FDR
@@ -122,98 +88,13 @@ conduitR::log_with_timestamp(
 )
 
 # =============================================================================
-# Apply score-coverage filter to FDR-passing families
-# =============================================================================
-# Sort FDR-passers by score desc, compute per-taxon score fractions, and decide
-# which taxa are carried forward to the second pass per the configured filter.
-candidates <- fdr_result$results |>
-  dplyr::filter(!decoy, qvalue <= 0.01) |>
-  dplyr::arrange(dplyr::desc(score))
-
-n_candidates <- nrow(candidates)
-
-if (n_candidates == 0) {
-  candidates <- candidates |>
-    dplyr::mutate(
-      score_fraction            = numeric(0),
-      cumulative_score_fraction = numeric(0),
-      carried_forward           = logical(0)
-    )
-  filter_mode  <- "none (no FDR-passing taxa)"
-  filter_value <- NA_real_
-} else {
-  total_score <- sum(candidates$score)
-  candidates$score_fraction            <- candidates$score / total_score
-  candidates$cumulative_score_fraction <- cumsum(candidates$score_fraction)
-
-  if (!is.na(max_taxa)) {
-    cutoff       <- min(as.integer(max_taxa), n_candidates)
-    filter_mode  <- "max_taxa"
-    filter_value <- as.numeric(max_taxa)
-  } else if (!is.na(score_fraction_threshold)) {
-    reach <- which(candidates$cumulative_score_fraction >= score_fraction_threshold)
-    cutoff       <- if (length(reach) == 0) n_candidates else reach[1]
-    filter_mode  <- "score_fraction_threshold"
-    filter_value <- score_fraction_threshold
-  } else {
-    cutoff       <- n_candidates
-    filter_mode  <- "none (filter disabled)"
-    filter_value <- NA_real_
-  }
-
-  candidates$carried_forward <- seq_len(n_candidates) <= cutoff
-}
-
-n_carried <- sum(candidates$carried_forward)
-conduitR::log_with_timestamp(
-  "first-pass filter: kept %d/%d FDR-passing families (mode=%s, value=%s)",
-  n_carried, n_candidates, filter_mode, format(filter_value)
-)
-
-# =============================================================================
 # Format detected families for output
 # =============================================================================
-detected_families <- candidates |>
-  dplyr::filter(carried_forward) |>
-  dplyr::transmute(
-    ncbi_taxonomy_id  = taxon,
-    detected_taxonomy = paste0("family_", taxon)
-  )
+detected_families <- fdr_result$detected |>
+  dplyr::select(ncbi_taxonomy_id = taxon) |>
+  dplyr::mutate(detected_taxonomy = paste0("family_", ncbi_taxonomy_id))
 
-conduitR::log_with_timestamp("Carried forward %d families", nrow(detected_families))
-
-# =============================================================================
-# Build augmented FDR results table (audit trail)
-# =============================================================================
-# Decoy rows and FDR-failing target rows are preserved with NA fractions and
-# carried_forward = FALSE so the table still represents the full calc_taxon_fdr
-# output alongside the new filter columns.
-non_candidates <- fdr_result$results |>
-  dplyr::filter(decoy | qvalue > 0.01) |>
-  dplyr::mutate(
-    score_fraction            = NA_real_,
-    cumulative_score_fraction = NA_real_,
-    carried_forward           = FALSE
-  )
-
-augmented_results <- dplyr::bind_rows(candidates, non_candidates)
-
-# Pull a human-readable name for each family taxid from DIA-NN's Protein.Names
-# column (sourced from the FASTA "{rank}_{name}" description field). The join
-# only resolves a family name when the FASTA contains family-rank peptides for
-# that family; families detected purely via genus/species fallback peptides get
-# NA.
-name_map <- precursors |>
-  dplyr::transmute(
-    taxon      = stringr::str_extract(Protein.Ids, "(?<=\\|)[^|]+$"),
-    taxon_name = stringr::str_remove(Protein.Names, "^(family_|genus_|species_|strain_)")
-  ) |>
-  dplyr::filter(!is.na(taxon), !is.na(taxon_name), taxon_name != "") |>
-  dplyr::distinct(taxon, .keep_all = TRUE)
-
-augmented_results <- augmented_results |>
-  dplyr::left_join(name_map, by = "taxon") |>
-  dplyr::relocate(taxon_name, .after = taxon)
+conduitR::log_with_timestamp("Detected %d families", nrow(detected_families))
 
 # =============================================================================
 # Write output
@@ -221,7 +102,7 @@ augmented_results <- augmented_results |>
 readr::write_tsv(detected_families, ncbi_taxonomy_id_fp)
 conduitR::log_with_timestamp("Written: %s", ncbi_taxonomy_id_fp)
 
-readr::write_tsv(augmented_results, fdr_results_fp)
+readr::write_tsv(fdr_result$results, fdr_results_fp)
 conduitR::log_with_timestamp("Written FDR results table: %s", fdr_results_fp)
 
 # =============================================================================

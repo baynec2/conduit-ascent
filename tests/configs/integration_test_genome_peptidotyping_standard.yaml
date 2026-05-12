@@ -1,6 +1,0 @@
-# Integration test: genome_peptidotyping in standard (predicted-speclib) mode.
-# Exercises the speclib-gen + --lib branch of the genome-peptidotyping passes.
-experiment: integration_test
-run_name: genome_peptidotyping_standard
-search_space_method: genome_peptidotyping
-genome_peptidotyping_search_mode: standard

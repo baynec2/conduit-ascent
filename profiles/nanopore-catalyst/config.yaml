@@ -30,5 +30,3 @@ singularity-args: "--bind /home/nanopore-catalyst/HDD"
 config:
   - peptidotyping_resource_dir=/home/nanopore-catalyst/HDD/peptidotyping_resources/
   - taxonkit_db_dir=/home/nanopore-catalyst/HDD/peptidotyping_resources/taxonkit
-  - genome_resource_dir=/home/nanopore-catalyst/HDD/genome_resources/derived
-  - genome_set_resource_dir=/home/nanopore-catalyst/HDD/genome_resources/derived_sets

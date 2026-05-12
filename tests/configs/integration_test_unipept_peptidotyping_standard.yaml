@@ -1,7 +1,0 @@
-# Integration test: unipept_peptidotyping in standard (predicted-speclib) mode.
-# Exercises the speclib-gen + --lib branch of perform_first_pass_search /
-# perform_second_pass_search.
-experiment: integration_test
-run_name: unipept_peptidotyping_standard
-search_space_method: unipept_peptidotyping
-unipept_peptidotyping_search_mode: standard

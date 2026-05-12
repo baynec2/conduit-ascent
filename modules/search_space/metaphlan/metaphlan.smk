@@ -20,8 +20,7 @@ rule run_metaphlan:
     input:
         fastq=os.path.join(EXPERIMENT_DIR, "input/fastq_files/{sample}.fastq.gz")
     output:
-        profile=os.path.join(RUN_DIR, "metaphlan/{sample}_profile.txt"),
-        mapout=os.path.join(RUN_DIR, "metaphlan/{sample}.mapout.txt")
+        profile=os.path.join(RUN_DIR, "metaphlan/{sample}_profile.txt")
     container: config["containers"]["metaphlan"]
     log:
         os.path.join(RUN_DIR, "logs/search_space/metaphlan/run_metaphlan_{sample}.log")
@@ -32,7 +31,6 @@ rule run_metaphlan:
             --input_type fastq \
             --nproc {threads} \
             --db_dir resources/metaphlan/ \
-            --mapout {output.mapout} \
             -o {output.profile} \
             >> {log} 2>&1
         """
