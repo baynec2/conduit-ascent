@@ -198,22 +198,42 @@ non_candidates <- fdr_result$results |>
 
 augmented_results <- dplyr::bind_rows(candidates, non_candidates)
 
-# Pull a human-readable name for each family taxid from DIA-NN's Protein.Names
-# column (sourced from the FASTA "{rank}_{name}" description field). The join
-# only resolves a family name when the FASTA contains family-rank peptides for
-# that family; families detected purely via genus/species fallback peptides get
-# NA.
-name_map <- precursors |>
+# Pull a human-readable name for each family taxid. Every peptide carries
+# `lca_taxid` (last segment of Protein.Ids) and `{rank}_{name}` (Protein.Names).
+# Joining lca_taxid → family_taxid via taxid_map gives us a per-family pool of
+# names; we pick one with rank preference family > genus > species > strain so
+# families whose effective first-pass rank is genus/species fall back to a
+# genus/species/strain name observed for them rather than NA.
+rank_priority <- c("family" = 1L, "genus" = 2L, "species" = 3L, "strain" = 4L)
+
+name_lookup <- precursors |>
   dplyr::transmute(
-    taxon      = stringr::str_extract(Protein.Ids, "(?<=\\|)[^|]+$"),
-    taxon_name = stringr::str_remove(Protein.Names, "^(family_|genus_|species_|strain_)")
+    lca_taxid      = stringr::str_extract(Protein.Ids, "(?<=\\|)[^|]+$"),
+    name_rank      = stringr::str_extract(Protein.Names, "^(family|genus|species|strain)(?=_)"),
+    name_stripped  = stringr::str_remove(Protein.Names, "^(family_|genus_|species_|strain_)")
   ) |>
-  dplyr::filter(!is.na(taxon), !is.na(taxon_name), taxon_name != "") |>
-  dplyr::distinct(taxon, .keep_all = TRUE)
+  dplyr::filter(
+    !is.na(lca_taxid),
+    !is.na(name_rank),
+    !is.na(name_stripped),
+    name_stripped != ""
+  ) |>
+  dplyr::inner_join(
+    dplyr::select(taxid_map, lca_taxid, family_taxid),
+    by = "lca_taxid"
+  ) |>
+  dplyr::mutate(prio = rank_priority[name_rank]) |>
+  dplyr::arrange(family_taxid, prio) |>
+  dplyr::distinct(family_taxid, .keep_all = TRUE) |>
+  dplyr::transmute(
+    taxon           = family_taxid,
+    taxon_name      = name_stripped,
+    taxon_name_rank = name_rank
+  )
 
 augmented_results <- augmented_results |>
-  dplyr::left_join(name_map, by = "taxon") |>
-  dplyr::relocate(taxon_name, .after = taxon)
+  dplyr::left_join(name_lookup, by = "taxon") |>
+  dplyr::relocate(taxon_name, taxon_name_rank, .after = taxon)
 
 # =============================================================================
 # Write output
