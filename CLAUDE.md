@@ -149,16 +149,26 @@ Located at `/home/nanopore-catalyst/conduitR`. An R package providing:
 
 ## Running the Workflow Locally
 
-Use the per-hostname Snakemake profile under `profiles/<hostname>/`. The profile injects `--cores`, `--use-singularity`, the `/home/nanopore-catalyst/HDD` bind, and any per-machine resource-path overrides — no manual flags required:
+The HDD is mounted at `/home/nanopore-catalyst/HDD`. Apptainer/Singularity containers do not see this path by default — always bind it explicitly:
 
 ```bash
 conda activate conduit
-snakemake --profile profiles/<hostname> \
-  --configfile experiments/<name>/config/<method>.yaml <target>
+snakemake --use-singularity --singularity-args "--bind /home/nanopore-catalyst/HDD" \
+  --cores 20 --configfile experiments/<name>/config.yaml <target>
 ```
-
-`tests/run_integration_tests.sh` auto-applies the profile that matches `hostname`.
 
 ### Peptidotyping Resources
 
-Pre-built peptidotyping resources (UMGAP sequence index, peptide TSVs, taxonkit DB) live on the HDD at `/home/nanopore-catalyst/HDD/peptidotyping_resources/`. The `nanopore-catalyst` profile already points `peptidotyping_resource_dir` and `taxonkit_db_dir` at this location, so experiment configs do **not** carry these paths. To enable a new host, copy `profiles/nanopore-catalyst/` to `profiles/<new-hostname>/` and edit the bind / resource paths to match that machine's storage layout.
+Pre-built peptidotyping resources (UMGAP sequence index, peptide TSVs, taxonkit DB) live on the HDD:
+
+```
+/home/nanopore-catalyst/HDD/peptidotyping_resources/
+```
+
+Point configs there via:
+```yaml
+peptidotyping_resource_dir: "/home/nanopore-catalyst/HDD/peptidotyping_resources/"
+taxonkit_db_dir: "/home/nanopore-catalyst/HDD/peptidotyping_resources/taxonkit"
+```
+
+The `experiments/peptidotyping_test/config/peptidotyping.yaml` already has these paths set correctly and is the config to use for end-to-end peptidotyping testing.

@@ -1,6 +1,0 @@
-# Integration test: unipept_hapid in InfiniDIA mode.
-# Skips speclib-gen and runs DIA-NN with --pre-search --pre-filter.
-experiment: integration_test
-run_name: unipept_hapid_infinidia
-search_space_method: unipept_hapid
-unipept_hapid_search_mode: infinidia

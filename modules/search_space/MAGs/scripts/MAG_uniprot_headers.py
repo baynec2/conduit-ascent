@@ -3,6 +3,7 @@
 from Bio import SeqIO
 import pandas as pd
 import os
+import re
 
 # -----------------------------
 # Snakemake bindings
@@ -11,10 +12,15 @@ BAKTA_DIRS    = snakemake.input.bakta_dirs
 TAXONOMY_PATH = snakemake.params.taxonomy   # mag_taxonomy.txt (has genome + organism_id cols)
 
 FASTA_OUT = snakemake.output.fasta
+GO_OUT    = snakemake.output.go
+KEGG_OUT  = snakemake.output.kegg
 
 LOG = snakemake.log[0]
 
+# Create directories for outputs
 os.makedirs(os.path.dirname(FASTA_OUT), exist_ok=True)
+os.makedirs(os.path.dirname(GO_OUT), exist_ok=True)
+os.makedirs(os.path.dirname(KEGG_OUT), exist_ok=True)
 
 log = open(LOG, "w")
 def logprint(msg):
@@ -80,10 +86,23 @@ def preprocess_bakta_annotations(MAG_dir, MAG):
     return faa_clean_path, cds_tsv_path
 
 
+def extract_go_kegg(dbxref_string):
+    """
+    Extract GO:xxxxxxx and KEGG K numbers.
+    """
+    if pd.isna(dbxref_string):
+        return [], []
+
+    gos = re.findall(r"GO:\d+", dbxref_string)
+    keggs = re.findall(r"(?:KEGG:)?(K\d+)", dbxref_string)
+
+    return gos, keggs
+
+
 def format_uniprot_metadata(MAG_dir, MAG):
     """
-    Creates a dataframe with UniProt-style metadata. organism_id is looked up
-    from the taxonomy file (not computed from the genome name).
+    Creates a dataframe with UniProt-style metadata and GO/KEGG lists.
+    organism_id is looked up from the taxonomy file (not computed from the genome name).
     """
     cds_tsv_path = os.path.join(MAG_dir, f"{MAG}_cds.tsv")
 
@@ -101,10 +120,6 @@ def format_uniprot_metadata(MAG_dir, MAG):
     species_name = GENOME_SPECIES.get(MAG, "Unknown species")
     org_id       = GENOME_ORG_ID.get(MAG, "0")
 
-    # MGnify metadata has empty species cells for some MAGs -> pandas reads NaN.
-    if pd.isna(species_name) or not isinstance(species_name, str):
-        species_name = "Unknown species"
-
     parts = species_name.split(" ")
     genus   = parts[0] if len(parts) > 0 else "UNK"
     species = parts[1] if len(parts) > 1 else "UNK"
@@ -115,6 +130,22 @@ def format_uniprot_metadata(MAG_dir, MAG):
     df["Species_Locus_Tag"]  = [f"{lt}_{genus_abbr}{species_abbr}" for lt in locus_tags]
     df["Species_Name"]       = species_name
     df["Organism_Identifier"] = org_id  # from taxonomy lookup
+
+    # GO & KEGG extraction
+    go_terms = []
+    kegg_terms = []
+
+    if "DbXrefs" in cds_meta.columns:
+        for x in cds_meta["DbXrefs"]:
+            gos, keggs = extract_go_kegg(x)
+            go_terms.append(gos)
+            kegg_terms.append(keggs)
+    else:
+        go_terms   = [[] for _ in locus_tags]
+        kegg_terms = [[] for _ in locus_tags]
+
+    df["GO_Terms"]   = go_terms
+    df["KEGG_Terms"] = kegg_terms
 
     return df
 
@@ -178,11 +209,24 @@ def concatenate_uniprot_fastas(mag_dirs_by_name, output_path):
     logprint(f"Wrote combined FASTA → {output_path}")
 
 
+def write_go_kegg_annotation_files(df):
+    """
+    Write GO and KEGG annotations to Snakemake-designated output paths.
+    """
+    df[["GO_Terms"]].to_csv(GO_OUT, sep="\t", header=False)
+    df[["KEGG_Terms"]].to_csv(KEGG_OUT, sep="\t", header=False)
+
+    logprint(f"Wrote GO annotations → {GO_OUT}")
+    logprint(f"Wrote KEGG annotations → {KEGG_OUT}")
+
+
 # -----------------------------
 # MAIN
 # -----------------------------
 def main():
     MAG_list = list(GENOME_SPECIES.keys())
+
+    all_meta = []
 
     for MAG in MAG_list:
         MAG_dir = MAG_DIR_BY_NAME.get(MAG)
@@ -196,9 +240,26 @@ def main():
         df = format_uniprot_metadata(MAG_dir, MAG)
         replace_faa_headers(MAG_dir, MAG, df)
 
+        if df is not None:
+            df["MAG"] = MAG
+            all_meta.append(df)
+
+    if not all_meta:
+        # Snakemake requires every declared output to exist on completion.
+        # Touch empties so the rule succeeds; downstream rules will surface
+        # the "no proteins found" condition more clearly than us crashing here.
+        logprint("No MAG metadata found — writing empty outputs.")
+        for path in (FASTA_OUT, GO_OUT, KEGG_OUT):
+            open(path, "w").close()
+        log.close()
+        return
+
+    full_df = pd.concat(all_meta)
+
+    write_go_kegg_annotation_files(full_df)
     concatenate_uniprot_fastas(MAG_DIR_BY_NAME, FASTA_OUT)
 
-    logprint("MAG UniProt processing complete.")
+    logprint("MAG UniProt + GO/KEGG processing complete.")
     log.close()
 
 
