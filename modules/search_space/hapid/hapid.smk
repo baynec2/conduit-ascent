@@ -1,5 +1,6 @@
 import os
 import glob
+import sys
 
 include: "../_shared/genome_cache.smk"
 
@@ -9,6 +10,17 @@ include: "../_shared/genome_cache.smk"
 EXPERIMENT_DIR  = config["experiment_dir"]
 RUN_DIR         = config["run_dir"]
 HAPID_DIR       = os.path.join(EXPERIMENT_DIR, "input/MAG_files")
+
+sys.path.insert(0, os.path.join(workflow.basedir, "modules", "_shared"))
+from diann_staging import (
+    list_raw_files,
+    list_samples,
+    raw_path_for_sample,
+    stage3_symlink_commands,
+)
+
+RAW_FILEPATHS = list_raw_files(EXPERIMENT_DIR)
+SAMPLES = list_samples(EXPERIMENT_DIR)
 # Three tiers of cacheability — see _shared/genome_cache.smk:
 #   HAPID_FGS_DIR    — per-genome (FragGeneScan FAA depends only on a single genome)
 #   HAPID_HMMER_DIR  — per-genome (HMMER tblout depends only on FAA + HMM profiles)
@@ -127,18 +139,25 @@ rule predict_orfs_with_fraggenescan:
     container:
         config["containers"]["fraggenescan_hmmer"]
     shell:
+        # FragGeneScan reads training files relative to its install dir, so we
+        # must `cd` into it first. Resolve all paths to absolute form *before*
+        # the cd so they survive (works whether {output} is a per-run relative
+        # path or an absolute mgnify-cache path).
         """
-        WORKDIR=$(pwd)
-        mkdir -p $WORKDIR/$(dirname {output})
-        mkdir -p $WORKDIR/$(dirname {log})
-        cd $(dirname $(which FragGeneScan))
+        INPUT_FA=$(realpath -m {input.genome_fa})
+        OUTPUT=$(realpath -m {output})
+        PREFIX=$(realpath -m {params.prefix})
+        LOG=$(realpath -m {log})
+        mkdir -p "$(dirname "$OUTPUT")"
+        mkdir -p "$(dirname "$LOG")"
+        cd "$(dirname "$(which FragGeneScan)")"
         FragGeneScan \
-            -s $WORKDIR/{input.genome_fa} \
-            -o $WORKDIR/{params.prefix} \
+            -s "$INPUT_FA" \
+            -o "$PREFIX" \
             -w 0 \
             -t complete \
             -p {threads} \
-            > $WORKDIR/{log} 2>&1
+            > "$LOG" 2>&1
         """
 
 
@@ -250,68 +269,196 @@ rule create_hapid_profiling_spectral_library:
     container:
         config["containers"]["diann"]
     shell:
+        # cd + basename for --out-lib so dots in the parent dir (catalog slug) don't get parsed as extensions.
         """
-        mkdir -p $(dirname {output})
-        mkdir -p $(dirname {log})
+        INPUT_FA=$(realpath -m {input.fasta})
+        CFG=$(realpath -m {input.cfg})
+        LOG=$(realpath -m {log})
+        OUT_DIR=$(dirname $(realpath -m {output}))
+        OUT_BASE=$(basename {params.out_prefix})
+        mkdir -p "$OUT_DIR"
+        mkdir -p "$(dirname "$LOG")"
+        cd "$OUT_DIR"
         diann \
-            --cfg {input.cfg} \
-            --fasta {input.fasta} \
+            --cfg "$CFG" \
+            --fasta "$INPUT_FA" \
             --threads {threads} \
-            --out-lib {params.out_prefix} \
+            --out-lib "$OUT_BASE" \
             --cut "K*,R*" \
             --missed-cleavages 1 \
             --min-pep-len 7 \
             --max-pep-len 30 \
             --species-ids \
-            > {log} 2>&1
+            > "$LOG" 2>&1
         """
 
 
-rule perform_hapid_profiling_search:
-    input:
-        raw_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files"),
-        speclib = (
-            [os.path.join(HAPID_SET_DIR, "marker_gene.predicted.speclib")]
-            if config.get("hapid_search_mode", "standard") == "standard"
-            else []
-        ),
-        fasta   = marker_gene_db_path,
-        cfg     = (
-            "config/hapid_infinidia.cfg"
-            if config.get("hapid_search_mode", "standard") == "infinidia"
-            else config["diann_library_search_base_config"]
-        )
-    output:
-        os.path.join(HAPID_OUT_ROOT, "marker_gene_profiling_report.parquet")
-    params:
-        out_prefix = lambda wildcards, output: output[0].replace(".parquet", ""),
-        lib_flag = (
-            f"--lib {os.path.join(HAPID_SET_DIR, 'marker_gene.predicted.speclib')}"
-            if config.get("hapid_search_mode", "standard") == "standard"
-            else ""
-        )
-    log:
-        os.path.join(RUN_DIR, "logs/search_space/hapid/profiling_search.log")
-    threads: workflow.cores
-    container:
-        config["containers"]["diann"]
-    shell:
-        """
-        mkdir -p $(dirname {output})
-        mkdir -p $(dirname {log})
-        diann \
-            --cfg {input.cfg} \
-            --fasta {input.fasta} \
-            --out {params.out_prefix} \
-            --dir {input.raw_dir} \
-            {params.lib_flag} \
-            --cut "K*,R*" \
-            --missed-cleavages 1 \
-            --min-pep-len 7 \
-            --max-pep-len 30 \
-            --threads {threads} \
-            > {log} 2>&1
-        """
+GENOME_HAPID_QUANTS = os.path.join(HAPID_OUT_ROOT, "profiling_quant_files")
+
+# HAPiID-style marker-gene profiling search.
+# Standard: 3-stage split. InfinDIA: monolithic. See modules/diann/diann.smk for rationale.
+if config.get("hapid_search_mode", "standard") == "standard":
+
+    rule genome_hapid_build_empirical_lib:
+        input:
+            raw_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files"),
+            speclib = os.path.join(HAPID_SET_DIR, "marker_gene.predicted.speclib"),
+            fasta   = marker_gene_db_path,
+            cfg     = config["diann_library_search_base_config"]
+        output:
+            empirical_lib = os.path.join(HAPID_OUT_ROOT, "marker_gene_empirical.parquet")
+        params:
+            out_lib = os.path.join(HAPID_OUT_ROOT, "marker_gene_empirical"),
+            tmpdir = os.path.join(HAPID_OUT_ROOT, "build_empirical_quant_files"),
+        log:
+            os.path.join(RUN_DIR, "logs/search_space/hapid/build_empirical_lib.log")
+        threads: workflow.cores
+        container:
+            config["containers"]["diann"]
+        shell:
+            """
+            mkdir -p $(dirname {output.empirical_lib})
+            mkdir -p $(dirname {log})
+            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
+            diann \
+                --cfg {input.cfg} \
+                --fasta {input.fasta} \
+                --dir {input.raw_dir} \
+                --temp {params.tmpdir} \
+                --lib {input.speclib} \
+                --gen-spec-lib \
+                --rt-profiling \
+                --out-lib {params.out_lib} \
+                --cut "K*,R*" \
+                --missed-cleavages 1 \
+                --min-pep-len 7 \
+                --max-pep-len 30 \
+                --threads {threads} \
+                > {log} 2>&1
+            """
+
+    rule genome_hapid_search_one_raw:
+        input:
+            empirical_lib = os.path.join(HAPID_OUT_ROOT, "marker_gene_empirical.parquet"),
+            fasta = marker_gene_db_path,
+            cfg = config["diann_library_search_base_config"],
+            raw = lambda w: raw_path_for_sample(EXPERIMENT_DIR, w.sample)
+        output:
+            quant = os.path.join(GENOME_HAPID_QUANTS, "{sample}.quant")
+        params:
+            tmpdir = lambda w: os.path.join(HAPID_OUT_ROOT, "profiling_quant_tmp", w.sample)
+        log:
+            os.path.join(RUN_DIR, "logs/search_space/hapid/search_one_raw.{sample}.log")
+        threads: min(8, workflow.cores)
+        container:
+            config["containers"]["diann"]
+        shell:
+            """
+            mkdir -p $(dirname {log})
+            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir} $(dirname {output.quant})
+            diann \
+                --cfg {input.cfg} \
+                --f {input.raw} \
+                --lib {input.empirical_lib} \
+                --fasta {input.fasta} \
+                --temp {params.tmpdir} \
+                --out {params.tmpdir}/per_run_report \
+                --cut "K*,R*" \
+                --missed-cleavages 1 \
+                --min-pep-len 7 \
+                --max-pep-len 30 \
+                --threads {threads} \
+                > {log} 2>&1
+            mv {params.tmpdir}/*.quant {output.quant}
+            rm -rf {params.tmpdir}
+            """
+
+    rule genome_hapid_combine:
+        input:
+            quants = expand(
+                os.path.join(GENOME_HAPID_QUANTS, "{sample}.quant"),
+                sample=SAMPLES
+            ),
+            empirical_lib = os.path.join(HAPID_OUT_ROOT, "marker_gene_empirical.parquet"),
+            fasta = marker_gene_db_path,
+            cfg = config["diann_library_search_base_config"],
+            raw_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files")
+        output:
+            os.path.join(HAPID_OUT_ROOT, "marker_gene_profiling_report.parquet")
+        params:
+            tmpdir = os.path.join(HAPID_OUT_ROOT, "profiling_combine_tmp"),
+            out_prefix = lambda wildcards, output: output[0].replace(".parquet", ""),
+            symlink_cmds = stage3_symlink_commands(
+                os.path.join(HAPID_OUT_ROOT, "profiling_combine_tmp"),
+                RAW_FILEPATHS,
+                GENOME_HAPID_QUANTS
+            )
+        log:
+            os.path.join(RUN_DIR, "logs/search_space/hapid/combine.log")
+        threads: workflow.cores
+        container:
+            config["containers"]["diann"]
+        shell:
+            """
+            mkdir -p $(dirname {output[0]})
+            mkdir -p $(dirname {log})
+            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
+            {params.symlink_cmds}
+            diann \
+                --cfg {input.cfg} \
+                --dir {input.raw_dir} \
+                --lib {input.empirical_lib} \
+                --fasta {input.fasta} \
+                --temp {params.tmpdir} \
+                --use-quant \
+                --out {params.out_prefix} \
+                --cut "K*,R*" \
+                --missed-cleavages 1 \
+                --min-pep-len 7 \
+                --max-pep-len 30 \
+                --threads {threads} \
+                > {log} 2>&1
+            rm -rf {params.tmpdir}
+            """
+
+else:  # infinidia — monolithic
+
+    rule genome_hapid_monolithic:
+        input:
+            raw_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files"),
+            fasta   = marker_gene_db_path,
+            cfg     = "config/hapid_infinidia.cfg"
+        output:
+            os.path.join(HAPID_OUT_ROOT, "marker_gene_profiling_report.parquet")
+        params:
+            out_prefix = lambda wildcards, output: output[0].replace(".parquet", ""),
+            tmpdir = os.path.join(HAPID_OUT_ROOT, "monolithic_quant_files"),
+        log:
+            os.path.join(RUN_DIR, "logs/search_space/hapid/monolithic.log")
+        threads: workflow.cores
+        container:
+            config["containers"]["diann"]
+        shell:
+            """
+            mkdir -p $(dirname {output[0]})
+            mkdir -p $(dirname {log})
+            rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
+            diann \
+                --cfg {input.cfg} \
+                --fasta {input.fasta} \
+                --dir {input.raw_dir} \
+                --temp {params.tmpdir} \
+                --pre-search --pre-filter \
+                --gen-spec-lib \
+                --rt-profiling \
+                --out {params.out_prefix} \
+                --cut "K*,R*" \
+                --missed-cleavages 1 \
+                --min-pep-len 7 \
+                --max-pep-len 30 \
+                --threads {threads} \
+                > {log} 2>&1
+            """
 
 
 # ==============================================================================

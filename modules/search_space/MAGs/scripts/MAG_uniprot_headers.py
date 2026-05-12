@@ -101,6 +101,10 @@ def format_uniprot_metadata(MAG_dir, MAG):
     species_name = GENOME_SPECIES.get(MAG, "Unknown species")
     org_id       = GENOME_ORG_ID.get(MAG, "0")
 
+    # MGnify metadata has empty species cells for some MAGs -> pandas reads NaN.
+    if pd.isna(species_name) or not isinstance(species_name, str):
+        species_name = "Unknown species"
+
     parts = species_name.split(" ")
     genus   = parts[0] if len(parts) > 0 else "UNK"
     species = parts[1] if len(parts) > 1 else "UNK"

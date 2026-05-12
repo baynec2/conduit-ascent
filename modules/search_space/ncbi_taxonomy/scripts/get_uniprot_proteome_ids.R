@@ -25,11 +25,18 @@ append_additional_ncbi_taxa_id <- snakemake@config$append_additional_ncbi_taxa_i
 conduitR::log_with_timestamp("Making the database_resources_directory if it doesn't exist.")
 
 conduitR::log_with_timestamp("Reading organism IDs from the input file.")
-# Read organism IDs from the input file (single-column, skip header line)
-organism_ids <- readr::read_lines(input_file) |>
-  (\(x) x[nchar(trimws(x)) > 0])() |>   # drop blank lines
-  tail(-1L) |>                             # drop header
-  as.integer()
+# Read organism IDs from the input file. Tolerates either a single-column
+# format (just the numeric ID under any header, e.g. `ncbi_taxa_id`) or a
+# multi-column TSV where the first column carries the IDs and additional
+# columns carry user metadata (e.g. `organism_id\tsource`). The previous
+# implementation used `readr::read_lines + as.integer`, which silently
+# coerced lines like `820\tBacteroides_uniformis_ATCC_8492` to NA and then
+# queried UniProt with NAs (HTTP 400).
+organism_ids <- readr::read_tsv(input_file, show_col_types = FALSE) |>
+  dplyr::pull(1) |>
+  as.integer() |>
+  (\(x) x[!is.na(x)])() |>
+  unique()
 
 # Append additional NCBI taxonomic IDs if specified by the user
 if (!isFALSE(append_additional_ncbi_taxa_id)) {

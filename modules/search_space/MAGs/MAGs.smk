@@ -60,16 +60,16 @@ def _selected_genomes_source():
         return os.path.join(RUN_DIR, "genome_download/mgnify/species_representatives.txt")
     return None
 
-# When a selection method is in play, route everything through a checkpoint
-# defined IN this module — this is what lets get_mag_list() use checkpoints.X
-# without crossing module boundaries. The upstream dependency is a plain file
-# path, so checkpoint-aware DAG re-evaluation propagates correctly.
+# Local checkpoint so get_mag_list() stays inside this module's checkpoints
+# proxy (Snakemake 9 scopes it per-module). Output is temp() so the checkpoint
+# re-runs every invocation — otherwise lambdas calling .get() resolve to "<TBD>"
+# when its output persists from a prior run while upstream regenerates input.
 if _selected_genomes_source() is not None:
     checkpoint canonicalize_selected_genomes:
         input:
             _selected_genomes_source()
         output:
-            os.path.join(DB_OUT_ROOT, "selected_genomes.txt")
+            temp(os.path.join(DB_OUT_ROOT, "selected_genomes.txt"))
         log:
             os.path.join(RUN_DIR, "logs/search_space/MAGs/canonicalize_selected_genomes.log")
         shell:
