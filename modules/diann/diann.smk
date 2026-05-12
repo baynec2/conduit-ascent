@@ -72,6 +72,7 @@ if config.get("diann_search_mode", "standard") == "standard":
             empirical_lib = os.path.join(DIANN_OUT, "empirical.parquet")
         params:
             out_lib = os.path.join(DIANN_OUT, "empirical"),
+            out_report = os.path.join(DIANN_OUT, "build_empirical_report"),
             tmpdir = os.path.join(DIANN_OUT, "build_empirical_quant_files"),
         log: os.path.join(RUN_DIR,"logs/diann/run_diann_build_empirical_lib.log")
         container:
@@ -96,6 +97,7 @@ if config.get("diann_search_mode", "standard") == "standard":
             --gen-spec-lib \
             --rt-profiling \
             --out-lib {params.out_lib} \
+            --out {params.out_report} \
             --threads {threads} --verbose 1 >> {log} 2>&1
             """
 
