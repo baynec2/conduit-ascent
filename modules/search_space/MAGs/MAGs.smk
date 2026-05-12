@@ -2,14 +2,18 @@ import os
 import glob
 import pandas as pd
 
+include: "../_shared/genome_cache.smk"
+
 # Experiment specific directories
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR = config["run_dir"]
 MAG_DIR = os.path.join(EXPERIMENT_DIR,"input/MAG_files")
 # Resource specific directories.
 BAKTA_DIR = config["bakta_db_dir"]
-# Database specific output
-BAKTA_OUT_ROOT = os.path.join(RUN_DIR,"database_resources/bakta")
+# Bakta annotations are shared across runs when source == "mgnify" (genome IDs are
+# globally unique). For local MAGs they fall back to per-run paths to avoid
+# cross-experiment name collisions. See _shared/genome_cache.smk.
+BAKTA_OUT_ROOT = per_genome_cache_root("bakta")
 DB_OUT_ROOT = os.path.join(RUN_DIR,"database_resources")
 
 # MGnify shared cache paths (see modules/genome_download/mgnify/mgnify.smk).
@@ -56,16 +60,16 @@ def _selected_genomes_source():
         return os.path.join(RUN_DIR, "genome_download/mgnify/species_representatives.txt")
     return None
 
-# When a selection method is in play, route everything through a checkpoint
-# defined IN this module — this is what lets get_mag_list() use checkpoints.X
-# without crossing module boundaries. The upstream dependency is a plain file
-# path, so checkpoint-aware DAG re-evaluation propagates correctly.
+# Local checkpoint so get_mag_list() stays inside this module's checkpoints
+# proxy (Snakemake 9 scopes it per-module). Output is temp() so the checkpoint
+# re-runs every invocation — otherwise lambdas calling .get() resolve to "<TBD>"
+# when its output persists from a prior run while upstream regenerates input.
 if _selected_genomes_source() is not None:
     checkpoint canonicalize_selected_genomes:
         input:
             _selected_genomes_source()
         output:
-            os.path.join(DB_OUT_ROOT, "selected_genomes.txt")
+            temp(os.path.join(DB_OUT_ROOT, "selected_genomes.txt"))
         log:
             os.path.join(RUN_DIR, "logs/search_space/MAGs/canonicalize_selected_genomes.log")
         shell:
@@ -211,7 +215,11 @@ rule parse_mag_taxonomy:
     input:
         taxonomy = _mag_taxonomy_input()
     output:
-        os.path.join(DB_OUT_ROOT, "mag_taxonomy.txt")
+        # Intermediate: consumed by create_uniprot_style_database (needs the
+        # `genome` column for per-MAG species lookup) and by
+        # append_additional_organisms_or_proteomes (drops `genome`, writes
+        # taxonomy.txt). Snakemake auto-deletes after both finish.
+        temp(os.path.join(DB_OUT_ROOT, "mag_taxonomy.txt"))
     log:
         os.path.join(RUN_DIR, "logs/search_space/MAGs/parse_mag_taxonomy.log")
     container:
@@ -226,9 +234,9 @@ rule create_uniprot_style_database:
         ],
         taxonomy = os.path.join(DB_OUT_ROOT, "mag_taxonomy.txt")
     output:
-        fasta = os.path.join(DB_OUT_ROOT, "mag_database.fasta"),
-        go = os.path.join(DB_OUT_ROOT, "go_annotations.txt"),
-        kegg = os.path.join(DB_OUT_ROOT, "kegg_annotations.txt")
+        # Intermediate: consumed by append_additional_organisms_or_proteomes,
+        # which writes the final database.fasta. Auto-deleted after.
+        fasta = temp(os.path.join(DB_OUT_ROOT, "mag_database.fasta"))
     params:
         taxonomy = os.path.join(DB_OUT_ROOT, "mag_taxonomy.txt")
     log:
@@ -240,13 +248,10 @@ rule create_uniprot_style_database:
 
 rule append_additional_organisms_or_proteomes:
     input:
-        # Modifying the mag database to also have uniprot information. 
+        # Modifying the mag database to also have uniprot information.
         mag_fasta = os.path.join(DB_OUT_ROOT, "mag_database.fasta"),
         mag_taxonomy = os.path.join(DB_OUT_ROOT,"mag_taxonomy.txt")
     output:
-        # Directory containing uniprot annotations
-        uniprot_fasta_dir = directory(os.path.join(DB_OUT_ROOT,"uniprot_database")),
-        # modified files with 
         fasta = os.path.join(DB_OUT_ROOT,"database.fasta"),
         taxonomy = os.path.join(DB_OUT_ROOT,"taxonomy.txt")
     log: os.path.join(RUN_DIR,"logs/search_space/MAGs/append_additional_data.log")
@@ -260,7 +265,9 @@ rule get_mag_annotations:
             os.path.join(BAKTA_OUT_ROOT, mag) for mag in get_mag_list()
         ],
     output:
-        mag_annotations = os.path.join(RUN_DIR, "database_resources/bakta/mag_annotations.txt")
+        # Per-run: filtered to this experiment's selected genomes (get_mag_list).
+        # Don't write under BAKTA_OUT_ROOT — that path may be a shared cache.
+        mag_annotations = os.path.join(DB_OUT_ROOT, "mag_annotations.txt")
     log:
         os.path.join(RUN_DIR,"logs/search_space/MAGs/get_mag_annotations.log")
     container:

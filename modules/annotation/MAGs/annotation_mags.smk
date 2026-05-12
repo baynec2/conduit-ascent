@@ -5,7 +5,7 @@ RUN_DIR = config["run_dir"]
 rule get_detected_mag_annotations:
   input:
     detected_protein_info = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/detected_protein_info.txt"),
-    mag_annotations = os.path.join(RUN_DIR,"database_resources/bakta/mag_annotations.txt")
+    mag_annotations = os.path.join(RUN_DIR,"database_resources/mag_annotations.txt")
   output:
     bakta_annotated_protein_info = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/bakta_annotated_protein_info.txt")
   log: os.path.join(RUN_DIR,"logs/annotation/MAGs/get_annotations_from_mags.log")

@@ -17,7 +17,8 @@ rule add_annotations_to_qfeatures:
   input:
     qf = os.path.join(RUN_DIR,"output_files/qf.rds"),
     uniprot_annotated_protein_info = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/uniprot_annotated_protein_info.txt"),
-    conduit_annotations = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/conduit_annotations.txt")
+    conduit_annotations = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/conduit_annotations.txt"),
+    protein_info = os.path.join(RUN_DIR,"database_resources/protein_info.txt")
   output:
     annotated_qf=os.path.join(RUN_DIR,"output_files/annotated_qf.rds")
   log: os.path.join(RUN_DIR,"logs/build_conduit/add_annotations_to_qfeatures.log")
