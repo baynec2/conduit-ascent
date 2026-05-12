@@ -211,9 +211,20 @@ def _mag_taxonomy_input():
         return _mgnify_taxonomy_path()
     return os.path.join(MAG_DIR, "taxonomy.txt")
 
+def _parse_mag_taxonomy_inputs():
+    inputs = {"taxonomy": _mag_taxonomy_input()}
+    # When an upstream selector (hapid / genome_peptidotyping / mgnify reps) is
+    # in play, filter taxonomy.txt to the selected subset so the final taxonomy
+    # mirrors what's actually in database.fasta. Pure-MAGs runs have no
+    # selector and the user-provided taxonomy already matches MAG_files/.
+    if _selected_genomes_source() is not None:
+        inputs["selected_genomes"] = os.path.join(DB_OUT_ROOT, "selected_genomes.txt")
+    return inputs
+
+
 rule parse_mag_taxonomy:
     input:
-        taxonomy = _mag_taxonomy_input()
+        unpack(_parse_mag_taxonomy_inputs)
     output:
         # Intermediate: consumed by create_uniprot_style_database (needs the
         # `genome` column for per-MAG species lookup) and by

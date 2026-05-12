@@ -16,9 +16,10 @@ import os
 import pandas as pd
 
 # Snakemake bindings
-TAXONOMY_IN  = snakemake.input.taxonomy
-TAXONOMY_OUT = snakemake.output[0]
-LOG          = snakemake.log[0]
+TAXONOMY_IN   = snakemake.input.taxonomy
+SELECTED_IN   = getattr(snakemake.input, "selected_genomes", None)
+TAXONOMY_OUT  = snakemake.output[0]
+LOG           = snakemake.log[0]
 
 os.makedirs(os.path.dirname(TAXONOMY_OUT), exist_ok=True)
 
@@ -43,6 +44,27 @@ logprint(f"Read {len(tax_df)} genome rows")
 
 if "genome" not in tax_df.columns:
     raise ValueError("Input taxonomy.txt must have a 'genome' column")
+
+# Filter to the upstream-selected genome subset (hapid / genome_peptidotyping /
+# mgnify reps). Without this the final taxonomy.txt — and the conduit object's
+# `taxonomy` slot — carry rows for organisms whose proteins were never written
+# into database.fasta. Organism IDs are assigned AFTER filtering so they
+# enumerate the actual database.
+if SELECTED_IN:
+    with open(SELECTED_IN) as fh:
+        selected = {line.strip() for line in fh if line.strip()}
+    before = len(tax_df)
+    tax_df = tax_df[tax_df["genome"].astype(str).isin(selected)]
+    logprint(
+        f"Filtered taxonomy to {len(tax_df)}/{before} genomes "
+        f"using selected_genomes.txt ({len(selected)} entries)"
+    )
+    missing = selected - set(tax_df["genome"].astype(str))
+    if missing:
+        logprint(
+            f"WARNING: {len(missing)} selected genomes have no taxonomy row "
+            f"(first few: {sorted(missing)[:5]})"
+        )
 
 # Assign organism_id as sequential integers by alphabetical genome order
 tax_df = tax_df.sort_values("genome").reset_index(drop=True)
