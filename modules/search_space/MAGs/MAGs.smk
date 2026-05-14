@@ -211,7 +211,9 @@ def _mag_taxonomy_input():
         return _mgnify_taxonomy_path()
     return os.path.join(MAG_DIR, "taxonomy.txt")
 
-def _parse_mag_taxonomy_inputs():
+def _parse_mag_taxonomy_inputs(wildcards):
+    # Snakemake input functions are always called with a wildcards arg, even
+    # when the rule has no wildcards — accept and ignore it.
     inputs = {"taxonomy": _mag_taxonomy_input()}
     # When an upstream selector (hapid / genome_peptidotyping / mgnify reps) is
     # in play, filter taxonomy.txt to the selected subset so the final taxonomy
