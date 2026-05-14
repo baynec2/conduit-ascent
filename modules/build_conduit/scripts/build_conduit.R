@@ -40,7 +40,20 @@ diann_stats <- readr::read_tsv(diann_stats_fp) |>
     dplyr::mutate(File.Name = tools::file_path_sans_ext(basename(File.Name)))
   
 metrics <- list(diann_stats = diann_stats)
-  
+
+  # Reading in optional search-space detection artifacts (peptidotyping /
+  # hapid). Keys come from search_space_detection_inputs() in build_conduit.smk
+  # and are absent for methods that don't produce a detection artifact.
+input_names <- names(snakemake@input)
+for (key in c("peptidotyping_first_pass",
+              "peptidotyping_second_pass",
+              "hapid_greedy_selection")) {
+  if (key %in% input_names) {
+    metrics[[key]] <- readr::read_tsv(snakemake@input[[key]], show_col_types = FALSE)
+    conduitR::log_with_timestamp(paste0("Added ", key, " from ", snakemake@input[[key]]))
+  }
+}
+
   # Reading in Database (in tabular format)
 database <- readr::read_tsv(database_fp) |>
     # Only keeping protein ids and corresponding organism ids

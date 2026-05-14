@@ -1,5 +1,30 @@
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR = config["run_dir"]
+
+
+def search_space_detection_inputs(wildcards):
+    """Optional taxon-detection artifacts for build_conduit, keyed by
+    metric-slot name. Methods that don't produce a detection artifact return
+    an empty dict, so no extra inputs are added to the rule's DAG."""
+    m = config["search_space_method"]
+    base = os.path.join(RUN_DIR, "database_resources")
+    if m == "unipept_peptidotyping":
+        return {
+            "peptidotyping_first_pass":  os.path.join(base, "peptidotyping/first_pass_fdr_results.tsv"),
+            "peptidotyping_second_pass": os.path.join(base, "peptidotyping/second_pass_fdr_results.tsv"),
+        }
+    if m == "genome_peptidotyping":
+        return {
+            "peptidotyping_first_pass":  os.path.join(base, "genome_peptidotyping/first_pass_fdr_results.tsv"),
+            "peptidotyping_second_pass": os.path.join(base, "genome_peptidotyping/second_pass_fdr_results.tsv"),
+        }
+    if m == "unipept_hapid":
+        return {"hapid_greedy_selection": os.path.join(base, "unipept_hapid/unipept_hapid_greedy_selection.tsv")}
+    if m == "hapid":
+        return {"hapid_greedy_selection": os.path.join(base, "hapid/hapid_greedy_selection.tsv")}
+    return {}
+
+
 ################################################################################
 # Processing to QFeatures
 ################################################################################
@@ -27,6 +52,7 @@ rule add_annotations_to_qfeatures:
 
 rule build_conduit:
   input:
+    unpack(search_space_detection_inputs),
     diann_stats= os.path.join(RUN_DIR,"diann_output/diann.stats.tsv"),
     qfeatures= os.path.join(RUN_DIR,"output_files/annotated_qf.rds"),
     database=os.path.join(RUN_DIR,"database_resources/protein_info.txt"),
