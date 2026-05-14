@@ -604,7 +604,7 @@ else:  # infinidia — monolithic
         input:
             raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
             fasta = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
-            config_file = "config/peptidotyping_infinidia.cfg"
+            config_file = os.path.join(RUN_DIR,"config/peptidotyping_infinidia.cfg")
         output:
             first_pass_diann_parquet = os.path.join(PT_OUT, "first_pass_diann.parquet")
         params:
@@ -828,7 +828,7 @@ else:  # infinidia — monolithic
         input:
             raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
             fasta         = os.path.join(PT_OUT, "second_pass_database.fasta"),
-            config_file = "config/peptidotyping_infinidia.cfg"
+            config_file = os.path.join(RUN_DIR,"config/peptidotyping_infinidia.cfg")
         output:
             second_pass_diann_parquet = os.path.join(PT_OUT, "second_pass_diann.parquet")
         params:

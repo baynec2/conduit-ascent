@@ -50,10 +50,19 @@ containers:
   taxonkit:     "docker://quay.io/biocontainers/taxonkit:0.20.0--h9ee0642_1"
 
 # --- DIA-NN cfg-file pointers (rarely changed per-experiment) ---
+# Every cfg below is snapshotted into RUN_DIR/config/ at run start (see
+# modules/setup/setup.smk); consuming rules read the snapshot, so the cfg
+# used by a run is reproducibly frozen with the run. Override any of these
+# keys in an experiment YAML to swap in a variant cfg (e.g. proteoform-mode
+# peptidotyping) without editing the rule.
 # Shared flags for spectral-library generation. Per-rule digest flags are inline in module rules.
 diann_spectral_library_base_config: config/diann_spectral_library_base.cfg
 # Shared flags for library-based DIA-NN searches (HAPiID-style).
 diann_library_search_base_config: config/diann_library_search_base.cfg
+# Shared flags for the peptidotyping InfiniDIA DIA-NN search (both passes).
+peptidotyping_infinidia_config: config/peptidotyping_infinidia.cfg
+# Shared flags for the HAPiID InfiniDIA DIA-NN search.
+hapid_infinidia_config: config/hapid_infinidia.cfg
 # Main DIA-NN search mode. Options:
 #   standard   use run_diann_config below
 #   infinidia  use config/run_diann_infinidia.cfg (--pre-search --pre-filter)

@@ -3,7 +3,7 @@ import os
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR = config["run_dir"]
 
-localrules: setup_diann_spectral_library_config, setup_diann_run_config, write_run_manifest
+localrules: setup_diann_spectral_library_config, setup_diann_run_config, setup_peptidotyping_infinidia_config, setup_hapid_infinidia_config, setup_diann_library_search_base_config, write_run_manifest
 
 ################################################################################
 # Configuration Setup Rules
@@ -35,6 +35,41 @@ rule setup_diann_run_config:
     run:
         import shutil
         shutil.copy(params.selected_config, output.diann_run_config_file)
+
+# Snapshot the peptidotyping InfiniDIA DIA-NN cfg into RUN_DIR/config/.
+# Source path is config["peptidotyping_infinidia_config"]; experiments can
+# override that key to swap in a variant (e.g. proteoform-mode) cfg.
+rule setup_peptidotyping_infinidia_config:
+    output:
+        output_config_file = os.path.join(RUN_DIR,"config/peptidotyping_infinidia.cfg")
+    params:
+        selected_config = config.get("peptidotyping_infinidia_config")
+    log: os.path.join(RUN_DIR,"logs/setup/setup_peptidotyping_infinidia_config.log")
+    run:
+        import shutil
+        shutil.copy(params.selected_config, output.output_config_file)
+
+# Snapshot the HAPiID InfiniDIA DIA-NN cfg into RUN_DIR/config/.
+rule setup_hapid_infinidia_config:
+    output:
+        output_config_file = os.path.join(RUN_DIR,"config/hapid_infinidia.cfg")
+    params:
+        selected_config = config.get("hapid_infinidia_config")
+    log: os.path.join(RUN_DIR,"logs/setup/setup_hapid_infinidia_config.log")
+    run:
+        import shutil
+        shutil.copy(params.selected_config, output.output_config_file)
+
+# Snapshot the DIA-NN library-search base cfg into RUN_DIR/config/.
+rule setup_diann_library_search_base_config:
+    output:
+        output_config_file = os.path.join(RUN_DIR,"config/diann_library_search_base.cfg")
+    params:
+        selected_config = config.get("diann_library_search_base_config")
+    log: os.path.join(RUN_DIR,"logs/setup/setup_diann_library_search_base_config.log")
+    run:
+        import shutil
+        shutil.copy(params.selected_config, output.output_config_file)
 
 # Point-in-time reproducibility snapshot: resolved merged config + git SHA +
 # sample_annotation hash + cfg-file hashes + container tags.

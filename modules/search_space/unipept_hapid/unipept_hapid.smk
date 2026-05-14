@@ -219,7 +219,7 @@ if config.get("unipept_hapid_search_mode", "standard") == "standard":
             raw_files_dir    = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
             spectral_library = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping.predicted.speclib"),
             fasta            = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping_db.fasta"),
-            config_file      = config["diann_library_search_base_config"]
+            config_file      = os.path.join(RUN_DIR,"config/diann_library_search_base.cfg")
         output:
             empirical_lib = os.path.join(UH_OUT, "hapid_first_pass_empirical.parquet")
         params:
@@ -251,7 +251,7 @@ if config.get("unipept_hapid_search_mode", "standard") == "standard":
         input:
             empirical_lib = os.path.join(UH_OUT, "hapid_first_pass_empirical.parquet"),
             fasta = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping_db.fasta"),
-            config_file = config["diann_library_search_base_config"],
+            config_file = os.path.join(RUN_DIR,"config/diann_library_search_base.cfg"),
             raw = lambda w: raw_path_for_sample(EXPERIMENT_DIR, w.sample)
         output:
             quant = os.path.join(UH_QUANTS, "{sample}.quant")
@@ -287,7 +287,7 @@ if config.get("unipept_hapid_search_mode", "standard") == "standard":
             ),
             empirical_lib = os.path.join(UH_OUT, "hapid_first_pass_empirical.parquet"),
             fasta = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping_db.fasta"),
-            config_file = config["diann_library_search_base_config"],
+            config_file = os.path.join(RUN_DIR,"config/diann_library_search_base.cfg"),
             raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files")
         output:
             hapid_diann_parquet = os.path.join(UH_OUT, "hapid_first_pass_diann.parquet")
@@ -328,7 +328,7 @@ else:  # infinidia — monolithic
         input:
             raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
             fasta         = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping_db.fasta"),
-            config_file   = "config/hapid_infinidia.cfg"
+            config_file   = os.path.join(RUN_DIR,"config/hapid_infinidia.cfg")
         output:
             hapid_diann_parquet = os.path.join(UH_OUT, "hapid_first_pass_diann.parquet")
         params:

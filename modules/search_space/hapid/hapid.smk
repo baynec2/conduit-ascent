@@ -304,7 +304,7 @@ if config.get("hapid_search_mode", "standard") == "standard":
             raw_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files"),
             speclib = os.path.join(HAPID_SET_DIR, "marker_gene.predicted.speclib"),
             fasta   = marker_gene_db_path,
-            cfg     = config["diann_library_search_base_config"]
+            cfg     = os.path.join(RUN_DIR,"config/diann_library_search_base.cfg")
         output:
             empirical_lib = os.path.join(HAPID_OUT_ROOT, "marker_gene_empirical.parquet")
         params:
@@ -341,7 +341,7 @@ if config.get("hapid_search_mode", "standard") == "standard":
         input:
             empirical_lib = os.path.join(HAPID_OUT_ROOT, "marker_gene_empirical.parquet"),
             fasta = marker_gene_db_path,
-            cfg = config["diann_library_search_base_config"],
+            cfg = os.path.join(RUN_DIR,"config/diann_library_search_base.cfg"),
             raw = lambda w: raw_path_for_sample(EXPERIMENT_DIR, w.sample)
         output:
             quant = os.path.join(GENOME_HAPID_QUANTS, "{sample}.quant")
@@ -381,7 +381,7 @@ if config.get("hapid_search_mode", "standard") == "standard":
             ),
             empirical_lib = os.path.join(HAPID_OUT_ROOT, "marker_gene_empirical.parquet"),
             fasta = marker_gene_db_path,
-            cfg = config["diann_library_search_base_config"],
+            cfg = os.path.join(RUN_DIR,"config/diann_library_search_base.cfg"),
             raw_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files")
         output:
             os.path.join(HAPID_OUT_ROOT, "marker_gene_profiling_report.parquet")
@@ -427,7 +427,7 @@ else:  # infinidia — monolithic
         input:
             raw_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files"),
             fasta   = marker_gene_db_path,
-            cfg     = "config/hapid_infinidia.cfg"
+            cfg     = os.path.join(RUN_DIR,"config/hapid_infinidia.cfg")
         output:
             os.path.join(HAPID_OUT_ROOT, "marker_gene_profiling_report.parquet")
         params:
