@@ -40,7 +40,7 @@ output_dir: output/
 # --- Container images ---
 # Moving tags like :alpha / :develop are OK for active dev; pin to @sha256:... for reproducibility.
 containers:
-  conduitr:     "docker://baynec2/conduitr:863d413"
+  conduitr:     "docker://baynec2/conduitr:920b45f"
   diann:        "docker://baynec2/diann:f5f961d"
   bakta:        "docker://baynec2/bakta:f5f961d"
   metaphlan:    "docker://baynec2/metaphlan:f5f961d"
