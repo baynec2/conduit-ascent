@@ -21,6 +21,9 @@ fdr_results_fp           <- snakemake@output[["fdr_results"]]
 # Score-coverage filter params (see config/snakemake.yaml).
 score_fraction_threshold <- snakemake@params[["score_fraction_threshold"]]
 max_taxa                 <- snakemake@params[["max_taxa"]]
+# Evidence-quantity floor: minimum distinct peptide sequences supporting a taxon
+# call. Applied as a hard gate after FDR and before the score-coverage filter.
+min_unique_peptides      <- snakemake@params[["min_unique_peptides"]]
 
 normalize_param <- function(x) {
   if (is.null(x) || length(x) == 0) return(NA_real_)
@@ -29,6 +32,7 @@ normalize_param <- function(x) {
 }
 score_fraction_threshold <- normalize_param(score_fraction_threshold)
 max_taxa                 <- normalize_param(max_taxa)
+min_unique_peptides      <- normalize_param(min_unique_peptides)
 
 if (!is.na(score_fraction_threshold) && !is.na(max_taxa)) {
   stop(sprintf(
@@ -46,7 +50,8 @@ conduitR::log_with_timestamp("taxid→family map:   %s", taxid_family_map_fp)
 conduitR::log_with_timestamp("Output (detected):  %s", ncbi_taxonomy_id_fp)
 conduitR::log_with_timestamp("Output (FDR table): %s", fdr_results_fp)
 conduitR::log_with_timestamp(
-  "Score-coverage filter: score_fraction_threshold=%s, max_taxa=%s",
+  "Filters: min_unique_peptides=%s, score_fraction_threshold=%s, max_taxa=%s",
+  format(min_unique_peptides),
   format(score_fraction_threshold), format(max_taxa)
 )
 
@@ -82,7 +87,7 @@ conduitR::log_with_timestamp("taxid map rows: %d", nrow(taxid_map))
 conduitR::log_with_timestamp("Extracting lca_taxid from Protein.Ids and mapping to family")
 
 psms <- precursors |>
-  dplyr::select(PEP, Stripped.Sequence, Decoy, Protein.Ids) |>
+  dplyr::select(PEP, Q.Value, Stripped.Sequence, Decoy, Protein.Ids) |>
   dplyr::mutate(
     lca_taxid = stringr::str_extract(Protein.Ids, "(?<=\\|)[^|]+$"),
     decoy     = as.logical(Decoy)
@@ -121,14 +126,39 @@ conduitR::log_with_timestamp(
   fdr_result$n_targets, fdr_result$n_decoys, nrow(fdr_result$detected)
 )
 
+# Confident-peptide count per (target) family: distinct peptide sequences each
+# with at least one precursor PSM at Q.Value <= 0.01. See the second-pass
+# script for the rationale (gating uses this column, not n_unique_peptides_all).
+PSM_QVALUE_CONFIDENT <- 0.01
+q01_peptide_counts <- psms |>
+  dplyr::filter(!decoy, !is.na(Q.Value), Q.Value <= PSM_QVALUE_CONFIDENT) |>
+  dplyr::distinct(family_taxid, Stripped.Sequence) |>
+  dplyr::count(family_taxid, name = "n_unique_peptides_q01") |>
+  dplyr::rename(taxon = family_taxid)
+
+fdr_result$results <- fdr_result$results |>
+  dplyr::left_join(q01_peptide_counts, by = "taxon") |>
+  dplyr::mutate(n_unique_peptides_q01 = ifelse(is.na(n_unique_peptides_q01),
+                                               0L, as.integer(n_unique_peptides_q01)))
+
 # =============================================================================
-# Apply score-coverage filter to FDR-passing families
+# Apply min-unique-peptides + score-coverage filters to FDR-passing families
 # =============================================================================
-# Sort FDR-passers by score desc, compute per-taxon score fractions, and decide
-# which taxa are carried forward to the second pass per the configured filter.
-candidates <- fdr_result$results |>
+# Filter chain (see infer_species_strain_presence.R for the same structure):
+#   1. FDR / decoy        — qvalue <= 0.01, !decoy
+#   2. min_unique_peptides — evidence-quantity floor (NA disables)
+#   3. score_fraction     — coverage filter on what survives (1)+(2)
+fdr_passers <- fdr_result$results |>
   dplyr::filter(!decoy, qvalue <= 0.01) |>
   dplyr::arrange(dplyr::desc(score))
+
+if (!is.na(min_unique_peptides)) {
+  candidates    <- dplyr::filter(fdr_passers, n_unique_peptides_q01 >= min_unique_peptides)
+  pep_failures  <- dplyr::filter(fdr_passers, n_unique_peptides_q01 <  min_unique_peptides)
+} else {
+  candidates    <- fdr_passers
+  pep_failures  <- fdr_passers[0, , drop = FALSE]
+}
 
 n_candidates <- nrow(candidates)
 
@@ -137,9 +167,10 @@ if (n_candidates == 0) {
     dplyr::mutate(
       score_fraction            = numeric(0),
       cumulative_score_fraction = numeric(0),
-      carried_forward           = logical(0)
+      carried_forward           = logical(0),
+      filter_reason             = character(0)
     )
-  filter_mode  <- "none (no FDR-passing taxa)"
+  filter_mode  <- "none (no FDR+min-peptides-passing taxa)"
   filter_value <- NA_real_
 } else {
   total_score <- sum(candidates$score)
@@ -161,13 +192,27 @@ if (n_candidates == 0) {
     filter_value <- NA_real_
   }
 
-  candidates$carried_forward <- seq_len(n_candidates) <= cutoff
+  in_cov <- seq_len(n_candidates) <= cutoff
+  candidates$carried_forward <- in_cov
+  candidates$filter_reason   <- ifelse(in_cov, "", filter_mode)
+}
+
+if (nrow(pep_failures) > 0) {
+  pep_failures <- pep_failures |>
+    dplyr::mutate(
+      score_fraction            = NA_real_,
+      cumulative_score_fraction = NA_real_,
+      carried_forward           = FALSE,
+      filter_reason             = "min_unique_peptides"
+    )
 }
 
 n_carried <- sum(candidates$carried_forward)
 conduitR::log_with_timestamp(
-  "first-pass filter: kept %d/%d FDR-passing families (mode=%s, value=%s)",
-  n_carried, n_candidates, filter_mode, format(filter_value)
+  "first-pass filter: kept %d/%d FDR-passing families (min_unique_peptides=%s rejected %d; coverage mode=%s, value=%s)",
+  n_carried, nrow(fdr_passers),
+  format(min_unique_peptides), nrow(pep_failures),
+  filter_mode, format(filter_value)
 )
 
 # =============================================================================
@@ -185,18 +230,20 @@ conduitR::log_with_timestamp("Carried forward %d families", nrow(detected_famili
 # =============================================================================
 # Build augmented FDR results table (audit trail)
 # =============================================================================
-# Decoy rows and FDR-failing target rows are preserved with NA fractions and
-# carried_forward = FALSE so the table still represents the full calc_taxon_fdr
-# output alongside the new filter columns.
+# Every calc_taxon_fdr row is preserved, tagged with carried_forward + the
+# filter_reason that explains why a row was rejected (decoy / fdr /
+# min_unique_peptides / score_fraction_threshold / max_taxa). Empty reason
+# means the taxon passed every gate.
 non_candidates <- fdr_result$results |>
   dplyr::filter(decoy | qvalue > 0.01) |>
   dplyr::mutate(
     score_fraction            = NA_real_,
     cumulative_score_fraction = NA_real_,
-    carried_forward           = FALSE
+    carried_forward           = FALSE,
+    filter_reason             = ifelse(decoy, "decoy", "fdr")
   )
 
-augmented_results <- dplyr::bind_rows(candidates, non_candidates)
+augmented_results <- dplyr::bind_rows(candidates, pep_failures, non_candidates)
 
 # Pull a human-readable name for each family taxid. Every peptide carries
 # `lca_taxid` (last segment of Protein.Ids) and `{rank}_{name}` (Protein.Names).

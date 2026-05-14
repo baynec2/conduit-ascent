@@ -643,6 +643,7 @@ rule infer_first_pass_presence:
     params:
         score_fraction_threshold = config.get("peptidotyping_first_pass_score_fraction_threshold", 0.90),
         max_taxa                 = config.get("peptidotyping_first_pass_max_taxa", None),
+        min_unique_peptides      = config.get("peptidotyping_first_pass_min_unique_peptides", 10),
         pass_label               = "first_pass"
     log: os.path.join(RUN_DIR,"logs/peptidotyping/infer_family_presence.log")
     container: config["containers"]["conduitr"]
@@ -865,6 +866,7 @@ rule infer_second_pass_presence:
     params:
         score_fraction_threshold = config.get("peptidotyping_second_pass_score_fraction_threshold", 0.90),
         max_taxa                 = config.get("peptidotyping_second_pass_max_taxa", None),
+        min_unique_peptides      = config.get("peptidotyping_second_pass_min_unique_peptides", 10),
         pass_label               = "second_pass"
     log: os.path.join(RUN_DIR,"logs/peptidotyping/infer_species_strain_presence.log")
     container: config["containers"]["conduitr"]

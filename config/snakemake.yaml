@@ -40,7 +40,7 @@ output_dir: output/
 # --- Container images ---
 # Moving tags like :alpha / :develop are OK for active dev; pin to @sha256:... for reproducibility.
 containers:
-  conduitr:     "docker://baynec2/conduitr:9748bbd"
+  conduitr:     "docker://baynec2/conduitr:863d413"
   diann:        "docker://baynec2/diann:f5f961d"
   bakta:        "docker://baynec2/bakta:f5f961d"
   metaphlan:    "docker://baynec2/metaphlan:f5f961d"
@@ -118,7 +118,22 @@ taxonkit_db_dir: "resources/peptidotyping/taxonkit"
 # Minimum diagnostic peptides per taxon required for it to enter the search database.
 min_taxon_db_peptides: 10
 
-# Score-coverage filter applied AFTER taxonomic FDR (q ≤ 0.01) on each pass.
+# Filter chain applied to each peptidotyping pass, in order:
+#   1. taxonomic FDR  (q ≤ 0.01 via target-decoy competition at the taxon level)
+#   2. min_unique_peptides — evidence-quantity floor (NA disables)
+#   3. score-coverage — *_score_fraction_threshold OR *_max_taxa
+#
+# Each gate is recorded in the per-pass *_fdr_results.tsv via the
+# filter_reason column, so it's trivial to see which gate rejected which taxon.
+#
+# min_unique_peptides — minimum distinct peptide sequences required to call a
+# taxon present at FDR ≤ 0.01. 10 is a sensible default across sample types:
+# clean single-organism samples (chickpea/egg) easily clear it for the truth
+# taxon, and it removes the long single-/few-peptide FP tail that otherwise
+# inflates downstream search-space databases.
+peptidotyping_first_pass_min_unique_peptides:  10
+peptidotyping_second_pass_min_unique_peptides: 10
+# Score-coverage filter applied to whatever survives FDR + min-peptides.
 # For each pass, set EXACTLY ONE of *_score_fraction_threshold / *_max_taxa —
 # setting both for the same pass is an error. Set both to null to disable.
 #   *_score_fraction_threshold: keep the smallest top-by-score prefix of
