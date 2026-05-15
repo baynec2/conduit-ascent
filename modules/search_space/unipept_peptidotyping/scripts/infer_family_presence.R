@@ -10,6 +10,10 @@ start_time <- Sys.time()
 
 conduitR::log_with_timestamp("Starting infer_family_presence.R")
 
+# Pure-function helpers (normalize_param, extract_family_psms) live in a
+# sibling file so they're reachable from testthat without snakemake@ globals.
+snakemake@source("presence_lib.R")
+
 # =============================================================================
 # Inputs / Outputs / Config
 # =============================================================================
@@ -25,11 +29,6 @@ max_taxa                 <- snakemake@params[["max_taxa"]]
 # call. Applied as a hard gate after FDR and before the score-coverage filter.
 min_unique_peptides      <- snakemake@params[["min_unique_peptides"]]
 
-normalize_param <- function(x) {
-  if (is.null(x) || length(x) == 0) return(NA_real_)
-  if (is.character(x) && (x %in% c("", "NA", "null", "None"))) return(NA_real_)
-  suppressWarnings(as.numeric(x))
-}
 score_fraction_threshold <- normalize_param(score_fraction_threshold)
 max_taxa                 <- normalize_param(max_taxa)
 min_unique_peptides      <- normalize_param(min_unique_peptides)
@@ -86,17 +85,7 @@ conduitR::log_with_timestamp("taxid map rows: %d", nrow(taxid_map))
 
 conduitR::log_with_timestamp("Extracting lca_taxid from Protein.Ids and mapping to family")
 
-psms <- precursors |>
-  dplyr::select(PEP, Q.Value, Stripped.Sequence, Decoy, Protein.Ids) |>
-  dplyr::mutate(
-    lca_taxid = stringr::str_extract(Protein.Ids, "(?<=\\|)[^|]+$"),
-    decoy     = as.logical(Decoy)
-  ) |>
-  dplyr::left_join(
-    dplyr::select(taxid_map, lca_taxid, family_taxid),
-    by = "lca_taxid"
-  ) |>
-  dplyr::filter(!is.na(family_taxid), !is.na(PEP))
+psms <- extract_family_psms(precursors, taxid_map)
 
 conduitR::log_with_timestamp("PSMs with family taxid: %d (targets: %d, decoys: %d)",
   nrow(psms),

@@ -15,6 +15,10 @@ conduitR::log_with_timestamp("Starting get_uniprot_proteome_ids.R script")
 conduitR::log_with_timestamp("Input file: %s", snakemake@input[[1]])
 conduitR::log_with_timestamp("Output file: %s", snakemake@output[[1]])
 
+# Pure-function helper (parse_organism_ids) lives in a sibling file so it's
+# reachable from testthat without snakemake@ globals.
+snakemake@source("get_uniprot_proteome_ids_lib.R")
+
 ## Defining inputs and outputs from snakemake workflow
 input_file <- snakemake@input[[1]]
 proteome_ids_fp <- snakemake@output[[1]]
@@ -25,41 +29,25 @@ append_additional_ncbi_taxa_id <- snakemake@config$append_additional_ncbi_taxa_i
 conduitR::log_with_timestamp("Making the database_resources_directory if it doesn't exist.")
 
 conduitR::log_with_timestamp("Reading organism IDs from the input file.")
-# Read organism IDs from the input file. Tolerates either a single-column
-# format (just the numeric ID under any header, e.g. `ncbi_taxa_id`) or a
-# multi-column TSV where the first column carries the IDs and additional
-# columns carry user metadata (e.g. `organism_id\tsource`). The previous
-# implementation used `readr::read_lines + as.integer`, which silently
-# coerced lines like `820\tBacteroides_uniformis_ATCC_8492` to NA and then
-# queried UniProt with NAs (HTTP 400).
-organism_ids <- readr::read_tsv(input_file, show_col_types = FALSE) |>
-  dplyr::pull(1) |>
-  as.integer() |>
-  (\(x) x[!is.na(x)])() |>
-  unique()
+raw_df <- readr::read_tsv(input_file, show_col_types = FALSE)
 
-# Append additional NCBI taxonomic IDs if specified by the user
+# Compute the pre-append id set so we can log "already present" vs "appended"
+# accurately. The parse_organism_ids helper handles both cases internally and
+# returns the final deduplicated vector.
+pre_append_ids <- parse_organism_ids(raw_df, append_id = FALSE)
+organism_ids   <- parse_organism_ids(raw_df, append_additional_ncbi_taxa_id)
+
 if (!isFALSE(append_additional_ncbi_taxa_id)) {
-  # Check if the user-specified ID is already in the list of organism IDs
-  if (append_additional_ncbi_taxa_id %in% organism_ids) {
+  if (as.integer(append_additional_ncbi_taxa_id) %in% pre_append_ids) {
     conduitR::log_with_timestamp(
-      paste0(
-        "User-specified NCBI organism ID ", 
-        append_additional_ncbi_taxa_id, 
-        " is already present in the data."
-      )
+      "User-specified NCBI organism ID %s is already present in the data.",
+      append_additional_ncbi_taxa_id
     )
   } else {
-    # Log that we are appending the user-specified ID
     conduitR::log_with_timestamp(
-      paste0(
-        "Appending user-specified NCBI organism ID ", 
-        append_additional_ncbi_taxa_id, 
-        " to the NCBI taxonomy IDs to search."
-      )
+      "Appending user-specified NCBI organism ID %s to the NCBI taxonomy IDs to search.",
+      append_additional_ncbi_taxa_id
     )
-    # Actually append the ID to the list
-    organism_ids <- c(organism_ids, append_additional_ncbi_taxa_id)
   }
 }
 

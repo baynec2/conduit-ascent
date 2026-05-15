@@ -247,16 +247,14 @@ run_uniprot_proteome_id() {
 }
 run_MAGs()                { run_integration_test MAGs; }
 run_metaphlan() {
-    # Seed the mock merged_profiles.txt into the run directory so downstream
-    # rules are not pruned from the DAG when merge_profiles is omitted.
-    local mock_src="$REPO_ROOT/experiments/integration_test/input/metaphlan/merged_profiles.txt"
-    local mock_dst="$REPO_ROOT/experiments/integration_test/runs/metaphlan/metaphlan/merged_profiles.txt"
-    mkdir -p "$(dirname "$mock_dst")"
-    cp "$mock_src" "$mock_dst"
-
-    # Skip MetaPhlAn database download and profiling steps.
-    run_integration_test metaphlan \
-        "--omit-from download_metaphlan_resources run_metaphlan merge_profiles"
+    # The integration_test sample1.fastq.gz is a 1k-read subset of an E. coli
+    # sequencing run (sourced from experiments/s76/input/fastq_files/76.fastq.gz)
+    # — small enough for fast iteration, large enough for MetaPhlAn to hit
+    # E. coli marker genes reliably. The MetaPhlAn DB is expected at
+    # config["metaphlan_database_dir"]; on a host with the DB already present
+    # the install rule is a no-op (only the sentinel mpa_latest file is
+    # checked). No --omit-from games — the full DAG runs.
+    run_integration_test metaphlan
 }
 run_unipept_peptidotyping() {
     if [ -n "$PEPTIDOTYPING_INDEX" ] && [ ! -f "$PEPTIDOTYPING_INDEX" ]; then

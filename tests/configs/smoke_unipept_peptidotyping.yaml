@@ -1,0 +1,10 @@
+# Smoke test: unipept_peptidotyping against the in-repo subset fixture.
+#
+# Points peptidotyping_resource_dir at tests/fixtures/peptidotyping_subset/,
+# which carries ~45k peptides spanning the 10 pool species + their genus and
+# family ancestors. The smoke layer is local-only (not in CI); it verifies the
+# peptidotyping pipeline end-to-end without the 170 GB production index.
+experiment: integration_test
+run_name: smoke_unipept_peptidotyping
+search_space_method: unipept_peptidotyping
+peptidotyping_resource_dir: tests/fixtures/peptidotyping_subset/

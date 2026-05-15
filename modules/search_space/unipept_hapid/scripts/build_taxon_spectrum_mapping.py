@@ -20,45 +20,55 @@ import os
 
 import pandas as pd
 
-PARQUET_IN = snakemake.input.parquet
-JSON_OUT = snakemake.output[0]
-LOG = snakemake.log[0]
 
-os.makedirs(os.path.dirname(JSON_OUT), exist_ok=True)
-log = open(LOG, "w")
+def build_taxon_spectrum_mapping(df):
+    """Pure transform: filter proteotypic precursors, group spectrum_ids by taxon.
 
-
-def logp(msg):
-    print(msg)
-    print(msg, file=log)
-
-
-df = pd.read_parquet(PARQUET_IN)
-logp(f"Parquet rows: {len(df)}")
-if len(df) == 0:
-    raise SystemExit(
-        f"DIA-NN parquet at {PARQUET_IN} contains 0 rows — "
-        "the upstream DIA-NN search produced no peptides. "
-        "Inspect the corresponding DIA-NN log under logs/ before re-running."
+    Expects columns: Proteotypic, Run, Precursor.Id, Protein.Group.
+    Returns dict {taxon_id: sorted list of unique spectrum_ids}.
+    """
+    df = df[df["Proteotypic"] == 1].copy()
+    df["spectrum_id"] = df["Run"].astype(str) + "||" + df["Precursor.Id"].astype(str)
+    df["taxon_id"] = df["Protein.Group"].astype(str).str.rsplit("|", n=1).str[-1]
+    return (
+        df.groupby("taxon_id")["spectrum_id"]
+          .apply(lambda s: sorted(set(s)))
+          .to_dict()
     )
 
-df = df[df["Proteotypic"] == 1].copy()
-logp(f"After Proteotypic == 1 filter: {len(df)} rows")
 
-df["spectrum_id"] = df["Run"].astype(str) + "||" + df["Precursor.Id"].astype(str)
-df["taxon_id"] = df["Protein.Group"].astype(str).str.rsplit("|", n=1).str[-1]
+def main():
+    PARQUET_IN = snakemake.input.parquet
+    JSON_OUT = snakemake.output[0]
+    LOG = snakemake.log[0]
 
-taxon2spectrum = (
-    df.groupby("taxon_id")["spectrum_id"]
-    .apply(lambda s: sorted(set(s)))
-    .to_dict()
-)
-logp(f"Distinct taxa with hits: {len(taxon2spectrum)}")
-total_spectra = len(set().union(*taxon2spectrum.values())) if taxon2spectrum else 0
-logp(f"Total unique spectra: {total_spectra}")
+    os.makedirs(os.path.dirname(JSON_OUT), exist_ok=True)
+    log = open(LOG, "w")
 
-with open(JSON_OUT, "w") as f:
-    json.dump(taxon2spectrum, f)
+    def logp(msg):
+        print(msg)
+        print(msg, file=log)
 
-logp(f"Written to {JSON_OUT}")
-log.close()
+    df = pd.read_parquet(PARQUET_IN)
+    logp(f"Parquet rows: {len(df)}")
+    if len(df) == 0:
+        raise SystemExit(
+            f"DIA-NN parquet at {PARQUET_IN} contains 0 rows — "
+            "the upstream DIA-NN search produced no peptides. "
+            "Inspect the corresponding DIA-NN log under logs/ before re-running."
+        )
+
+    taxon2spectrum = build_taxon_spectrum_mapping(df)
+    logp(f"After Proteotypic == 1 filter: {sum(len(v) for v in taxon2spectrum.values())} precursor-rows kept across {len(taxon2spectrum)} taxa")
+    total_spectra = len(set().union(*taxon2spectrum.values())) if taxon2spectrum else 0
+    logp(f"Total unique spectra: {total_spectra}")
+
+    with open(JSON_OUT, "w") as f:
+        json.dump(taxon2spectrum, f)
+
+    logp(f"Written to {JSON_OUT}")
+    log.close()
+
+
+if __name__ == "__main__" or "snakemake" in globals():
+    main()

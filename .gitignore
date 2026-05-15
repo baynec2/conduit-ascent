@@ -84,6 +84,15 @@ resources/
 # Pipeline-generated test outputs (kept out of git; regenerated per run)
 experiments/integration_test/runs/
 
+# Workflow-generated outputs inside the peptidotyping smoke fixture
+# (build_effective_detection_rank_db writes these into peptidotyping_resource_dir,
+# which the smoke config points at tests/fixtures/peptidotyping_subset/).
+# Inputs (allowlist.txt + the three rank TSVs) are committed; outputs aren't.
+tests/fixtures/peptidotyping_subset/effective_*
+tests/fixtures/peptidotyping_subset/family_rank_peptide_counts.tsv
+tests/fixtures/peptidotyping_subset/taxid_to_family_genus.tsv
+tests/fixtures/peptidotyping_subset/logs/
+
 # bakta + check_mag_fastas leftovers under input/MAG_files/
 experiments/*/input/MAG_files/.fastas_checked
 experiments/*/input/MAG_files/logs/

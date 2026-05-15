@@ -38,10 +38,26 @@ jobs:
           r-version: "4.3"
 
       - name: Install R script test dependencies
-        run: Rscript -e "install.packages(c('readr','dplyr','stringr'), repos='https://cloud.r-project.org')"
+        run: Rscript -e "install.packages(c('readr','dplyr','stringr','tidyr','tibble','testthat','rprojroot'), repos='https://cloud.r-project.org')"
 
-      - name: Run R script unit tests
+      - name: Run R script unit tests (eggnogmapper regression)
         run: Rscript tests/scripts/test_parse_eggnogmapper_annotations.R
+
+      - name: Run R testthat suite (refactored snakemake-script helpers)
+        run: |
+          Rscript -e '
+            res <- testthat::test_dir("tests/scripts/testthat", reporter = "summary")
+            df <- as.data.frame(res)
+            if (any(df$failed > 0)) quit(status = 1)
+          '
+
+      - name: Run Python unit tests (MAGs + unipept_hapid script helpers)
+        run: |
+          pip install pytest pandas biopython
+          python -m pytest tests/scripts/python -v
+
+      - name: Run awk pipeline tests (peptidotyping FASTA header generation)
+        run: bash tests/scripts/test_awk_pipelines.sh
 
       - name: Generate DAGs
         run: |

@@ -2,23 +2,30 @@ import glob
 import os
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR = config["run_dir"]
+METAPHLAN_DB_DIR = config["metaphlan_database_dir"]
 
 ################################################################################
 # MetaPhlAn Database Management
 ################################################################################
+# `mpa_latest` is the canonical sentinel file emitted by `metaphlan --install`.
+# Using a real file as the rule output (not the whole directory) lets us point
+# metaphlan_database_dir at an existing off-repo DB on a machine profile
+# (no symlinks; apptainer binds the parent path). When the file is present
+# snakemake skips the install; when it isn't, the install rule populates it.
 rule download_metaphlan_resources:
     output:
-        database_dir = directory("resources/metaphlan")
+        marker_index = os.path.join(METAPHLAN_DB_DIR, "mpa_latest")
     container: config["containers"]["metaphlan"]
-    log: "resources/metaphlan/logs/download_metaphlan_resources.log"
-    shell: "metaphlan --install --db_dir {output.database_dir} 2> {log}"
+    log: os.path.join(METAPHLAN_DB_DIR, "logs/download_metaphlan_resources.log")
+    shell: "metaphlan --install --db_dir " + METAPHLAN_DB_DIR + " 2> {log}"
 
 ###############################################################################
 # Generating MetaPhlAn Output Files
 ###############################################################################
 rule run_metaphlan:
     input:
-        fastq=os.path.join(EXPERIMENT_DIR, "input/fastq_files/{sample}.fastq.gz")
+        fastq=os.path.join(EXPERIMENT_DIR, "input/fastq_files/{sample}.fastq.gz"),
+        marker_index=os.path.join(METAPHLAN_DB_DIR, "mpa_latest")
     output:
         profile=os.path.join(RUN_DIR, "metaphlan/{sample}_profile.txt"),
         mapout=os.path.join(RUN_DIR, "metaphlan/{sample}.mapout.txt")
@@ -31,7 +38,7 @@ rule run_metaphlan:
         metaphlan {input.fastq} \
             --input_type fastq \
             --nproc {threads} \
-            --db_dir resources/metaphlan/ \
+            --db_dir """ + METAPHLAN_DB_DIR + """ \
             --mapout {output.mapout} \
             -o {output.profile} \
             >> {log} 2>&1

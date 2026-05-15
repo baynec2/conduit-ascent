@@ -10,6 +10,10 @@ start_time <- Sys.time()
 
 conduitR::log_with_timestamp("Starting infer_species_strain_presence.R")
 
+# Pure-function helpers (normalize_param, extract_species_strain_psms) live in
+# a sibling file so they're reachable from testthat without snakemake@ globals.
+snakemake@source("presence_lib.R")
+
 # =============================================================================
 # Inputs / Outputs
 # =============================================================================
@@ -24,11 +28,6 @@ max_taxa                 <- snakemake@params[["max_taxa"]]
 # call. Applied as a hard gate after FDR and before the score-coverage filter.
 min_unique_peptides      <- snakemake@params[["min_unique_peptides"]]
 
-normalize_param <- function(x) {
-  if (is.null(x) || length(x) == 0) return(NA_real_)
-  if (is.character(x) && (x %in% c("", "NA", "null", "None"))) return(NA_real_)
-  suppressWarnings(as.numeric(x))
-}
 score_fraction_threshold <- normalize_param(score_fraction_threshold)
 max_taxa                 <- normalize_param(max_taxa)
 min_unique_peptides      <- normalize_param(min_unique_peptides)
@@ -74,13 +73,7 @@ if (nrow(precursors) == 0) {
 # entries the lca_taxid IS the species/strain taxid, so we extract it directly.
 conduitR::log_with_timestamp("Extracting species/strain taxid from Protein.Ids")
 
-psms <- precursors |>
-  dplyr::select(PEP, Q.Value, Stripped.Sequence, Decoy, Protein.Ids) |>
-  dplyr::mutate(
-    species_taxid = stringr::str_extract(Protein.Ids, "(?<=\\|)[^|]+$"),
-    decoy         = as.logical(Decoy)
-  ) |>
-  dplyr::filter(!is.na(species_taxid), !is.na(PEP))
+psms <- extract_species_strain_psms(precursors)
 
 conduitR::log_with_timestamp("PSMs with species/strain taxid: %d (targets: %d, decoys: %d)",
   nrow(psms),
