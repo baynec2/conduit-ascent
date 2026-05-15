@@ -38,7 +38,11 @@ jobs:
           r-version: "4.3"
 
       - name: Install R script test dependencies
-        run: Rscript -e "install.packages(c('readr','dplyr','stringr','tidyr','tibble','testthat','rprojroot'), repos='https://cloud.r-project.org')"
+        # Use the default repo (set by r-lib/actions/setup-r to Posit's RSPM,
+        # which serves Linux binaries). Overriding with cloud.r-project.org
+        # forces source builds and trips over fs/pkgload/testthat needing
+        # system deps that aren't preinstalled on the Ubuntu runner.
+        run: Rscript -e "install.packages(c('readr','dplyr','stringr','tidyr','tibble','testthat','rprojroot'))"
 
       - name: Run R script unit tests (eggnogmapper regression)
         run: Rscript tests/scripts/test_parse_eggnogmapper_annotations.R
