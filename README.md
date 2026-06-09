@@ -291,13 +291,18 @@ cd conduit-ascent
 
 ### 3. Create a conda environment with Snakemake + the SLURM executor
 
-Snakemake and the SLURM executor plugin go in a dedicated conda environment.
-Barnacle2 provides Singularity as a module (loaded per session in step 4), so do
-**not** install singularity/apptainer into this env — that keeps the module's
-Singularity as the one on `PATH`.
+Per the Barnacle2 documentation, use **Miniforge** to create and manage conda
+environments (set it up following those docs — e.g. `module load` or a personal
+install). Miniforge defaults to the conda-forge channel and ships `mamba` as a
+fast solver (`mamba` and `conda` are interchangeable in the commands below).
+
+Snakemake and the SLURM executor plugin go in a dedicated environment. Barnacle2
+provides Singularity as a module (loaded per session in step 4), so do **not**
+install singularity/apptainer into this env — that keeps the module's Singularity
+as the one on `PATH`.
 
 ```bash
-conda create -n conduit -c conda-forge -c bioconda \
+mamba create -n conduit -c conda-forge -c bioconda \
     snakemake snakemake-executor-plugin-slurm
 conda activate conduit
 snakemake --version                      # sanity check
