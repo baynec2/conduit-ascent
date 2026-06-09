@@ -1,28 +1,55 @@
-# Snakemake profile for barnacle2 (UCSD HPC cluster).
+# Snakemake profile for barnacle2 (UCSD / Knight Lab HPC cluster).
 #
-# Pattern: a single SBATCH job runs Snakemake inline (see run_conduit_barnacle2.slurm
-# for the wrapper). This profile sets the SNAKEMAKE flags; SBATCH directives
-# (time, memory, cpus-per-task, account, etc.) live in the wrapper itself.
+# Pattern: the SLURM EXECUTOR. Snakemake submits each rule as its own SLURM
+# job (one sbatch per job) and tracks them to completion. This parallelizes
+# across the cluster far better than the old "single inline SBATCH job runs
+# Snakemake with --cores" pattern.
 #
-# Usage from the SLURM wrapper:
-#   snakemake --profile profiles/barnacle2 \
-#             --configfile experiments/<exp>/config/<method>.yaml \
-#             --cores ${SLURM_CPUS_PER_TASK}
+# Requires the executor plugin in the environment running Snakemake:
+#   pip install snakemake-executor-plugin-slurm
 #
-# This profile deliberately does NOT hardcode:
-#   - cores          -> pass from SLURM_CPUS_PER_TASK at job submission
-#   - --cache        -> user-specific scratch path; set in the wrapper via
-#                       $SNAKEMAKE_OUTPUT_CACHE on the CLI
-#   - user scratch dirs (/ddn_scratch/<user>/…) -> set in the wrapper
-# …so the profile is portable across barnacle2 users.
+# Usage: run Snakemake from a login-node tmux/screen session (the Snakemake
+# process is tiny — it only submits and polls the per-rule SLURM jobs). First
+# load Singularity and point scratch/cache dirs at /ddn_scratch/$USER (see the
+# README "Running Conduit on Barnacle2" section), then:
+#       snakemake --profile profiles/barnacle2 \
+#                 --configfile experiments/<exp>/config/<method>.yaml
+#
+# Site-specific knobs (partition / account): barnacle2's default partition
+# worked for the old inline-job setup with neither specified, so they are
+# left unset here and the cluster default is used. If your cluster requires
+# them, uncomment slurm_partition / slurm_account under default-resources.
 
+executor: slurm
 use-singularity: true
 rerun-incomplete: true
 
 # /ddn_scratch is the cluster scratch filesystem that holds TMPDIR,
-# XDG_CACHE_HOME, and Snakemake's output cache on barnacle2. Apptainer /
-# Singularity doesn't auto-bind it, so containers can't see files under
-# /ddn_scratch without this bind. The wrapper sets env-var paths under
-# /ddn_scratch; this exposes the whole tree so those paths resolve inside
-# rule containers.
+# XDG_CACHE_HOME, and Snakemake's output cache. Apptainer/Singularity doesn't
+# auto-bind it, so containers can't see files under /ddn_scratch without this.
+# The pre-run setup exports env-var paths under /ddn_scratch/$USER; this
+# exposes the whole tree so those paths resolve inside rule containers.
 singularity-args: "--bind /ddn_scratch"
+
+# Cap simultaneously-queued SLURM jobs to stay friendly to the scheduler.
+jobs: 50
+
+# Retry transient failures (node OOM, preemption).
+restart-times: 2
+
+# Per-job thread ceiling. In executor mode --cores limits threads PER job, not
+# locally: rules with `threads: workflow.cores` request this many cpus_per_task
+# (e.g. DIA-NN searches → 16), lighter rules use their own smaller thread count.
+cores: 16
+
+# Cluster-wide default resources.
+#   - The plugin maps each rule's `threads` → cpus_per_task automatically.
+#   - Memory scales per-cpu: 16 cpus * 4000 = 64 GB for a DIA-NN search, matching
+#     the old inline job's --mem=64G. Lighter rules get proportionally less.
+#   - runtime is intentionally NOT set: each job inherits barnacle2's partition
+#     default time limit. Add `runtime: <minutes>` here (or per-rule via
+#     set-resources) once real wall-clock numbers are known.
+default-resources:
+  # slurm_partition: "<partition>"   # uncomment if the cluster has no default
+  # slurm_account: "<account>"       # uncomment if your cluster requires one
+  mem_mb_per_cpu: 4000

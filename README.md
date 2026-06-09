@@ -281,20 +281,23 @@ ssh <username>@barnacle2.ucsd.edu
 ```bash
 git clone https://github.com/baynec2/conduit-ascent.git
 cd conduit-ascent
-mkdir slurm_out
 ```
 
-### 3. Install Snakemake in your base environment
+### 3. Install Snakemake + the SLURM executor in your base environment
 
 Barnacle2 has Singularity available system-wide. Install Snakemake (and dependencies) into the base environment — **do not** create a separate conda environment, as that will shadow the system Singularity.
 
 ```bash
 singularity --version   # verify Singularity is available
 
-pip install snakemake
+pip install snakemake snakemake-executor-plugin-slurm
 pip install wheel
 pip install datrie
 ```
+
+The `snakemake-executor-plugin-slurm` package is what lets Snakemake submit each
+pipeline rule as its own SLURM job (see `profiles/barnacle2/`), rather than
+running everything inside one large allocation.
 
 ### 4. Add SLURM core detection to the UniProt annotation script
 
@@ -305,17 +308,44 @@ slurm_cores <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", 1))
 options(parallelly.maxWorkers.localhost = slurm_cores)
 ```
 
-### 5. Submit the job
+### 5. Run the workflow
 
-Use the `run_conduit_barnacle2.slurm` script included in the repository root. Update `--mail-user` in the SBATCH header with your email before submitting.
+The `profiles/barnacle2/` profile uses the SLURM **executor**: Snakemake itself
+submits each rule as its own SLURM job. The Snakemake process is lightweight (it
+just submits and polls jobs), so run it directly from a login node inside a
+`tmux`/`screen` session so it survives your SSH disconnecting.
 
 ```bash
-sbatch run_conduit_barnacle2.slurm
-squeue --me           # check job status
-cat slurm_out/*.err   # check Snakemake logs
+tmux new -s conduit          # so the run survives disconnects
+
+# --- one-time-per-session setup ---
+module load singularity_3.6.4
+singularity --version
+
+# Point Snakemake's caches/temp at your scratch space. SLURM exports this
+# environment (incl. the loaded module) to the per-rule jobs, so Singularity
+# is on PATH inside them too.
+export XDG_CACHE_HOME="/ddn_scratch/${USER}/.cache"
+export TMPDIR="/ddn_scratch/${USER}/tmp"
+export SNAKEMAKE_OUTPUT_CACHE="/ddn_scratch/${USER}/.snakemake_cache"
+mkdir -p "$XDG_CACHE_HOME" "$TMPDIR" "$SNAKEMAKE_OUTPUT_CACHE"
+
+# --- launch the workflow ---
+snakemake \
+  --profile profiles/barnacle2 \
+  --configfile experiments/<exp>/config/<method>.yaml \
+  --cache "$SNAKEMAKE_OUTPUT_CACHE"
 ```
 
-With `--cpus-per-task=16` and `--mem=64G`, test inputs take approximately 50 minutes on Barnacle2.
+Detach from `tmux` with `Ctrl-b d`; reattach later with `tmux attach -t conduit`.
+Check the per-rule SLURM jobs Snakemake has submitted with `squeue --me`, and
+per-rule logs under `runs/{run_name}/logs/` (workflow) and
+`.snakemake/slurm_logs/` (raw SLURM stdout/stderr, written by the executor).
+
+The profile caps concurrent SLURM jobs at 50 and requests memory scaled per CPU
+(`mem_mb_per_cpu: 4000`). Walltime is left to barnacle2's partition default; if
+long jobs are getting killed for time, add a `runtime` (minutes) to
+`default-resources` or to specific rules via `set-resources` in the profile.
 
 ## Troubleshooting
 
