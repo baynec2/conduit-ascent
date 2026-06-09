@@ -307,9 +307,9 @@ mamba --version                                  # sanity check
 ```
 
 Then create a dedicated environment with Snakemake and the SLURM executor plugin.
-Don't install singularity/apptainer into it — Barnacle2 provides Singularity as a
-module (loaded per session in step 4), and keeping it out of the env leaves the
-module's Singularity on `PATH`.
+Don't install singularity/apptainer into it — Barnacle2 has Singularity installed
+system-wide (`/usr/bin/singularity`, SingularityCE 4.x), so keeping it out of the
+env leaves that system Singularity on `PATH` (on every node, no module needed).
 
 ```bash
 mamba create -n conduit -c conda-forge -c bioconda \
@@ -334,22 +334,18 @@ tmux new -s conduit          # so the run survives disconnects
 
 # --- one-time-per-session setup ---
 conda activate conduit
-module load singularity_3.6.4
-singularity --version       # confirm Singularity resolves to the module
+singularity --version       # system install at /usr/bin/singularity (SingularityCE 4.x)
 
-# Point Snakemake's caches/temp at your scratch space. SLURM exports this
-# environment (incl. the loaded module) to the per-rule jobs, so Singularity
-# is on PATH inside them too.
+# Point Snakemake's caches/temp at scratch so they don't fill your quota-limited
+# $HOME. SLURM exports this environment to the per-rule jobs.
 export XDG_CACHE_HOME="/ddn_scratch/${USER}/.cache"
 export TMPDIR="/ddn_scratch/${USER}/tmp"
-export SNAKEMAKE_OUTPUT_CACHE="/ddn_scratch/${USER}/.snakemake_cache"
-mkdir -p "$XDG_CACHE_HOME" "$TMPDIR" "$SNAKEMAKE_OUTPUT_CACHE"
+mkdir -p "$XDG_CACHE_HOME" "$TMPDIR"
 
 # --- launch the workflow ---
 snakemake \
   --profile profiles/barnacle2 \
-  --configfile experiments/<exp>/config/<method>.yaml \
-  --cache "$SNAKEMAKE_OUTPUT_CACHE"
+  --configfile experiments/<exp>/config/<method>.yaml
 ```
 
 Detach from `tmux` with `Ctrl-b d`; reattach later with `tmux attach -t conduit`.

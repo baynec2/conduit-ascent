@@ -9,8 +9,9 @@
 #   pip install snakemake-executor-plugin-slurm
 #
 # Usage: run Snakemake from a login-node tmux/screen session (the Snakemake
-# process is tiny — it only submits and polls the per-rule SLURM jobs). First
-# load Singularity and point scratch/cache dirs at /ddn_scratch/$USER (see the
+# process is tiny — it only submits and polls the per-rule SLURM jobs).
+# Singularity is system-wide on barnacle2 (/usr/bin/singularity, on every node,
+# no module needed); just point scratch/cache dirs at /ddn_scratch/$USER (see the
 # README "Running Conduit on Barnacle2" section), then:
 #       snakemake --profile profiles/barnacle2 \
 #                 --configfile experiments/<exp>/config/<method>.yaml
