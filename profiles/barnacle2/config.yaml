@@ -44,12 +44,35 @@ cores: 16
 
 # Cluster-wide default resources.
 #   - The plugin maps each rule's `threads` → cpus_per_task automatically.
-#   - Memory scales per-cpu: 16 cpus * 4000 = 64 GB for a DIA-NN search, matching
-#     the old inline job's --mem=64G. Lighter rules get proportionally less.
-#   - runtime is intentionally NOT set: each job inherits barnacle2's partition
-#     default time limit. Add `runtime: <minutes>` here (or per-rule via
-#     set-resources) once real wall-clock numbers are known.
+#   - Memory: barnacle2 nodes are uniform at 64 cores / 514 GB (~8 GB/core), so
+#     mem scales at 8000 MB per cpu — a 16-cpu DIA-NN search gets 128 GB, and a
+#     full 64-cpu node packs to ~512 GB. `* attempt` bumps memory on each retry
+#     (with restart-times: 2) so an OOM self-corrects instead of dying. Written
+#     as `mem_mb` rather than `mem_mb_per_cpu` so the per-rule mem_mb overrides
+#     below don't collide (SLURM rejects --mem together with --mem-per-cpu).
+#   - runtime is intentionally NOT set: the default `short` partition allows
+#     14 days (and `qiita` is unlimited), which comfortably covers even the
+#     multi-day build_sequence_index rebuild. Add `runtime` only if a real
+#     wall-clock measurement later shows a rule needs a cap/guarantee.
 default-resources:
-  # slurm_partition: "<partition>"   # uncomment if the cluster has no default
+  # slurm_partition: "<partition>"   # default is `short` (14-day limit); set to
+  #                                  # `qiita` for unlimited-walltime jobs.
   # slurm_account: "<account>"       # uncomment if your cluster requires one
-  mem_mb_per_cpu: 4000
+  mem_mb: 8000 * threads * attempt
+
+# Per-rule first-attempt memory for the heavy, low-cpu rules the per-core default
+# would starve (they run on ~1 cpu, so 8 GB otherwise). 514 GB nodes give ample
+# headroom, so these start generous and still escalate via `* attempt`.
+# NOTE: these starting values are estimates — replace with benchmark numbers
+# (add `benchmark:` directives) after a real run.
+set-resources:
+  build_sequence_index:                  # UMGAP build + giant external sort
+    mem_mb: 64000 * attempt
+  build_conduit:                         # assembles the full conduit S4 object
+    mem_mb: 32000 * attempt
+  generate_qfeatures_from_diann_parquet: # loads the full DIA-NN matrix into R
+    mem_mb: 32000 * attempt
+  add_annotations_to_qfeatures:
+    mem_mb: 32000 * attempt
+  get_annotations_from_uniprot:          # network fetch + parse
+    mem_mb: 16000 * attempt
