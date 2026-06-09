@@ -86,6 +86,11 @@ set-threads:
   # demanded a full node and stacked up in the queue on a busy cluster. 8 cpus
   # lets ~8 pack per node and schedule promptly.
   annotate_mags_with_bakta: 8
+  # run_metaphlan is the same pattern — one fastq sample per job — so a full node
+  # per sample would stack the queue on a busy cluster. Pin to 8 (matches the
+  # per-raw DIA-NN search rules). Preemptive: not exercised by the MAGs method,
+  # applies when you run the metaphlan search-space method.
+  run_metaphlan: 8
 
 # Per-rule first-attempt memory for the heavy, low-cpu rules the per-core default
 # would starve (they run on ~1 cpu, so 8 GB otherwise). 514 GB nodes give ample
