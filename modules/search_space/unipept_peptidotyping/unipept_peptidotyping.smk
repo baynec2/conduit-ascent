@@ -222,6 +222,44 @@ rule generate_peptidotyping_db:
 # unique proteotypic peptides exist. This approach replaces the previous
 # genus-fallback mechanism (which was broken because genus-level peptides were
 # never generated) with a principled, multi-rank strategy.
+
+################################################################################
+# Download the NCBI taxonkit database (taxdump)
+################################################################################
+# taxonkit reads the NCBI taxonomy dump (names.dmp / nodes.dmp / merged.dmp /
+# delnodes.dmp) from $TAXONKIT_DB. Nothing else in the workflow produces these,
+# so this rule fetches and extracts the current taxdump into taxonkit_db_dir,
+# making the peptidotyping resource build self-contained. Run in the conduitr
+# container because the minimal taxonkit biocontainer lacks curl/tar.
+#
+# Only names.dmp/nodes.dmp are declared as outputs (the files taxonkit always
+# needs and the ones wired as inputs downstream); merged.dmp/delnodes.dmp are
+# co-extracted. This keeps already-populated taxonkit_db_dir overrides (e.g.
+# the nanopore-catalyst HDD copy) from being needlessly re-downloaded.
+rule download_taxonkit_db:
+    output:
+        names = os.path.join(config["taxonkit_db_dir"],"names.dmp"),
+        nodes = os.path.join(config["taxonkit_db_dir"],"nodes.dmp")
+    params:
+        outdir = config["taxonkit_db_dir"]
+    container:
+        config["containers"]["conduitr"]
+    log:
+        os.path.join(config["peptidotyping_resource_dir"],"logs/download_taxonkit_db.log")
+    shell:
+        r"""
+        set -euo pipefail
+        mkdir -p {params.outdir} "$(dirname {log})"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Downloading NCBI taxdump" > {log}
+        curl -L --fail --retry 3 \
+          -o {params.outdir}/taxdump.tar.gz \
+          https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz >> {log} 2>&1
+        tar -xzf {params.outdir}/taxdump.tar.gz -C {params.outdir} \
+          names.dmp nodes.dmp merged.dmp delnodes.dmp >> {log} 2>&1
+        rm -f {params.outdir}/taxdump.tar.gz
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] taxonkit DB ready in {params.outdir}" >> {log}
+        """
+
 #
 # Algorithm:
 #   1. Build a taxid → family_taxid lineage lookup via taxonkit.
@@ -239,7 +277,9 @@ rule build_effective_detection_rank_db:
     input:
         family_tsv  = os.path.join(config["peptidotyping_resource_dir"],"family_lca_filtered_peptides.tsv"),
         genus_tsv   = os.path.join(config["peptidotyping_resource_dir"],"genus_lca_filtered_peptides.tsv"),
-        species_tsv = os.path.join(config["peptidotyping_resource_dir"],"species_strain_lca_filtered_peptides.tsv")
+        species_tsv = os.path.join(config["peptidotyping_resource_dir"],"species_strain_lca_filtered_peptides.tsv"),
+        taxonkit_names = os.path.join(config["taxonkit_db_dir"],"names.dmp"),
+        taxonkit_nodes = os.path.join(config["taxonkit_db_dir"],"nodes.dmp")
     output:
         first_pass_fasta    = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
         rank_mapping        = os.path.join(config["peptidotyping_resource_dir"],"effective_detection_rank_mapping.tsv"),
@@ -657,7 +697,9 @@ rule infer_first_pass_presence:
 # determine what species/strains are present. 
 rule map_first_pass_detected_taxa_to_species_strains:
     input:
-        ncbi_taxonomy_ids = os.path.join(RUN_DIR,"database_resources/peptidotyping/detected_family_taxa_ids.txt")
+        ncbi_taxonomy_ids = os.path.join(RUN_DIR,"database_resources/peptidotyping/detected_family_taxa_ids.txt"),
+        taxonkit_names = os.path.join(config["taxonkit_db_dir"],"names.dmp"),
+        taxonkit_nodes = os.path.join(config["taxonkit_db_dir"],"nodes.dmp")
     output:
         families_to_species_strains = os.path.join(RUN_DIR,"database_resources/peptidotyping/families_to_species_strains.txt")
     log: os.path.join(RUN_DIR,"logs/peptidotyping/map_families_to_species_strains.log")
