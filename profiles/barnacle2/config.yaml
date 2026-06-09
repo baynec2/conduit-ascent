@@ -37,19 +37,25 @@ jobs: 50
 # Retry transient failures (node OOM, preemption).
 restart-times: 2
 
-# Per-job thread ceiling. In executor mode --cores limits threads PER job, not
-# locally: rules with `threads: workflow.cores` request this many cpus_per_task
-# (e.g. DIA-NN searches → 16), lighter rules use their own smaller thread count.
-cores: 16
+# Per-job thread ceiling. In executor mode --cores limits threads PER job, and
+# `workflow.cores` resolves to this value. Set to a full node's width (64) so
+# rules that declare `threads: workflow.cores` (DIA-NN library generation and
+# searches, eggNOG, MetaPhlAn) can use the whole node; per-raw search rules stay
+# at `min(8, workflow.cores) = 8`. A job can't span nodes, so 64 is the true
+# ceiling.
+cores: 64
 
 # Cluster-wide default resources.
 #   - The plugin maps each rule's `threads` → cpus_per_task automatically.
 #   - Memory: barnacle2 nodes are uniform at 64 cores / 514 GB (~8 GB/core), so
-#     mem scales at 8000 MB per cpu — a 16-cpu DIA-NN search gets 128 GB, and a
-#     full 64-cpu node packs to ~512 GB. `* attempt` bumps memory on each retry
-#     (with restart-times: 2) so an OOM self-corrects instead of dying. Written
-#     as `mem_mb` rather than `mem_mb_per_cpu` so the per-rule mem_mb overrides
-#     below don't collide (SLURM rejects --mem together with --mem-per-cpu).
+#     mem scales at 8000 MB per cpu — a 16-cpu rule gets 128 GB. `* attempt`
+#     bumps memory on each retry (with restart-times: 2) so an OOM self-corrects.
+#     min(..., 490000) caps every request ~24 GB below the node's 514 GB
+#     allocatable: that leaves OS / page-cache headroom (under cgroups a job's
+#     file-read cache counts against its own limit, and DIA-NN is I/O-heavy) and
+#     keeps even a 64-cpu rule's retries schedulable. Written as `mem_mb` rather
+#     than `mem_mb_per_cpu` so the per-rule mem_mb overrides below don't collide
+#     (SLURM rejects --mem together with --mem-per-cpu).
 #   - runtime is intentionally NOT set: the default `short` partition allows
 #     14 days (and `qiita` is unlimited), which comfortably covers even the
 #     multi-day build_sequence_index rebuild. Add `runtime` only if a real
@@ -58,7 +64,15 @@ default-resources:
   # slurm_partition: "<partition>"   # default is `short` (14-day limit); set to
   #                                  # `qiita` for unlimited-walltime jobs.
   # slurm_account: "<account>"       # uncomment if your cluster requires one
-  mem_mb: 8000 * threads * attempt
+  mem_mb: min(8000 * threads * attempt, 490000)
+
+# Give DIA-NN spectral-library prediction a full node — it's one of the heaviest
+# steps and its memory scales with database size. Explicit so the intent holds
+# regardless of the global `cores` ceiling. (With cores: 64 the thread count is
+# already 64 via workflow.cores; set-threads documents it.) 490000 MB leaves the
+# ~24 GB node headroom; flat, not * attempt, since it's already at the cap.
+set-threads:
+  generate_diann_spectral_library: 64
 
 # Per-rule first-attempt memory for the heavy, low-cpu rules the per-core default
 # would starve (they run on ~1 cpu, so 8 GB otherwise). 514 GB nodes give ample
@@ -66,6 +80,8 @@ default-resources:
 # NOTE: these starting values are estimates — replace with benchmark numbers
 # (add `benchmark:` directives) after a real run.
 set-resources:
+  generate_diann_spectral_library:       # DIA-NN library prediction — full node
+    mem_mb: 490000
   build_sequence_index:                  # UMGAP build + giant external sort
     mem_mb: 64000 * attempt
   build_conduit:                         # assembles the full conduit S4 object
