@@ -73,6 +73,13 @@ default-resources:
 # ~24 GB node headroom; flat, not * attempt, since it's already at the cap.
 set-threads:
   generate_diann_spectral_library: 64
+  # Pin back the one workflow.cores rule that isn't cpu-parallel: it's dominated
+  # by single-threaded awk over the peptide tables (only `taxonkit lineage -j`
+  # uses threads), so a full node is wasted. 8 cpus also sets its default memory
+  # to 64 GB (8000 * 8), ample for streaming awk; `* attempt` escalates if not.
+  # (The DIA-NN *_combine rules are left at full width — each is a real threaded
+  # `diann --use-quant` pass and runs as a single post-search job.)
+  build_effective_detection_rank_db: 8
 
 # Per-rule first-attempt memory for the heavy, low-cpu rules the per-core default
 # would starve (they run on ~1 cpu, so 8 GB otherwise). 514 GB nodes give ample
