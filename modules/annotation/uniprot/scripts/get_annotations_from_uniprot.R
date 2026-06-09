@@ -1,6 +1,15 @@
 ################################################################################
 # Get Detected Proteins Annotation From Uniprot
 ################################################################################
+# When running under SLURM, cap parallel workers to the cores allocated to this
+# job (SLURM_CPUS_PER_TASK); without it, parallelly detects all cores on the node
+# and can oversubscribe. No-op off SLURM (var unset), so local / single-node runs
+# keep their default worker count.
+slurm_cores <- Sys.getenv("SLURM_CPUS_PER_TASK", unset = "")
+if (nzchar(slurm_cores)) {
+  options(parallelly.maxWorkers.localhost = as.integer(slurm_cores))
+}
+
 # Open the log file to write both stdout and stderr
 logfile <- snakemake@log[[1]]
 zz <- file(logfile, open = "a")

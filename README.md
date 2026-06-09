@@ -292,7 +292,7 @@ cd conduit-ascent
 ### 3. Create a conda environment with Snakemake + the SLURM executor
 
 Snakemake and the SLURM executor plugin go in a dedicated conda environment.
-Barnacle2 provides Singularity as a module (loaded per session in step 5), so do
+Barnacle2 provides Singularity as a module (loaded per session in step 4), so do
 **not** install singularity/apptainer into this env — that keeps the module's
 Singularity as the one on `PATH`.
 
@@ -307,16 +307,7 @@ The `snakemake-executor-plugin-slurm` package is what lets Snakemake submit each
 pipeline rule as its own SLURM job (see `profiles/barnacle2/`), rather than
 running everything inside one large allocation.
 
-### 4. Add SLURM core detection to the UniProt annotation script
-
-Edit `modules/annotation/uniprot/scripts/get_annotations_from_uniprot.R` and add these two lines after the opening comment block:
-
-```r
-slurm_cores <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", 1))
-options(parallelly.maxWorkers.localhost = slurm_cores)
-```
-
-### 5. Run the workflow
+### 4. Run the workflow
 
 The `profiles/barnacle2/` profile uses the SLURM **executor**: Snakemake itself
 submits each rule as its own SLURM job. The Snakemake process is lightweight (it
