@@ -276,23 +276,31 @@ These instructions are for Knight Lab members running Conduit on Barnacle2 via S
 ssh <username>@barnacle2.ucsd.edu
 ```
 
-### 2. Clone the repository
+### 2. Clone the repository onto scratch
+
+Clone into your `/ddn_scratch` space — it's large and not purged, so the repo,
+your MS files, all outputs (`runs/`), and the (re)built peptidotyping resources
+live there and stay visible inside the rule containers (the profile binds
+`/ddn_scratch`). Avoid `$HOME`, which is quota-limited.
 
 ```bash
+cd /ddn_scratch/$USER
 git clone https://github.com/baynec2/conduit-ascent.git
 cd conduit-ascent
 ```
 
-### 3. Install Snakemake + the SLURM executor in your base environment
+### 3. Create a conda environment with Snakemake + the SLURM executor
 
-Barnacle2 has Singularity available system-wide. Install Snakemake (and dependencies) into the base environment — **do not** create a separate conda environment, as that will shadow the system Singularity.
+Snakemake and the SLURM executor plugin go in a dedicated conda environment.
+Barnacle2 provides Singularity as a module (loaded per session in step 5), so do
+**not** install singularity/apptainer into this env — that keeps the module's
+Singularity as the one on `PATH`.
 
 ```bash
-singularity --version   # verify Singularity is available
-
-pip install snakemake snakemake-executor-plugin-slurm
-pip install wheel
-pip install datrie
+conda create -n conduit -c conda-forge -c bioconda \
+    snakemake snakemake-executor-plugin-slurm
+conda activate conduit
+snakemake --version                      # sanity check
 ```
 
 The `snakemake-executor-plugin-slurm` package is what lets Snakemake submit each
@@ -319,8 +327,9 @@ just submits and polls jobs), so run it directly from a login node inside a
 tmux new -s conduit          # so the run survives disconnects
 
 # --- one-time-per-session setup ---
+conda activate conduit
 module load singularity_3.6.4
-singularity --version
+singularity --version       # confirm Singularity resolves to the module
 
 # Point Snakemake's caches/temp at your scratch space. SLURM exports this
 # environment (incl. the loaded module) to the per-rule jobs, so Singularity
@@ -342,10 +351,12 @@ Check the per-rule SLURM jobs Snakemake has submitted with `squeue --me`, and
 per-rule logs under `runs/{run_name}/logs/` (workflow) and
 `.snakemake/slurm_logs/` (raw SLURM stdout/stderr, written by the executor).
 
-The profile caps concurrent SLURM jobs at 50 and requests memory scaled per CPU
-(`mem_mb_per_cpu: 4000`). Walltime is left to barnacle2's partition default; if
-long jobs are getting killed for time, add a `runtime` (minutes) to
-`default-resources` or to specific rules via `set-resources` in the profile.
+The profile caps concurrent SLURM jobs at 50, lets each job use up to a full
+node (64 cores), and scales memory at ~8 GB/core (capped ~24 GB below the node's
+514 GB). Walltime is left to barnacle2's partition default — `short` allows 14
+days, which covers even the multi-day peptidotyping resource rebuild. After a
+run, the `benchmarks/*.tsv` files record each rule's real peak memory and
+runtime; use them to tighten the `set-resources` values in the profile.
 
 ## Troubleshooting
 
