@@ -289,17 +289,27 @@ git clone https://github.com/baynec2/conduit-ascent.git
 cd conduit-ascent
 ```
 
-### 3. Create a conda environment with Snakemake + the SLURM executor
+### 3. Install Miniforge and create the Snakemake environment
 
-Per the Barnacle2 documentation, use **Miniforge** to create and manage conda
-environments (set it up following those docs — e.g. `module load` or a personal
-install). Miniforge defaults to the conda-forge channel and ships `mamba` as a
-fast solver (`mamba` and `conda` are interchangeable in the commands below).
+Barnacle2 has **no conda/Miniforge module** (`module avail` lists only tools like
+`singularity_3.6.4`), so install Miniforge yourself, into `$HOME` — a Miniforge
+install plus this env is small (a few hundred MB), and `$HOME` is backed up and
+mounted on the compute nodes. Miniforge defaults to the conda-forge channel and
+ships `mamba` as a fast solver (`mamba` and `conda` are interchangeable below).
 
-Snakemake and the SLURM executor plugin go in a dedicated environment. Barnacle2
-provides Singularity as a module (loaded per session in step 4), so do **not**
-install singularity/apptainer into this env — that keeps the module's Singularity
-as the one on `PATH`.
+```bash
+cd ~
+wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
+bash Miniforge3-Linux-x86_64.sh -b            # installs to $HOME/miniforge3
+source $HOME/miniforge3/etc/profile.d/conda.sh   # activate in this shell
+$HOME/miniforge3/bin/conda init bash             # load on future logins
+mamba --version                                  # sanity check
+```
+
+Then create a dedicated environment with Snakemake and the SLURM executor plugin.
+Don't install singularity/apptainer into it — Barnacle2 provides Singularity as a
+module (loaded per session in step 4), and keeping it out of the env leaves the
+module's Singularity on `PATH`.
 
 ```bash
 mamba create -n conduit -c conda-forge -c bioconda \
