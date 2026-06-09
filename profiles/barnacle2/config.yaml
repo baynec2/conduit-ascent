@@ -81,6 +81,11 @@ set-threads:
   # (The DIA-NN *_combine rules are left at full width — each is a real threaded
   # `diann --use-quant` pass and runs as a single post-search job.)
   build_effective_detection_rank_db: 8
+  # bakta annotates ONE isolate genome per job (~5 MB); it's multithreaded but
+  # doesn't scale to a whole node. At workflow.cores=64 each of the N genome jobs
+  # demanded a full node and stacked up in the queue on a busy cluster. 8 cpus
+  # lets ~8 pack per node and schedule promptly.
+  annotate_mags_with_bakta: 8
 
 # Per-rule first-attempt memory for the heavy, low-cpu rules the per-core default
 # would starve (they run on ~1 cpu, so 8 GB otherwise). 514 GB nodes give ample
