@@ -47,6 +47,8 @@ rule run_eggnogmapper:
         db_files = expand(os.path.join(EGGNOG_DB_DIR, "{file}"), file=REQUIRED_EGGNOG_FILES)
     output:
         annotations = os.path.join(RUN_DIR, "database_resources/detected_protein_resources/emapper.emapper.annotations")
+    benchmark:
+        os.path.join(RUN_DIR, "benchmarks/annotation/eggnogmapper/run_eggnogmapper.tsv")
     log:
         os.path.join(RUN_DIR, "logs/annotation/eggnogmapper/run_eggnogmapper.log")
     container:

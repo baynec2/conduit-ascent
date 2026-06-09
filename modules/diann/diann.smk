@@ -29,6 +29,7 @@ rule generate_diann_spectral_library:
         os.path.join(RUN_DIR,"database_resources/database.predicted.speclib")
     params:
         out_lib = lambda w, output: os.path.splitext(os.path.splitext(output[0])[0])[0]
+    benchmark: os.path.join(RUN_DIR,"benchmarks/diann/generate_diann_spectral_library.tsv")
     log: os.path.join(RUN_DIR,"logs/diann/generate_diann_spectral_library.log")
     container:
         config["containers"]["diann"]
@@ -74,6 +75,7 @@ if config.get("diann_search_mode", "standard") == "standard":
             out_lib = os.path.join(DIANN_OUT, "empirical"),
             out_report = os.path.join(DIANN_OUT, "build_empirical_report"),
             tmpdir = os.path.join(DIANN_OUT, "build_empirical_quant_files"),
+        benchmark: os.path.join(RUN_DIR,"benchmarks/diann/run_diann_build_empirical_lib.tsv")
         log: os.path.join(RUN_DIR,"logs/diann/run_diann_build_empirical_lib.log")
         container:
             config["containers"]["diann"]
@@ -111,6 +113,7 @@ if config.get("diann_search_mode", "standard") == "standard":
             quant = os.path.join(DIANN_QUANTS, "{sample}.quant")
         params:
             tmpdir = lambda w: os.path.join(DIANN_OUT, "quant_tmp", w.sample)
+        benchmark: os.path.join(RUN_DIR,"benchmarks/diann/run_diann_search_one_raw.{sample}.tsv")
         log: os.path.join(RUN_DIR,"logs/diann/run_diann_search_one_raw.{sample}.log")
         container:
             config["containers"]["diann"]
@@ -151,6 +154,7 @@ if config.get("diann_search_mode", "standard") == "standard":
                 RAW_FILEPATHS,
                 DIANN_QUANTS
             )
+        benchmark: os.path.join(RUN_DIR,"benchmarks/diann/run_diann_combine.tsv")
         log: os.path.join(RUN_DIR,"logs/diann/run_diann_combine.log")
         container:
             config["containers"]["diann"]
@@ -184,6 +188,7 @@ else:  # infinidia — monolithic, see comment above
         params:
             out_prefix = os.path.join(DIANN_OUT, "diann"),
             tmpdir = os.path.join(DIANN_OUT, "monolithic_quant_files"),
+        benchmark: os.path.join(RUN_DIR,"benchmarks/diann/run_diann_monolithic.tsv")
         log: os.path.join(RUN_DIR,"logs/diann/run_diann_monolithic.log")
         container:
             config["containers"]["diann"]

@@ -104,6 +104,7 @@ rule generate_peptidotyping_db:
     params:
         taxon_ranks_str = lambda wildcards: PEPTIDOTYPING_RANK_CONFIG[wildcards.rank]
     container: config["containers"]["conduitr"]
+    benchmark: os.path.join(config["peptidotyping_resource_dir"],"benchmarks/generate_peptidotyping_db_{rank}.tsv")
     log: os.path.join(config["peptidotyping_resource_dir"],"logs/generate_peptidotyping_db_{rank}.log")
     shell:
         r"""
@@ -244,6 +245,8 @@ rule download_taxonkit_db:
         outdir = config["taxonkit_db_dir"]
     container:
         config["containers"]["conduitr"]
+    benchmark:
+        os.path.join(config["peptidotyping_resource_dir"],"benchmarks/download_taxonkit_db.tsv")
     log:
         os.path.join(config["peptidotyping_resource_dir"],"logs/download_taxonkit_db.log")
     shell:
@@ -288,6 +291,7 @@ rule build_effective_detection_rank_db:
         min_peptides = config["min_taxon_db_peptides"]
     threads: workflow.cores
     container: config["containers"]["taxonkit"]
+    benchmark: os.path.join(config["peptidotyping_resource_dir"],"benchmarks/build_effective_detection_rank_db.tsv")
     log: os.path.join(config["peptidotyping_resource_dir"],"logs/build_effective_detection_rank_db.log")
     shell:
         r"""
@@ -489,6 +493,7 @@ rule generate_first_pass_speclib:
         os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_database.predicted.speclib")
     params:
         out_lib = lambda w, output: os.path.splitext(os.path.splitext(output[0])[0])[0]
+    benchmark: os.path.join(RUN_DIR,"benchmarks/peptidotyping/generate_first_pass_speclib.tsv")
     log: os.path.join(RUN_DIR,"logs/peptidotyping/generate_first_pass_speclib.log")
     container:
         config["containers"]["diann"]
@@ -513,6 +518,7 @@ rule generate_second_pass_speclib:
         os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_database.predicted.speclib")
     params:
         out_lib = lambda w, output: os.path.splitext(os.path.splitext(output[0])[0])[0]
+    benchmark: os.path.join(RUN_DIR,"benchmarks/peptidotyping/generate_second_pass_speclib.tsv")
     log: os.path.join(RUN_DIR,"logs/peptidotyping/generate_second_pass_speclib.log")
     container:
         config["containers"]["diann"]
@@ -550,6 +556,7 @@ if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard":
         params:
             out_lib = os.path.join(PT_OUT, "first_pass_empirical"),
             tmpdir = os.path.join(PT_OUT, "first_pass_build_empirical_quant_files"),
+        benchmark: os.path.join(RUN_DIR,"benchmarks/peptidotyping/first_pass_build_empirical_lib.tsv")
         log: os.path.join(RUN_DIR,"logs/peptidotyping/first_pass_build_empirical_lib.log")
         container:
             config["containers"]["diann"]
@@ -579,6 +586,7 @@ if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard":
             quant = os.path.join(PT_FIRST_QUANTS, "{sample}.quant")
         params:
             tmpdir = lambda w: os.path.join(PT_OUT, "first_pass_quant_tmp", w.sample)
+        benchmark: os.path.join(RUN_DIR,"benchmarks/peptidotyping/first_pass_search_one_raw.{sample}.tsv")
         log: os.path.join(RUN_DIR,"logs/peptidotyping/first_pass_search_one_raw.{sample}.log")
         container:
             config["containers"]["diann"]
@@ -618,6 +626,7 @@ if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard":
                 RAW_FILEPATHS,
                 PT_FIRST_QUANTS
             )
+        benchmark: os.path.join(RUN_DIR,"benchmarks/peptidotyping/first_pass_combine.tsv")
         log: os.path.join(RUN_DIR,"logs/peptidotyping/first_pass_combine.log")
         container:
             config["containers"]["diann"]
@@ -650,6 +659,7 @@ else:  # infinidia — monolithic
         params:
             out_prefix = os.path.join(PT_OUT, "first_pass_diann"),
             tmpdir = os.path.join(PT_OUT, "first_pass_monolithic_quant_files"),
+        benchmark: os.path.join(RUN_DIR,"benchmarks/peptidotyping/first_pass_monolithic.tsv")
         log: os.path.join(RUN_DIR,"logs/peptidotyping/first_pass_monolithic.log")
         container:
             config["containers"]["diann"]
@@ -780,6 +790,7 @@ if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard":
         params:
             out_lib = os.path.join(PT_OUT, "second_pass_empirical"),
             tmpdir = os.path.join(PT_OUT, "second_pass_build_empirical_quant_files"),
+        benchmark: os.path.join(RUN_DIR,"benchmarks/peptidotyping/second_pass_build_empirical_lib.tsv")
         log: os.path.join(RUN_DIR,"logs/peptidotyping/second_pass_build_empirical_lib.log")
         container: config["containers"]["diann"]
         threads: workflow.cores
@@ -808,6 +819,7 @@ if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard":
             quant = os.path.join(PT_SECOND_QUANTS, "{sample}.quant")
         params:
             tmpdir = lambda w: os.path.join(PT_OUT, "second_pass_quant_tmp", w.sample)
+        benchmark: os.path.join(RUN_DIR,"benchmarks/peptidotyping/second_pass_search_one_raw.{sample}.tsv")
         log: os.path.join(RUN_DIR,"logs/peptidotyping/second_pass_search_one_raw.{sample}.log")
         container: config["containers"]["diann"]
         threads: min(8, workflow.cores)
@@ -846,6 +858,7 @@ if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard":
                 RAW_FILEPATHS,
                 PT_SECOND_QUANTS
             )
+        benchmark: os.path.join(RUN_DIR,"benchmarks/peptidotyping/second_pass_combine.tsv")
         log: os.path.join(RUN_DIR,"logs/peptidotyping/second_pass_combine.log")
         container: config["containers"]["diann"]
         threads: workflow.cores
@@ -877,6 +890,7 @@ else:  # infinidia — monolithic
         params:
             out_prefix = os.path.join(PT_OUT, "second_pass_diann"),
             tmpdir = os.path.join(PT_OUT, "second_pass_monolithic_quant_files"),
+        benchmark: os.path.join(RUN_DIR,"benchmarks/peptidotyping/second_pass_monolithic.tsv")
         log: os.path.join(RUN_DIR,"logs/peptidotyping/second_pass_monolithic.log")
         container: config["containers"]["diann"]
         threads: workflow.cores

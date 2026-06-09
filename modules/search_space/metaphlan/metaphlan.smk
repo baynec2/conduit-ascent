@@ -30,6 +30,8 @@ rule run_metaphlan:
         profile=os.path.join(RUN_DIR, "metaphlan/{sample}_profile.txt"),
         mapout=os.path.join(RUN_DIR, "metaphlan/{sample}.mapout.txt")
     container: config["containers"]["metaphlan"]
+    benchmark:
+        os.path.join(RUN_DIR, "benchmarks/search_space/metaphlan/run_metaphlan_{sample}.tsv")
     log:
         os.path.join(RUN_DIR, "logs/search_space/metaphlan/run_metaphlan_{sample}.log")
     threads: workflow.cores

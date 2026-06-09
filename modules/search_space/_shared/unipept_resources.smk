@@ -21,6 +21,8 @@ rule build_sequence_index:
     params:
         outdir      = config["peptidotyping_resource_dir"],
         temp_outdir = os.path.join(config["peptidotyping_resource_dir"],"temp")
+    benchmark:
+        os.path.join(config["peptidotyping_resource_dir"],"benchmarks/build_sequence_index.tsv")
     log:
         os.path.join(config["peptidotyping_resource_dir"],"logs/build_sequence_index.log")
     container:

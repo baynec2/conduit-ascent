@@ -34,6 +34,7 @@ rule generate_qfeatures_from_diann_parquet:
     sample_annotation=os.path.join(EXPERIMENT_DIR,"input/sample_annotation.txt")
   output:
     qf = os.path.join(RUN_DIR,"output_files/qf.rds")
+  benchmark: os.path.join(RUN_DIR,"benchmarks/build_conduit/generate_qfeatures_from_diann_parquet.tsv")
   log: os.path.join(RUN_DIR,"logs/build_conduit/generate_qfeatures_from_diann_parquet.log")
   container: config["containers"]["conduitr"]
   script: "scripts/generate_qfeatures_from_diann_parquet.R"
@@ -46,6 +47,7 @@ rule add_annotations_to_qfeatures:
     protein_info = os.path.join(RUN_DIR,"database_resources/protein_info.txt")
   output:
     annotated_qf=os.path.join(RUN_DIR,"output_files/annotated_qf.rds")
+  benchmark: os.path.join(RUN_DIR,"benchmarks/build_conduit/add_annotations_to_qfeatures.tsv")
   log: os.path.join(RUN_DIR,"logs/build_conduit/add_annotations_to_qfeatures.log")
   container: config["containers"]["conduitr"]
   script: "scripts/add_annotations_to_qfeatures.R"
@@ -69,6 +71,7 @@ rule build_conduit:
       "output_files",
       f"{config['experiment']}_{config['run_name']}_conduit.rds"
     )
+  benchmark: os.path.join(RUN_DIR,"benchmarks/build_conduit/build_conduit.tsv")
   log: os.path.join(RUN_DIR,"logs/build_conduit/build_conduit.log")
   container: config["containers"]["conduitr"]
   script: "scripts/build_conduit.R"
