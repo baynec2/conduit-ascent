@@ -159,7 +159,12 @@ rule download_bakta_resources:
 rule annotate_mags_with_bakta:
     input:
         mags_ok = os.path.join(MAG_DIR, ".fastas_checked"),
-        mag_fa = mag_fasta_path
+        mag_fa = mag_fasta_path,
+        # Depend on the bakta DB so Snakemake schedules download_bakta_resources
+        # when it's missing (and skips it when the DB is already staged at
+        # bakta_db_dir). Without this the download rule is an orphan — nothing
+        # requests its output, so the DB is never fetched and bakta fails.
+        bakta_db = expand(os.path.join(bakta_db_final, "{file}"), file=REQUIRED_BAKTA_FILES)
     output:
         directory(os.path.join(BAKTA_OUT_ROOT, "{mag}"))
     params:
