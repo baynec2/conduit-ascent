@@ -34,13 +34,19 @@ def _mgnify_taxonomy_path():
     # filters would clobber each other in a shared location.
     return os.path.join(RUN_DIR, "genome_download/mgnify/taxonomy.txt")
 
-# Files that should be included in Bakta database
+# Files that should be included in Bakta database.
+# The protein-sequence-cluster diamond DB differs by DB type: the `full` DB
+# ships psc.dmnd (UniRef90); the `light` DB drops that tier and ships only
+# pscc.dmnd (UniRef50 centroids). Declaring the wrong one as a required output
+# makes Snakemake flag download_bakta_resources as failed (missing output)
+# even though `bakta_db download` completed successfully.
+_BAKTA_PSC_FILE = "psc.dmnd" if config["bakta_db_type"] == "full" else "pscc.dmnd"
 REQUIRED_BAKTA_FILES = (
     "bakta.db",
     "version.json",
     "expert-protein-sequences.dmnd",
     "sorf.dmnd",
-    "psc.dmnd",
+    _BAKTA_PSC_FILE,
     "rfam-go.tsv",
     "oric.fna",
     "orit.fna",
