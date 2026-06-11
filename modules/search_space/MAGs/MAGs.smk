@@ -279,6 +279,10 @@ rule append_additional_organisms_or_proteomes:
         fasta = os.path.join(DB_OUT_ROOT,"database.fasta"),
         taxonomy = os.path.join(DB_OUT_ROOT,"taxonomy.txt")
     log: os.path.join(RUN_DIR,"logs/search_space/MAGs/append_additional_data.log")
+    # conduitR::get_proteome_ids_from_organism_ids() sizes its worker pool as
+    # future::availableCores() - 1; guarantee >=2 cores so it never resolves to 0
+    # workers (which would error) on a single-core allocation.
+    threads: min(8, workflow.cores)
     container: config["containers"]["conduitr"]
     script:
         "scripts/append_additional_organisms_or_proteomes.R"

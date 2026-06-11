@@ -22,6 +22,10 @@ rule get_annotations_from_uniprot:
   output:
     uniprot_annotated_protein_info = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/uniprot_annotated_protein_info.txt")
   log: os.path.join(RUN_DIR,"logs/annotation/MAGs/get_supplementary_annotations_from_uniprot.log")
+  # UniProt-API annotation is network-bound; cap workers (and thus concurrent
+  # API requests) to a modest count. snakemake@threads is propagated into the
+  # script to size the parallel worker pool (see the script header).
+  threads: min(8, workflow.cores)
   container: config["containers"]["conduitr"]
   script:
     "scripts/get_annotations_from_uniprot.R"
