@@ -44,6 +44,13 @@ rule build_sequence_index:
         # Setting temp dir (must be absolute so cargo resolves it correctly)
         export TMPDIR=$(realpath {params.temp_outdir})
 
+        # Stopgap for umgap:f5f961d and earlier: Rust was installed under
+        # /root/.rustup, but Apptainer rebinds $HOME to the host user home, so
+        # rustup can't find its default toolchain. Force $HOME back to /root.
+        # Harmless (and redundant) once the rebuilt image with absolute
+        # RUSTUP_HOME/CARGO_HOME is pinned — remove after that bump.
+        export HOME=/root
+
         # Build UMGAP peptidotyping tables
         modules/search_space/unipept_peptidotyping/scripts/unipept-database/scripts/generate_umgap_tables.sh tryptic \
           --output-dir {params.outdir} \
