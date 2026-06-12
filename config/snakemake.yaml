@@ -45,7 +45,7 @@ containers:
   bakta:        "docker://baynec2/bakta:f5f961d"
   metaphlan:    "docker://baynec2/metaphlan:f5f961d"
   eggnogmapper: "docker://baynec2/eggnogmapper:f5f961d"
-  umgap:        "docker://baynec2/umgap:f5f961d"
+  umgap:        "docker://baynec2/umgap:e46d512a"
   fraggenescan_hmmer: "docker://baynec2/fraggenescan_hmmer:f5f961d"
   taxonkit:     "docker://quay.io/biocontainers/taxonkit:0.20.0--h9ee0642_1"
 
