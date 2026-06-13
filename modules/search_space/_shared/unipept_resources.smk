@@ -44,6 +44,17 @@ rule build_sequence_index:
         # Setting temp dir (must be absolute so cargo resolves it correctly)
         export TMPDIR=$(realpath {params.temp_outdir})
 
+        # The Dockerfile pins CARGO_HOME=/usr/local/cargo so the umgap binary
+        # installs at build time, but that path lives inside the container image,
+        # which Apptainer mounts read-only. The runtime `cargo build --release`
+        # of the rust-utils helpers needs to write crates into the registry cache,
+        # so redirect CARGO_HOME to a writable host-bound location. Use a stable
+        # cache under the resource dir (not temp, which gets cleaned) so the crate
+        # downloads persist across runs.
+        # The rustup cargo proxy still finds its toolchain via RUSTUP_HOME (unchanged).
+        export CARGO_HOME=$(realpath {params.outdir})/cargo
+        mkdir -p "$CARGO_HOME"
+
         # Build UMGAP peptidotyping tables
         modules/search_space/unipept_peptidotyping/scripts/unipept-database/scripts/generate_umgap_tables.sh tryptic \
           --output-dir {params.outdir} \
