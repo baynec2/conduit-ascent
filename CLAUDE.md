@@ -115,17 +115,22 @@ All container images are pinned to short-SHA tags in `config/snakemake.yaml` und
 
 During active dev, container Dockerfiles change often. Before kicking off any non-trivial workflow run, verify the tags in `config/snakemake.yaml` match the latest CI-published SHA for each image:
 
+**Tag length matters: pin to the 7-char SHA, not 8.** CI (`build-container-images.yml`) tags every image with `git rev-parse --short HEAD`, which abbreviates to **7 characters** (e.g. `e46d512`). Git's `%h` / `git log` can auto-abbreviate to 8+ chars on this repo, so always force `--abbrev=7` when reading the SHA to pin — an 8-char pin like `e46d512a` will `MANIFEST_UNKNOWN` because that tag was never pushed.
+
 ```bash
-# Latest in-repo Dockerfile commit per container (must match :<sha> in config/snakemake.yaml)
+# Latest in-repo Dockerfile commit per container (7-char, matches the CI-pushed tag)
 for tool in bakta diann eggnogmapper fraggenescan_hmmer metaphlan umgap; do
-  printf "%-22s %s\n" "$tool" "$(git log develop --format='%h' -1 -- "containers/${tool}/Dockerfile")"
+  printf "%-22s %s\n" "$tool" "$(git log develop --abbrev=7 --format='%h' -1 -- "containers/${tool}/Dockerfile")"
 done
 
 # Latest CI-published runs (the SHA you should pin to is the latest "success" headSha)
 gh run list --workflow=build-container-images.yml --limit 5 --json conclusion,headSha,displayTitle
 
 # Latest conduitR develop SHA (for the conduitr container)
-git -C /home/nanopore-catalyst/conduitR log --oneline develop -1
+git -C /home/nanopore-catalyst/conduitR log --oneline --abbrev=7 develop -1
+
+# Verify a tag actually exists on Docker Hub before pinning (replace tool/sha):
+curl -s "https://hub.docker.com/v2/repositories/baynec2/umgap/tags?page_size=25" | python3 -c "import sys,json;print('\n'.join(t['name'] for t in json.load(sys.stdin)['results']))"
 ```
 
 Bump any tag in `config/snakemake.yaml` whose SHA differs from the latest CI-published one. (Once things stabilize and Dockerfiles aren't changing, this becomes a rare check.)
