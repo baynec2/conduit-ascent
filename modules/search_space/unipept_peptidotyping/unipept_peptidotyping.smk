@@ -691,9 +691,10 @@ rule infer_first_pass_presence:
         ncbi_taxonomy_id = os.path.join(RUN_DIR,"database_resources/peptidotyping/detected_family_taxa_ids.txt"),
         fdr_results      = os.path.join(RUN_DIR,"database_resources/peptidotyping/first_pass_fdr_results.tsv")
     params:
-        score_fraction_threshold = config.get("peptidotyping_first_pass_score_fraction_threshold", 0.90),
+        qvalue_threshold         = config.get("peptidotyping_first_pass_qvalue_threshold", 0.05),
+        min_peptides             = config.get("peptidotyping_first_pass_min_peptides", 2),
+        score_fraction_threshold = config.get("peptidotyping_first_pass_score_fraction_threshold", None),
         max_taxa                 = config.get("peptidotyping_first_pass_max_taxa", None),
-        min_unique_peptides      = config.get("peptidotyping_first_pass_min_unique_peptides", 10),
         pass_label               = "first_pass"
     log: os.path.join(RUN_DIR,"logs/peptidotyping/infer_family_presence.log")
     container: config["containers"]["conduitr"]
@@ -920,9 +921,10 @@ rule infer_second_pass_presence:
         detected_species_strains = os.path.join(RUN_DIR,"database_resources/peptidotyping/detected_species_strain_taxa_ids.txt"),
         fdr_results              = os.path.join(RUN_DIR,"database_resources/peptidotyping/second_pass_fdr_results.tsv")
     params:
-        score_fraction_threshold = config.get("peptidotyping_second_pass_score_fraction_threshold", 0.90),
+        qvalue_threshold         = config.get("peptidotyping_second_pass_qvalue_threshold", 0.05),
+        min_peptides             = config.get("peptidotyping_second_pass_min_peptides", 2),
+        score_fraction_threshold = config.get("peptidotyping_second_pass_score_fraction_threshold", None),
         max_taxa                 = config.get("peptidotyping_second_pass_max_taxa", None),
-        min_unique_peptides      = config.get("peptidotyping_second_pass_min_unique_peptides", 10),
         pass_label               = "second_pass"
     log: os.path.join(RUN_DIR,"logs/peptidotyping/infer_species_strain_presence.log")
     container: config["containers"]["conduitr"]

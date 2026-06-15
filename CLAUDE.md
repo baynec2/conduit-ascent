@@ -38,13 +38,13 @@ Every tryptic peptide in UniProt is assigned its LCA taxon by UMGAP. Peptides un
   - For each family: includes peptides at the finest rank (family → genus → species/strain) where ≥ `min_taxon_db_peptides` (default 10) unique peptides exist
   - Every FASTA header carries a `FAM=<family_taxid>` tag so the family is always recoverable regardless of which rank's peptides were used
 - DIA-NN is run in **InfiniDIA mode** (`--pre-search --pre-filter`) with `--qvalue 1 --report-decoys` (all PSMs reported for FDR calculation)
-- Family presence is determined by **target-decoy FDR** at the taxon level using `conduitR::calc_taxon_fdr` (FDR ≤ 0.01)
+- Family presence is determined by **picked target-decoy FDR** (Savitski et al. 2015) at the taxon level via `conduitR::calc_taxon_fdr`: it aggregates per-`(taxon, decoy)` scores, keeps only the higher-scoring of each lineage's `{target, decoy}` pair, and competes the representatives in one ranked list. A lineage is called present iff it is a target representative AND `qvalue ≤ qvalue_threshold` (default 0.05) AND `n_unique_peptides_all ≥ min_peptides` (default 2). This stops a high-abundance family's reversed decoy from outranking a true low-abundance family's target.
 
 **Pass 2 — Species/strain resolution:**
 - Database: `second_pass_database.fasta`
   - Filtered subset of `species_strain_lca_filtered_peptides.tsv` containing only taxa that are descendants of the families detected in pass 1
 - Same DIA-NN InfiniDIA search
-- Species/strain presence determined by `conduitR::calc_taxon_fdr` on `OX=<taxid>` extracted from FASTA headers
+- Species/strain presence determined by the same picked target-decoy FDR (`calc_taxon_fdr`) on `OX=<taxid>` extracted from FASTA headers
 
 **Output:** `ncbi_taxa_ids.txt` — detected species/strain NCBI taxon IDs, handed to the `ncbi_taxonomy` module which fetches UniProt proteomes.
 
@@ -53,8 +53,9 @@ Every tryptic peptide in UniProt is assigned its LCA taxon by UMGAP. Peptides un
 | File | Purpose |
 |------|---------|
 | `modules/search_space/unipept_peptidotyping/unipept_peptidotyping.smk` | All Snakemake rules |
-| `scripts/infer_family_presence.R` | Pass 1 FDR inference (extracts `FAM=` tag) |
-| `scripts/infer_species_strain_presence.R` | Pass 2 FDR inference (extracts `OX=` tag) |
+| `scripts/infer_family_presence.R` | Pass 1 picked-FDR inference (extracts `FAM=` tag) |
+| `scripts/infer_species_strain_presence.R` | Pass 2 picked-FDR inference (extracts `OX=` tag) |
+| `scripts/presence_lib.R` | Shared helper `apply_picked_presence_filter` (picked FDR + optional coverage filter) |
 | `scripts/unipept-database/scripts/generate_umgap_tables.sh` | Builds UMGAP sequence index from UniProt |
 | `config/peptidotyping_infinidia.cfg` | DIA-NN InfiniDIA config (shared by both passes) |
 
@@ -69,7 +70,7 @@ build_effective_detection_rank_db  (→ effective_first_pass_database.fasta + ra
         │
 perform_first_pass_search  [DIA-NN InfiniDIA]
         │
-infer_first_pass_presence  [calc_taxon_fdr @ FDR=0.01, extracts FAM= tag]
+infer_first_pass_presence  [calc_taxon_fdr picked FDR @ q≤0.05, extracts FAM= tag]
         │
 map_first_pass_detected_taxa_to_species_strains  [taxonkit]
         │
@@ -77,7 +78,7 @@ generate_second_pass_db  [awk filter species_strain TSV]
         │
 perform_second_pass_search  [DIA-NN InfiniDIA]
         │
-infer_second_pass_presence  [calc_taxon_fdr @ FDR=0.01, extracts OX= tag]
+infer_second_pass_presence  [calc_taxon_fdr picked FDR @ q≤0.05, extracts OX= tag]
         │
 generate_peptidotyping_ncbi_taxa_ids  →  ncbi_taxa_ids.txt
 ```
@@ -94,13 +95,16 @@ generate_peptidotyping_ncbi_taxa_ids  →  ncbi_taxa_ids.txt
 
 ### `calc_taxon_fdr` (conduitR)
 
-Signature: `calc_taxon_fdr(pep, taxon, decoy, peptide = NULL, fdr_threshold = 0.01)`
+Signature: `calc_taxon_fdr(pep, taxon, decoy, peptide = NULL, qvalue_threshold = 0.05, min_peptides = 2)`
 
-- Applies target-decoy competition at the taxon level
-- Input: PEP scores, taxon labels, decoy status (logical), optional peptide sequences for collapsing
-- Returns a list with `$detected` (taxa passing FDR threshold), `$results` (full table), `$n_targets`, `$n_decoys`
-- Requires unfiltered DIA-NN output (`--qvalue 1`) and decoys (`--report-decoys`)
-- Pools PSMs across all runs for experiment-level taxon calls
+- **Picked target-decoy FDR** (Savitski et al. 2015) in one call: aggregates PSM scores to one target row + one decoy row per taxon (`sum(-log(PEP))` + distinct-peptide counts), keeps only the higher-scoring of each lineage's `{target, decoy}` pair as the representative, discards the loser, then competes all representatives in one descending-score list
+- `fdr = (cum_decoy_winners + 1) / max(cum_target_winners, 1)`; `qvalue` = cumulative min of `fdr` from the bottom up
+- A lineage is **present** (`pass == TRUE`) iff it is a target representative AND `qvalue ≤ qvalue_threshold` AND `n_unique_peptides_all ≥ min_peptides`
+- Mixed ranks (family/genus/species/strain) compete together — picking sinks the null to the bottom, so no per-rank stratification is needed
+- Fixes the abundance bias of a running-FDR-over-both-rows scheme, where a high-abundance lineage's reversed decoy could outrank a true low-abundance lineage's target and wrongly reject it
+- Returns a list with `$results` (per-`(taxon, decoy)` rows incl. `picked_winner` / `fdr` / `qvalue` / `pass`), `$detected`, `$n_targets`, `$n_decoys`, `$first_decoy_rank`, `$n_missing_pair`
+- Requires unfiltered DIA-NN output (`--qvalue 1`) and decoys (`--report-decoys`); pools PSMs across all runs for experiment-level taxon calls
+- The picked competition core is the internal `conduitR:::pick_taxon_fdr_compete` (operates on an aggregated score table — the unit/regression test target). In peptidotyping it is wired in via `apply_picked_presence_filter` (in `presence_lib.R`), which builds the audit table and applies the optional, **off-by-default** score-coverage filter
 
 ### Container Strategy
 
@@ -141,7 +145,7 @@ If a Dockerfile commit predates the CI workflow being added (`184ad867`, 2026-04
 
 Located at `/home/nanopore-catalyst/conduitR`. An R package providing:
 - S4 `conduit` class for integrated metaproteomics data
-- `calc_taxon_fdr()` — taxonomic target-decoy FDR (used by peptidotyping)
+- `calc_taxon_fdr()` — picked taxonomic target-decoy FDR (Savitski et al. 2015), used by peptidotyping
 - Taxonomy utilities: `add_taxonomy_to_qf`, `get_ncbi_taxonomy`, etc.
 - Quantification: `calc_relative_abundance`, `add_log_imputed_norm_assay`, etc.
 - Visualization: `plot_taxa_tree`, `plot_volcano`, `plot_sunburst`, etc.

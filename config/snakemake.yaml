@@ -119,30 +119,38 @@ taxonkit_db_dir: "resources/peptidotyping/taxonkit"
 min_taxon_db_peptides: 10
 
 # Filter chain applied to each peptidotyping pass, in order:
-#   1. taxonomic FDR  (q ≤ 0.01 via target-decoy competition at the taxon level)
-#   2. min_unique_peptides — evidence-quantity floor (NA disables)
-#   3. score-coverage — *_score_fraction_threshold OR *_max_taxa
+#   1. picked target-decoy FDR (Savitski et al. 2015) at the taxon level —
+#      each lineage keeps only the higher-scoring of its {target, decoy} pair,
+#      then all representatives compete in one ranked list. A lineage is called
+#      present iff it is a target representative AND qvalue <= qvalue_threshold
+#      AND n_unique_peptides_all >= min_peptides. See conduitR::pick_taxon_fdr.
+#   2. score-coverage — *_score_fraction_threshold OR *_max_taxa (disabled by
+#      default; an abundance-based top-N gate that drops low-abundance lineages
+#      independent of FDR, so it is off for this recall-oriented first pass).
 #
 # Each gate is recorded in the per-pass *_fdr_results.tsv via the
 # filter_reason column, so it's trivial to see which gate rejected which taxon.
 #
-# min_unique_peptides — minimum distinct peptide sequences required to call a
-# taxon present at FDR ≤ 0.01. 10 is a sensible default across sample types:
-# clean single-organism samples (chickpea/egg) easily clear it for the truth
-# taxon, and it removes the long single-/few-peptide FP tail that otherwise
-# inflates downstream search-space databases.
-peptidotyping_first_pass_min_unique_peptides:  10
-peptidotyping_second_pass_min_unique_peptides: 10
-# Score-coverage filter applied to whatever survives FDR + min-peptides.
-# For each pass, set EXACTLY ONE of *_score_fraction_threshold / *_max_taxa —
-# setting both for the same pass is an error. Set both to null to disable.
+# qvalue_threshold — picked q-value cutoff for a presence call. 0.05 is
+# deliberately permissive: a lineage dropped here is unrecoverable in the later
+# species / full-proteome stages, so the first pass favours recall.
+peptidotyping_first_pass_qvalue_threshold:  0.05
+peptidotyping_second_pass_qvalue_threshold: 0.05
+# min_peptides — minimum distinct peptides (n_unique_peptides_all) required to
+# call a lineage present. 2 prevents a single chance peptide from making a call.
+peptidotyping_first_pass_min_peptides:  2
+peptidotyping_second_pass_min_peptides: 2
+# Optional score-coverage filter applied to whatever survives the picked FDR.
+# For each pass, set AT MOST ONE of *_score_fraction_threshold / *_max_taxa —
+# setting both for the same pass is an error. Both null (the default) disables
+# it — recommended, as it independently drops real low-abundance taxa.
 #   *_score_fraction_threshold: keep the smallest top-by-score prefix of
 #       FDR-passing taxa whose cumulative score reaches the given fraction
 #       of the total score (HAPiID-style coverage filter).
 #   *_max_taxa: keep the top-N FDR-passing taxa by score.
-peptidotyping_first_pass_score_fraction_threshold: 0.90
+peptidotyping_first_pass_score_fraction_threshold: null
 peptidotyping_first_pass_max_taxa: null
-peptidotyping_second_pass_score_fraction_threshold: 0.90
+peptidotyping_second_pass_score_fraction_threshold: null
 peptidotyping_second_pass_max_taxa: null
 
 
