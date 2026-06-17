@@ -137,9 +137,14 @@ min_taxon_db_peptides: 10
 peptidotyping_first_pass_qvalue_threshold:  0.05
 peptidotyping_second_pass_qvalue_threshold: 0.05
 # min_peptides — minimum distinct peptides (n_unique_peptides_all) required to
-# call a lineage present. 2 prevents a single chance peptide from making a call.
-peptidotyping_first_pass_min_peptides:  2
-peptidotyping_second_pass_min_peptides: 2
+# call a lineage present. Raised from 2 to 10 to curb over-calling: at 2 the
+# species/strain pass detected ~1100 taxa (many spurious). 10 distinct peptides
+# is a much harder bar for a noise lineage to clear. NOTE: this gate counts
+# n_unique_peptides_all (every contributing peptide regardless of PEP), not the
+# confident (Q<=0.01) count — so it raises the bar but stays confidence-blind;
+# gating on confident peptides is the deeper fix if 10 proves insufficient.
+peptidotyping_first_pass_min_peptides:  10
+peptidotyping_second_pass_min_peptides: 10
 # Optional score-coverage filter applied to whatever survives the picked FDR.
 # For each pass, set AT MOST ONE of *_score_fraction_threshold / *_max_taxa —
 # setting both for the same pass is an error. Both null (the default) disables
