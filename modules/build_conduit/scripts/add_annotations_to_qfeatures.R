@@ -176,6 +176,30 @@ qf = maybe_add_annotation(qf,
                                     conduit_annotations = conduit_annotations_wide,
                                     column_name = cazy_family)
 
+conduitR::log_with_timestamp("Adding gene_symbol annotations to QFeatures")
+qf = maybe_add_annotation(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = gene_symbol)
+
+conduitR::log_with_timestamp("Adding ec_number annotations to QFeatures")
+qf = maybe_add_annotation(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = ec_number)
+
+conduitR::log_with_timestamp("Adding kegg_module annotations to QFeatures")
+qf = maybe_add_annotation(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = kegg_module)
+
+conduitR::log_with_timestamp("Adding brite annotations to QFeatures")
+qf = maybe_add_annotation(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = brite)
+
 conduitR::log_with_timestamp(paste0("Annotations sucessfully added. Writing Qfeatures object to ", annotated_qf_fp))
 
 saveRDS(qf,annotated_qf_fp)

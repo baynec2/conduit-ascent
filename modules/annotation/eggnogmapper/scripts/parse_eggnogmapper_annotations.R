@@ -13,6 +13,15 @@
 #   pfam             <- PFAMs column
 #   cazy_class       <- CAZy column (class prefix, e.g. "GH" from "GH1")
 #   cazy_family      <- CAZy column (full family ID, e.g. "GH1")
+#   gene_symbol      <- Preferred_name column (symbol is its own description)
+#   ec_number        <- EC column (descriptions filled from ENZYME dictionary)
+#   kegg_module      <- KEGG_Module column (descriptions filled from KEGG list)
+#   brite            <- BRITE column (descriptions filled from KEGG list)
+#
+# Descriptions for go/kegg_*/pfam/ec_number/brite are intentionally left NA here
+# and filled in consolidate_annotations.R from authoritative offline dictionaries
+# (see conduitR::add_term_descriptions). KEGG_Reaction, KEGG_rclass, KEGG_TC and
+# BiGG_Reaction columns are intentionally not parsed (low fill / niche).
 #
 # eggNOG-mapper v2 output format notes:
 #   - Tab-separated; ## lines are metadata comments; column header starts with #
@@ -226,11 +235,66 @@ cazy_class_annotations <- cazy_expanded |>
   dplyr::distinct()
 
 cazy_family_annotations <- cazy_expanded |>
-  # Only include entries that matched a known class
-  dplyr::filter(class %in% cazy_class_lookup$class) |>
-  dplyr::mutate(annotation_type = "cazy_family", description = NA_character_) |>
+  # inner_join restricts to known classes and attaches the class-level
+  # description (e.g. "GH1" -> "glycoside_hydrolase"); this is a static,
+  # authoritative lookup, so it is consistent with the dictionary-only policy.
+  dplyr::inner_join(cazy_class_lookup, by = "class") |>
+  dplyr::mutate(annotation_type = "cazy_family") |>
   dplyr::select(protein_id, annotation_type, term = value, description) |>
   dplyr::distinct()
+
+################################################################################
+# 8. Gene symbol (Preferred_name)
+# Self-describing: the symbol is its own description (uniform readout), so the
+# term is mirrored into the description column.
+################################################################################
+conduitR::log_with_timestamp("Extracting gene symbol annotations")
+
+gene_symbol_annotations <- expand_col(raw, Preferred_name) |>
+  dplyr::mutate(annotation_type = "gene_symbol", description = value) |>
+  dplyr::select(protein_id, annotation_type, term = value, description) |>
+  dplyr::distinct()
+
+################################################################################
+# 9. EC numbers
+# Format: "1.1.1.1,2.7.7.7" (partial ECs like "1.3.-.-" are kept).
+# Descriptions are filled downstream from the ENZYME dictionary.
+################################################################################
+conduitR::log_with_timestamp("Extracting EC number annotations")
+
+ec_annotations <- expand_col(raw, EC) |>
+  dplyr::filter(stringr::str_detect(value, "^[0-9]")) |>
+  dplyr::mutate(annotation_type = "ec_number", description = NA_character_) |>
+  dplyr::select(protein_id, annotation_type, term = value, description) |>
+  dplyr::distinct()
+
+################################################################################
+# 10. KEGG modules
+# Format: "M00087,M00131". Descriptions filled downstream from KEGG list/module.
+################################################################################
+conduitR::log_with_timestamp("Extracting KEGG module annotations")
+
+kegg_module_annotations <- expand_col(raw, KEGG_Module) |>
+  dplyr::filter(stringr::str_starts(value, "M")) |>
+  dplyr::mutate(annotation_type = "kegg_module", description = NA_character_) |>
+  dplyr::select(protein_id, annotation_type, term = value, description) |>
+  dplyr::distinct()
+
+################################################################################
+# 11. BRITE functional hierarchies
+# Format: "ko00000,ko04147,br08901". Descriptions filled downstream from
+# KEGG list/brite.
+################################################################################
+conduitR::log_with_timestamp("Extracting BRITE annotations")
+
+brite_annotations <- expand_col(raw, BRITE) |>
+  dplyr::filter(stringr::str_detect(value, "^(ko|br)")) |>
+  dplyr::mutate(annotation_type = "brite", description = NA_character_) |>
+  dplyr::select(protein_id, annotation_type, term = value, description) |>
+  dplyr::distinct()
+
+# NOTE: KEGG_Reaction, KEGG_rclass, KEGG_TC and BiGG_Reaction columns are
+# intentionally not parsed (low fill rate / niche use); add them here if needed.
 
 ################################################################################
 # Combine all annotation types and write output
@@ -245,7 +309,11 @@ emapper_annotations <- dplyr::bind_rows(
   eggnog_code_annotations,
   pfam_annotations,
   cazy_class_annotations,
-  cazy_family_annotations
+  cazy_family_annotations,
+  gene_symbol_annotations,
+  ec_annotations,
+  kegg_module_annotations,
+  brite_annotations
 ) |>
   dplyr::filter(!is.na(term)) |>
   dplyr::distinct()

@@ -14,6 +14,24 @@ EGGNOG_DB_URL = config.get(
     "http://eggnog6.embl.de/download/eggnog_5.0/e5.og_annotations.tsv",
 )
 
+# Authoritative term-name dictionaries used to fill `description` for the
+# eggNOG-mapper-derived annotation types (go/kegg_*/pfam/ec_number/brite).
+# Pinned to specific releases for reproducibility; bump intentionally.
+DICT_DIR = "resources/annotation/dictionaries"
+GO_OBO_URL = config.get(
+    "go_obo_url",
+    "http://release.geneontology.org/2026-05-19/ontology/go-basic.obo",
+)
+KEGG_REST_URL = config.get("kegg_rest_url", "https://rest.kegg.jp")
+ENZYME_DAT_URL = config.get(
+    "enzyme_dat_url",
+    "https://ftp.expasy.org/databases/enzyme/enzyme.dat",
+)
+PFAM_CLANS_URL = config.get(
+    "pfam_clans_url",
+    "https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/Pfam37.0/Pfam-A.clans.tsv.gz",
+)
+
 # dbCAN's older bcb.unl.edu host has an incomplete cert chain in some containers.
 CAZY_DB_URL = CAZY_DB_URL.replace(
     "https://bcb.unl.edu/dbCAN2/",
@@ -139,9 +157,71 @@ rule get_go_info:
   script:
     "scripts/get_go_info.R"
 
+# Downloading authoritative term-name dictionaries (once, cached in resources/).
+# These name the eggNOG-mapper-derived accessions (GO/KEGG/EC/Pfam/BRITE) so the
+# `description` column is populated from an explicit external source rather than
+# borrowed from the UniProt-side annotations.
+rule download_annotation_dictionaries:
+    output:
+        go_obo       = os.path.join(DICT_DIR, "go-basic.obo"),
+        kegg_ko      = os.path.join(DICT_DIR, "kegg_ko.tsv"),
+        kegg_pathway = os.path.join(DICT_DIR, "kegg_pathway.tsv"),
+        kegg_module  = os.path.join(DICT_DIR, "kegg_module.tsv"),
+        kegg_brite   = os.path.join(DICT_DIR, "kegg_brite.tsv"),
+        enzyme_dat   = os.path.join(DICT_DIR, "enzyme.dat"),
+        pfam_clans   = os.path.join(DICT_DIR, "Pfam-A.clans.tsv"),
+        versions     = os.path.join(DICT_DIR, "dictionary_versions.tsv"),
+    log:
+        os.path.join(DICT_DIR, "download_annotation_dictionaries.log")
+    container:
+        config["containers"]["conduitr"]
+    params:
+        dict_dir       = DICT_DIR,
+        go_obo_url     = GO_OBO_URL,
+        kegg_rest_url  = KEGG_REST_URL,
+        enzyme_dat_url = ENZYME_DAT_URL,
+        pfam_clans_url = PFAM_CLANS_URL,
+    shell:
+        r"""
+        mkdir -p {params.dict_dir}
+        : > {log}
+
+        curl --fail -L -o {output.go_obo}       {params.go_obo_url}                  &>> {log}
+        curl --fail -L -o {output.kegg_ko}      {params.kegg_rest_url}/list/ko       &>> {log}
+        curl --fail -L -o {output.kegg_pathway} {params.kegg_rest_url}/list/pathway  &>> {log}
+        curl --fail -L -o {output.kegg_module}  {params.kegg_rest_url}/list/module   &>> {log}
+        curl --fail -L -o {output.kegg_brite}   {params.kegg_rest_url}/list/brite    &>> {log}
+        curl --fail -L -o {output.enzyme_dat}   {params.enzyme_dat_url}              &>> {log}
+
+        curl --fail -L -o {output.pfam_clans}.gz {params.pfam_clans_url}             &>> {log}
+        gunzip -f {output.pfam_clans}.gz 2>> {log}
+
+        # Record the resolved source + release/version of each dictionary so the
+        # conduit object can document where every description came from.
+        GO_VER=$(grep -m1 '^data-version:' {output.go_obo} | sed 's/data-version: *//')
+        KEGG_VER=$(curl --fail -sL {params.kegg_rest_url}/info/kegg 2>> {log} \
+                   | grep -i 'Release' | head -1 | sed 's/^[[:space:]]*//')
+        {{
+          printf 'dictionary\tsource\tversion\n'
+          printf 'go\t%s\t%s\n'     "{params.go_obo_url}"               "$GO_VER"
+          printf 'kegg\t%s\t%s\n'   "{params.kegg_rest_url}/list"       "${{KEGG_VER:-snapshot}}"
+          printf 'enzyme\t%s\t%s\n' "{params.enzyme_dat_url}"           "snapshot"
+          printf 'pfam\t%s\t%s\n'   "{params.pfam_clans_url}"           "Pfam37.0"
+        }} > {output.versions}
+        """
+
 # Consolidating annotations
 rule consolidate_annotations:
   input:
+    # Term-name dictionaries (authoritative, for description backfill)
+    go_obo = os.path.join(DICT_DIR, "go-basic.obo"),
+    kegg_ko = os.path.join(DICT_DIR, "kegg_ko.tsv"),
+    kegg_pathway = os.path.join(DICT_DIR, "kegg_pathway.tsv"),
+    kegg_module = os.path.join(DICT_DIR, "kegg_module.tsv"),
+    kegg_brite = os.path.join(DICT_DIR, "kegg_brite.tsv"),
+    enzyme_dat = os.path.join(DICT_DIR, "enzyme.dat"),
+    pfam_clans = os.path.join(DICT_DIR, "Pfam-A.clans.tsv"),
+    dictionary_versions = os.path.join(DICT_DIR, "dictionary_versions.tsv"),
     # Annotations
     go_info = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/go_info.txt"),
     kegg_pathway_info = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/kegg_pathway_info.txt"),

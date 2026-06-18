@@ -40,7 +40,7 @@ output_dir: output/
 # --- Container images ---
 # Moving tags like :alpha / :develop are OK for active dev; pin to @sha256:... for reproducibility.
 containers:
-  conduitr:     "docker://baynec2/conduitr:be3374b"
+  conduitr:     "docker://baynec2/conduitr:a636fd5"
   diann:        "docker://baynec2/diann:f5f961d"
   bakta:        "docker://baynec2/bakta:f5f961d"
   metaphlan:    "docker://baynec2/metaphlan:f5f961d"
@@ -101,6 +101,17 @@ eggnog_database:     "resources/annotation/eggnog/e5.og_annotations.tsv"  # ~200
 pfam_db_url:         "https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/pfamA.txt.gz"
 cazy_db_url:         "https://pro.unl.edu/dbCAN2/download/Databases/CAZyDB.07302020.fam-activities.txt"
 eggnog_db_url:       "http://eggnog6.embl.de/download/eggnog_5.0/e5.og_annotations.tsv"
+
+# Authoritative term-name dictionaries used to fill `description` for the
+# eggNOG-mapper-derived annotation types (go/kegg_*/pfam/ec_number/brite).
+# Pinned to specific releases for reproducibility (recorded in the conduit
+# object via resources/annotation/dictionaries/dictionary_versions.tsv).
+# KEGG REST is live (no dated archive); the downloaded snapshot is cached in
+# resources/ and its release is captured at download time.
+go_obo_url:          "http://release.geneontology.org/2026-05-19/ontology/go-basic.obo"  # GO release 2026-05-19
+kegg_rest_url:       "https://rest.kegg.jp"
+enzyme_dat_url:      "https://ftp.expasy.org/databases/enzyme/enzyme.dat"
+pfam_clans_url:      "https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/Pfam37.0/Pfam-A.clans.tsv.gz"  # Pfam 37.0
 
 
 # =============================================================================
