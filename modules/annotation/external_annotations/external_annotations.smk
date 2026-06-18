@@ -199,8 +199,11 @@ rule download_annotation_dictionaries:
         # Record the resolved source + release/version of each dictionary so the
         # conduit object can document where every description came from.
         GO_VER=$(grep -m1 '^data-version:' {output.go_obo} | sed 's/data-version: *//')
+        # KEGG's /info/kegg no longer emits a "Release" line, so grep can match
+        # nothing; tolerate that (|| true) and fall back to "snapshot" below
+        # rather than aborting the rule under set -euo pipefail.
         KEGG_VER=$(curl --fail -sL {params.kegg_rest_url}/info/kegg 2>> {log} \
-                   | grep -i 'Release' | head -1 | sed 's/^[[:space:]]*//')
+                   | grep -i 'release' | head -1 | sed 's/^[[:space:]]*//' || true)
         {{
           printf 'dictionary\tsource\tversion\n'
           printf 'go\t%s\t%s\n'     "{params.go_obo_url}"               "$GO_VER"
