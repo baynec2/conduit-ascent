@@ -103,14 +103,7 @@ experiments/*/input/MAG_files/.smb*
 logs/
 
 # Local driver scripts (not part of the workflow itself)
-run_all_experiments.sh
-run_s75_all_methods.sh
-run_singles_all_methods.sh
-run_food_all_methods.sh
-run_unipept_hapid_batch.sh
-run_unipept_peptidotyping_infinidia_batch.sh
-run_pool_pilot_all_methods.sh
-run_a_muc_all_methods.sh
+run_*.sh
 
 # Rust specific files
 .cargo/
