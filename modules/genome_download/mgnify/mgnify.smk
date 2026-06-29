@@ -126,7 +126,10 @@ rule download_mgnify_genome:
         # -f makes curl exit non-zero on 4xx/5xx (default behaviour writes the
         # HTML error body to {output.genome} and FragGeneScan downstream
         # segfaults on it). -S ensures errors are reported even with -s.
-        curl -fSL --retry 5 --retry-delay 10 \
+        # --retry-all-errors also retries connection-level failures (resets,
+        # partial transfers) that plain --retry skips; --connect-timeout bounds
+        # hangs against a flaky EBI FTP endpoint.
+        curl -fSL --retry 8 --retry-delay 10 --retry-all-errors --connect-timeout 30 \
             -o {output.genome} '{params.url}' 2> >(tee -a {log} >&2)
         # Validate the downloaded file is actually a FASTA — defence-in-depth
         # in case the URL ever serves a 200 with junk content.

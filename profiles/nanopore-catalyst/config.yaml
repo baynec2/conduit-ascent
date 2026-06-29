@@ -16,6 +16,11 @@
 cores: 20
 use-singularity: true
 rerun-incomplete: true
+# Auto-re-run any failed job up to twice before giving up. Blanket safety net
+# for transient infrastructure blips (UniProt/EBI network resets, FTP hiccups)
+# that otherwise abort a whole run; deterministic failures still surface after
+# the retries are exhausted.
+retries: 2
 
 # --- Make /home/nanopore-catalyst/HDD visible inside every container ---
 # Apptainer's default auto-binds cover the repo + $HOME but NOT the HDD.
