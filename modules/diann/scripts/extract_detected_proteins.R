@@ -58,14 +58,24 @@ readr::write_tsv(detected_protein_info,detected_protein_info_df)
 conduitR::log_with_timestamp("Filtering fasta file to only include detected proteins")
 # Reading in fasta file
 sequences <- Biostrings::readAAStringSet(protein_info_fasta)
-# Extract UniProt IDs from FASTA headers (expects sp|ID|... or tr|ID|... format)
-uniprot_ids <- names(sequences) |> stringr::str_extract("(?<=\\|)[A-Z0-9_]+(?=\\|)")
-n_failed <- sum(is.na(uniprot_ids))
+# Extract the protein accession from each FASTA header. UniProtKB-style headers
+# are "sp|ID|ENTRY" / "tr|ID|ENTRY" (accession is the middle pipe field);
+# UniParc-sourced (non-reference) proteomes use ">UPI... description" with no
+# pipes, where the accession is the first whitespace-delimited token. Handle
+# both so non-reference proteomes don't yield an empty detected FASTA.
+first_token <- names(sequences) |> stringr::word(1)
+uniprot_ids <- ifelse(
+  stringr::str_detect(first_token, "\\|"),
+  stringr::str_extract(first_token, "(?<=\\|)[^|]+(?=\\|)"),
+  first_token
+)
+n_failed <- sum(is.na(uniprot_ids) | uniprot_ids == "")
 if (n_failed > 0) {
-  warning(paste0(n_failed, " FASTA headers did not match the expected UniProt format ",
-                 "(e.g. 'sp|ID|...' or 'tr|ID|...'). These sequences will be excluded."))
+  warning(paste0(n_failed, " FASTA headers did not match an expected format ",
+                 "(UniProtKB 'sp|ID|...'/'tr|ID|...' or UniParc 'UPI...'). ",
+                 "These sequences will be excluded."))
 }
-# Create a named vector mapping UniProt IDs to full headers
+# Create a named vector mapping accessions to full headers
 header_map <- setNames(names(sequences), uniprot_ids)
 
 # Filtering the header map to include only the ids detected in study.

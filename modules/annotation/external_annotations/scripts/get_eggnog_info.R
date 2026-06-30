@@ -26,7 +26,24 @@ eggnog_code_info_fp = snakemake@output[["eggnog_code_info"]]
 # Reading in files
 conduitR::log_with_timestamp("Reading in files")
 
-detected_eggnog = readr::read_delim(uniprot_annotated_protein_info_fp) |>
+uniprot_annotated_protein_info = readr::read_delim(uniprot_annotated_protein_info_fp)
+
+# Empty input (UniParc / non-reference proteome -> no UniProtKB annotations):
+# emit empty, correctly-typed tables. NB these are the UniProt-derived eggNOG
+# xrefs; eggNOG-mapper's own annotations are produced on a separate path.
+.empty_annotation <- tibble::tibble(
+  protein_id = character(), annotation_type = character(),
+  term = character(), description = character()
+)
+if (nrow(uniprot_annotated_protein_info) == 0L) {
+  conduitR::log_with_timestamp("No UniProtKB annotations; writing empty eggNOG tables")
+  readr::write_delim(.empty_annotation, eggnog_info_fp)
+  readr::write_delim(.empty_annotation, eggnog_code_info_fp)
+  sink(type = "message"); sink(); close(zz)
+  quit(save = "no", status = 0)
+}
+
+detected_eggnog = uniprot_annotated_protein_info |>
 dplyr::select(protein_id,xref_eggnog)|>
 tidyr::separate_longer_delim(xref_eggnog,delim = ";")|>
 dplyr::filter(xref_eggnog != "")|>

@@ -22,6 +22,21 @@ go_info_fp = snakemake@output[["go_info"]]
 
 uniprot_annotated_protein_info <- readr::read_delim(uniprot_annotated_protein_info_fp)
 
+# UniParc / non-reference proteomes return no UniProtKB annotations, so the
+# input is empty. The matrix-indexing parse below (matches[,2]) errors on a
+# 0-row unnest, so short-circuit with an empty, correctly-typed table. eggNOG-
+# mapper annotations are produced on a separate path and still populate the conduit.
+.empty_annotation <- tibble::tibble(
+  protein_id = character(), annotation_type = character(),
+  term = character(), description = character()
+)
+if (nrow(uniprot_annotated_protein_info) == 0L) {
+  conduitR::log_with_timestamp("No UniProtKB annotations; writing empty GO table")
+  readr::write_delim(.empty_annotation, go_info_fp)
+  sink(type = "message"); sink(); close(zz)
+  quit(save = "no", status = 0)
+}
+
 go_long <- uniprot_annotated_protein_info |>
  dplyr::select(protein_id,go)|>
  # Extract description and GO ID together

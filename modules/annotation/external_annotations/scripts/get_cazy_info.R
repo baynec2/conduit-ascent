@@ -24,7 +24,23 @@ cazy_family_info_fp = snakemake@output[["cazy_family_info"]]
 
 conduitR::log_with_timestamp("Reading in detected cazyme annotations")
   
-detected_cazy = readr::read_delim(uniprot_annotated_protein_info_fp) |>
+uniprot_annotated_protein_info = readr::read_delim(uniprot_annotated_protein_info_fp)
+
+# Empty input (UniParc / non-reference proteome -> no UniProtKB annotations):
+# emit empty, correctly-typed tables.
+.empty_annotation <- tibble::tibble(
+  protein_id = character(), annotation_type = character(),
+  term = character(), description = character()
+)
+if (nrow(uniprot_annotated_protein_info) == 0L) {
+  conduitR::log_with_timestamp("No UniProtKB annotations; writing empty CAZy tables")
+  readr::write_delim(.empty_annotation, cazy_class_info_fp)
+  readr::write_delim(.empty_annotation, cazy_family_info_fp)
+  sink(type = "message"); sink(); close(zz)
+  quit(save = "no", status = 0)
+}
+
+detected_cazy = uniprot_annotated_protein_info |>
   dplyr::select(protein_id,xref_cazy)|>
   dplyr::filter(!is.na(xref_cazy))|>
   tidyr::separate_longer_delim(xref_cazy,delim = ";")|>
