@@ -78,6 +78,14 @@ def main(argv):
 
     selected = greedy_cover(genome2spectrum_dic)
 
+    if not selected:
+        # Empty first-pass result (no spectra / no taxa): emit a header-only
+        # selection so downstream resolves to an empty (no-detection) conduit
+        # instead of crashing on the cumulative-percentage step below.
+        with open(out_f, "w") as _out_f:
+            _out_f.write("genome\tnSpectraCovered\tcumulative_pct\n")
+        return 0
+
     with open(out_f, "w") as _out_f:
         _out_f.write("genome\tnSpectraCovered\n")
         for genome, n_cum in selected:

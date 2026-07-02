@@ -181,7 +181,13 @@ rule all:
     input:
         # Reproducibility snapshot
         os.path.join(RUN_DIR, "manifest.json"),
-        # Database resources
+        # Database resources. NB the DIA-NN-derived intermediates (predicted
+        # speclib, detected_protein_resources) are intentionally NOT listed
+        # here: they are pulled transitively by build_conduit for non-empty
+        # runs, and for an empty search space (no organisms detected) they must
+        # NOT be required — build_conduit's checkpoint branch resolves to an
+        # empty conduit without a DIA-NN search. Listing only the always-present
+        # database artifacts keeps `all` satisfiable in both cases.
         expand(os.path.join(RUN_DIR, "database_resources/{file}"),
                file=[
                    "database.fasta",
@@ -191,15 +197,6 @@ rule all:
                    "taxonomic_tree_of_database.pdf",
                    "README.md",
                    "README.html"
-               ]),
-        *([os.path.join(RUN_DIR, "database_resources/database.predicted.speclib")]
-          if config.get("diann_search_mode", "standard") == "standard" else []),
-        expand(os.path.join(RUN_DIR, "database_resources/detected_protein_resources/{file}"),
-               file=[
-                   "detected_protein_info.txt",
-                   "detected_protein.fasta",
-                   "uniprot_annotated_protein_info.txt",
-                   "conduit_annotations.txt"
                ]),
         # Final output file
         conduit = os.path.join(RUN_DIR, "output_files", f"{config['experiment']}_{config['run_name']}_conduit.rds")

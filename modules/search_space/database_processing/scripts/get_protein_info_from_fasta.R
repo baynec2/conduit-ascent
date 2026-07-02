@@ -23,6 +23,21 @@ conduitR::log_with_timestamp(paste0("Output file: ", snakemake@output[[1]]))
 conduitR::log_with_timestamp("Loading organism annotation from the taxonomy file.")
 taxonomy_txt <- readr::read_delim(taxonomy_txt)
 
+# Empty detection: an empty database.fasta means no search space was found.
+# Emit an empty, schema-correct protein_info table so the run resolves to an
+# empty (no-detection) conduit downstream instead of crashing on the parse.
+if (file.size(database_fasta) == 0L) {
+  conduitR::log_with_timestamp("Empty database.fasta — writing empty protein_info table.")
+  pi_cols <- c("protein_id", "organism_name", "organism_id", "sequence", "domain",
+               "kingdom", "phylum", "class", "order", "family", "genus", "species",
+               "proteome_id", "proteome_type", "download_info")
+  empty_pi <- stats::setNames(lapply(pi_cols, function(x) character(0)), pi_cols) |>
+    tibble::as_tibble()
+  readr::write_delim(empty_pi, output_file, delim = "\t")
+  sink(type = "message"); sink(); close(zz)
+  quit(save = "no", status = 0)
+}
+
 conduitR::log_with_timestamp("Extracting protein information from fasta database.")
 # Extracting protein information from fasta database
 protein_info <- conduitR::extract_fasta_info(database_fasta)

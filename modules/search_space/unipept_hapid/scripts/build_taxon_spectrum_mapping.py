@@ -52,11 +52,21 @@ def main():
     df = pd.read_parquet(PARQUET_IN)
     logp(f"Parquet rows: {len(df)}")
     if len(df) == 0:
-        raise SystemExit(
-            f"DIA-NN parquet at {PARQUET_IN} contains 0 rows — "
-            "the upstream DIA-NN search produced no peptides. "
-            "Inspect the corresponding DIA-NN log under logs/ before re-running."
+        # Genuine no-detection: the HAPiID first pass identified no peptides for
+        # this sample. Rather than hard-fail, emit an empty taxon map so the run
+        # resolves to an empty (no-detection) conduit downstream — see the
+        # database.fasta emptiness checkpoint in database_processing. Inspect the
+        # DIA-NN first-pass log under logs/ if a non-empty result was expected.
+        logp(
+            f"DIA-NN parquet at {PARQUET_IN} contains 0 rows — no peptides "
+            "identified. Writing an empty taxon map (run resolves to an empty "
+            "conduit)."
         )
+        with open(JSON_OUT, "w") as f:
+            json.dump({}, f)
+        logp(f"Written empty map to {JSON_OUT}")
+        log.close()
+        return
 
     taxon2spectrum = build_taxon_spectrum_mapping(df)
     logp(f"After Proteotypic == 1 filter: {sum(len(v) for v in taxon2spectrum.values())} precursor-rows kept across {len(taxon2spectrum)} taxa")

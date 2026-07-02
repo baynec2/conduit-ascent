@@ -10,6 +10,69 @@ sink(zz, type = "message")  # redirect stderr/messages
 start_time <- Sys.time()
 conduitR::log_with_timestamp("Running build_conduit.R script")
 
+# =============================================================================
+# EMPTY SEARCH SPACE branch. When the method detected no organisms the database
+# is empty and there is no DIA-NN search — build_conduit.smk's checkpoint routes
+# here by omitting the `qfeatures` input. Build a valid empty (no-detection)
+# conduit so the run completes and slots cleanly into downstream comparison code.
+# The normal path below is left unchanged.
+# =============================================================================
+if (!("qfeatures" %in% names(snakemake@input))) {
+  conduitR::log_with_timestamp("Empty search space (no organisms detected) — building an empty conduit")
+  suppressMessages({
+    library(SummarizedExperiment); library(QFeatures); library(S4Vectors)
+  })
+
+  sample_ann <- readr::read_tsv(snakemake@input[["sample_annotation"]], show_col_types = FALSE)
+  samples <- as.character(sample_ann[[1]])
+
+  # Empty QFeatures: 0 features x N samples.
+  mat <- matrix(numeric(0), nrow = 0, ncol = length(samples),
+                dimnames = list(NULL, samples))
+  se  <- SummarizedExperiment(assays = list(intensity = mat))
+  qf  <- QFeatures(list(proteins = se),
+                   colData = S4Vectors::DataFrame(row.names = samples))
+
+  # Empty (schema-correct) database / annotations / taxonomy.
+  db_in <- readr::read_tsv(snakemake@input[["database"]], show_col_types = FALSE)
+  database <- if (nrow(db_in) > 0) dplyr::select(db_in, protein_id, organism_id) else
+    tibble::tibble(protein_id = factor(), organism_id = factor())
+  annotations <- tibble::tibble(Protein.Group = factor(), annotation_type = factor(),
+                                term = factor(), description = factor())
+  taxonomy <- readr::read_delim(snakemake@input[["taxonomy"]], show_col_types = FALSE)
+
+  parse_diann_cfg <- function(path) {
+    lines <- readLines(path)
+    lines <- lines[nzchar(trimws(lines)) & !startsWith(trimws(lines), "#")]
+    tibble::tibble(parameter = paste0("line_", seq_along(lines)), value = lines)
+  }
+  config_list <- list(
+    snakemake_yaml = tibble::tibble(
+      parameter = names(snakemake@config),
+      value = vapply(snakemake@config, function(x) {
+        if (is.null(x) || length(x) == 0) return("")
+        if (is.list(x)) paste(names(x), unlist(x), sep = "=", collapse = ", ")
+        else as.character(x)
+      }, character(1))),
+    diann_spectral_library_cfg = parse_diann_cfg(snakemake@input[["diann_spectral_lib_config"]]),
+    diann_run_cfg = parse_diann_cfg(snakemake@input[["diann_run_config"]]),
+    runtime = tibble::tibble(parameter = "snakemake_version",
+                             value = snakemake@params[["snakemake_version"]])
+  )
+  provenance <- conduitR::create_provenance(
+    workflow_version = snakemake@params[["workflow_version"]], config = config_list)
+
+  conduit <- new("conduit",
+                 QFeatures = qf, metrics = list(),
+                 database = database, annotations = annotations,
+                 taxonomy = taxonomy, provenance = provenance)
+  # Skip add_protein_coverage_taxa_metrics() — it requires non-empty rowData.
+  saveRDS(conduit, snakemake@output[["conduit"]])
+  conduitR::log_with_timestamp("Wrote empty (no-detection) conduit.")
+  sink(type = "message"); sink(); close(zz)
+  quit(save = "no", status = 0)
+}
+
 conduitR::log_with_timestamp(paste0("Input file: ", snakemake@input[["diann_stats"]]))
 conduitR::log_with_timestamp(paste0("Input file: ", snakemake@input[["qfeatures"]]))
 conduitR::log_with_timestamp(paste0("Input file: ", snakemake@input[["database"]]))

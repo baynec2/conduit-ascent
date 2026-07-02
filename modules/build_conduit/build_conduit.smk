@@ -52,16 +52,56 @@ rule add_annotations_to_qfeatures:
   container: config["containers"]["conduitr"]
   script: "scripts/add_annotations_to_qfeatures.R"
 
+# Checkpoint: is the search database empty (no sequences)? A method that detects
+# no organisms produces an empty database.fasta; in that case build_conduit must
+# resolve to a valid empty (no-detection) conduit WITHOUT a DIA-NN search.
+# Defined here (not in the Snakefile / another module) because Snakemake 9 scopes
+# the checkpoint proxy per-module, and only build_conduit branches on it.
+checkpoint check_database_empty:
+  input:
+    database_fasta = os.path.join(RUN_DIR, "database_resources/database.fasta")
+  output:
+    status = os.path.join(RUN_DIR, "database_resources/.database_status")
+  run:
+    has_seq = False
+    with open(input.database_fasta) as fh:
+      for line in fh:
+        if line.startswith(">"):
+          has_seq = True
+          break
+    with open(output.status, "w") as out:
+      out.write("empty" if not has_seq else "nonempty")
+
+
+def build_conduit_inputs(wildcards):
+    """Branch build_conduit's inputs on database emptiness. Empty -> minimal
+    inputs (no qfeatures/diann/annotations), so the DIA-NN chain is never pulled
+    and build_conduit.R constructs an empty conduit. Non-empty -> the full set."""
+    status_file = checkpoints.check_database_empty.get(**wildcards).output.status
+    with open(status_file) as fh:
+        is_empty = fh.read().strip() == "empty"
+    base = os.path.join(RUN_DIR, "database_resources")
+    common = {
+        "database": os.path.join(base, "protein_info.txt"),
+        "taxonomy": os.path.join(base, "taxonomy.txt"),
+        "sample_annotation": os.path.join(EXPERIMENT_DIR, "input/sample_annotation.txt"),
+        "diann_spectral_lib_config": config["diann_spectral_library_base_config"],
+        "diann_run_config": config["run_diann_config"],
+    }
+    if is_empty:
+        return common
+    return {
+        **common,
+        **search_space_detection_inputs(wildcards),
+        "diann_stats": os.path.join(RUN_DIR, "diann_output/diann.stats.tsv"),
+        "qfeatures": os.path.join(RUN_DIR, "output_files/annotated_qf.rds"),
+        "annotations": os.path.join(base, "detected_protein_resources/conduit_annotations.txt"),
+    }
+
+
 rule build_conduit:
   input:
-    unpack(search_space_detection_inputs),
-    diann_stats= os.path.join(RUN_DIR,"diann_output/diann.stats.tsv"),
-    qfeatures= os.path.join(RUN_DIR,"output_files/annotated_qf.rds"),
-    database=os.path.join(RUN_DIR,"database_resources/protein_info.txt"),
-    annotations= os.path.join(RUN_DIR,"database_resources/detected_protein_resources/conduit_annotations.txt"),
-    taxonomy = os.path.join(RUN_DIR,"database_resources/taxonomy.txt"),
-    diann_spectral_lib_config = config["diann_spectral_library_base_config"],
-    diann_run_config          = config["run_diann_config"]
+    unpack(build_conduit_inputs)
   params:
     workflow_version  = open("VERSION").read().strip(),
     snakemake_version = __import__('snakemake').__version__

@@ -28,6 +28,20 @@ proteome_ids <- proteome_id_df |>
   dplyr::pull(proteome_id) |>
   unique()
 
+# Empty detection (no proteomes): emit an empty, schema-correct taxonomy table
+# so the run resolves to an empty (no-detection) conduit downstream.
+if (length(proteome_ids) == 0L) {
+  conduitR::log_with_timestamp("No proteome IDs — writing empty taxonomy table.")
+  tax_cols <- c("organism_id", "domain", "kingdom", "phylum", "class", "order",
+                "family", "genus", "species", "proteome_id", "proteome_type",
+                "download_info")
+  empty_tax <- stats::setNames(lapply(tax_cols, function(x) character(0)), tax_cols) |>
+    tibble::as_tibble()
+  readr::write_delim(empty_tax, output_file)
+  sink(type = "message"); sink(); close(zz)
+  quit(save = "no", status = 0)
+}
+
 conduitR::log_with_timestamp("Getting NCBI Taxonomy Ids corresponding to selected proteome from uniprot.")
 
 organism_ids = conduitR::get_taxonomy_from_proteome_ids(proteome_ids)|>

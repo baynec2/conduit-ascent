@@ -31,6 +31,24 @@ conduitR::log_with_timestamp("Making the database_resources_directory if it does
 conduitR::log_with_timestamp("Reading organism IDs from the input file.")
 raw_df <- readr::read_tsv(input_file, show_col_types = FALSE)
 
+# Empty detection (e.g. a first pass that identified nothing): no organism IDs
+# to resolve. Emit an empty, schema-correct proteome table so the run resolves
+# to an empty (no-detection) conduit downstream instead of querying UniProt with
+# an empty set.
+if (nrow(raw_df) == 0L && isFALSE(snakemake@config$append_additional_ncbi_taxa_id)) {
+  conduitR::log_with_timestamp("No organism IDs — writing empty proteome_ids table.")
+  empty_cols <- c("initial_proteome_id", "organism_id", "organism", "protein_count",
+                  "proteome_type", "redundant_to", "genome_assembly_id",
+                  "genome_assembly_level", "annotation_score", "parent_id",
+                  "child_rank", "proteome_id")
+  empty_df <- stats::setNames(
+    lapply(empty_cols, function(x) character(0)), empty_cols
+  ) |> tibble::as_tibble()
+  readr::write_tsv(empty_df, proteome_ids_fp)
+  sink(type = "message"); sink(); close(zz)
+  quit(save = "no", status = 0)
+}
+
 # Compute the pre-append id set so we can log "already present" vs "appended"
 # accurately. The parse_organism_ids helper handles both cases internally and
 # returns the final deduplicated vector.
