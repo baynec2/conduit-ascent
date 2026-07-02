@@ -118,6 +118,11 @@ rule download_mgnify_genome:
         url = mgnify_genome_url
     log:
         os.path.join(MGNIFY_OUT, "logs/download_{accession}.log")
+    # Run in the bakta container (same image the sibling genome-processing rules
+    # use) so curl is a modern, reproducible version — the host curl is 7.68,
+    # which lacks --retry-all-errors and made this rule host-version-dependent.
+    container:
+        config["containers"]["bakta"]
     shell:
         r"""
         set -euo pipefail
@@ -128,7 +133,8 @@ rule download_mgnify_genome:
         # segfaults on it). -S ensures errors are reported even with -s.
         # --retry-all-errors also retries connection-level failures (resets,
         # partial transfers) that plain --retry skips; --connect-timeout bounds
-        # hangs against a flaky EBI FTP endpoint.
+        # hangs against a flaky EBI FTP endpoint. (Requires the container's
+        # modern curl; the host's 7.68 lacks --retry-all-errors.)
         curl -fSL --retry 8 --retry-delay 10 --retry-all-errors --connect-timeout 30 \
             -o {output.genome} '{params.url}' 2> >(tee -a {log} >&2)
         # Validate the downloaded file is actually a FASTA — defence-in-depth
