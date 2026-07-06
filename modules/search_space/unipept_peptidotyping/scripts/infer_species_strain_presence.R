@@ -60,14 +60,37 @@ conduitR::log_with_timestamp(
 # Read second-pass DIA-NN results
 # =============================================================================
 conduitR::log_with_timestamp("Reading second-pass DIA-NN parquet")
-precursors <- arrow::read_parquet(second_pass_diann_parquet)
-conduitR::log_with_timestamp("Parquet rows: %d", nrow(precursors))
 
-if (nrow(precursors) == 0) {
-  stop(sprintf(
-    "DIA-NN parquet at %s contains 0 rows — the upstream DIA-NN search produced no peptides. Inspect the corresponding DIA-NN log under logs/ before re-running.",
-    second_pass_diann_parquet
-  ), call. = FALSE)
+# A 0-byte parquet is the empty marker written by the second-pass DIA-NN rule
+# when the second-pass database was empty (no families detected). Resolve to an
+# empty detection so the run yields an empty (no-detection) conduit, rather than
+# hard-failing. Guard before arrow::read_parquet, which errors on a 0-byte file.
+empty_second_pass <- file.size(second_pass_diann_parquet) == 0
+if (!empty_second_pass) {
+  precursors <- arrow::read_parquet(second_pass_diann_parquet)
+  conduitR::log_with_timestamp("Parquet rows: %d", nrow(precursors))
+  empty_second_pass <- nrow(precursors) == 0
+}
+
+if (empty_second_pass) {
+  conduitR::log_with_timestamp("Empty second-pass results — writing empty species/strain outputs.")
+  readr::write_tsv(
+    tibble::tibble(ncbi_taxonomy_id = character(), detected_taxonomy = character()),
+    detected_species_strains_fp
+  )
+  readr::write_tsv(
+    tibble::tibble(
+      taxon = character(), taxon_name = character(), score = numeric(),
+      n_unique_peptides_all = integer(), decoy = logical(), picked_winner = logical(),
+      fdr = numeric(), qvalue = numeric(), pass = logical(),
+      n_unique_peptides_q01 = integer(), score_fraction = numeric(),
+      cumulative_score_fraction = numeric(), carried_forward = logical(),
+      filter_reason = character()
+    ),
+    fdr_results_fp
+  )
+  sink(type = "message"); sink(); close(zz)
+  quit(save = "no", status = 0)
 }
 
 # =============================================================================

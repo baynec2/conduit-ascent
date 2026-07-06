@@ -708,15 +708,24 @@ else:  # infinidia — monolithic
             """
             mkdir -p $(dirname {log}) $(dirname {output.second_pass_diann_parquet})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
-            diann --cfg {input.config_file} \
-                --fasta {input.fasta} \
-                --dir {input.raw_files_dir} \
-                --temp {params.tmpdir} \
-                --pre-search --pre-filter \
-                --gen-spec-lib \
-                --rt-profiling \
-                --out {params.out_prefix} \
-                --threads {threads} --verbose 1 >> {log} 2>&1
+            # No families detected -> empty second-pass DB. DIA-NN exits non-zero
+            # on an empty FASTA, so skip it and write a 0-byte parquet as an
+            # empty marker; infer_second_pass_presence treats a 0-byte parquet as
+            # "no species detected", resolving the run to an empty conduit.
+            if ! grep -q '^>' {input.fasta}; then
+                echo "second_pass_database.fasta has no proteins — writing empty parquet marker" >> {log} 2>&1
+                : > {output.second_pass_diann_parquet}
+            else
+                diann --cfg {input.config_file} \
+                    --fasta {input.fasta} \
+                    --dir {input.raw_files_dir} \
+                    --temp {params.tmpdir} \
+                    --pre-search --pre-filter \
+                    --gen-spec-lib \
+                    --rt-profiling \
+                    --out {params.out_prefix} \
+                    --threads {threads} --verbose 1 >> {log} 2>&1
+            fi
             """
 
 rule infer_genome_peptidotyping_second_pass_presence:
