@@ -35,6 +35,16 @@ singularity-args: "--bind /ddn_scratch"
 # Cap simultaneously-queued SLURM jobs to stay friendly to the scheduler.
 jobs: 50
 
+# Use the greedy scheduler instead of Snakemake's default ILP scheduler. The
+# ILP scheduler solves a linear program over ALL currently-ready jobs each
+# cycle to pick the optimal batch to submit. Per-genome fan-out rules
+# (download_mgnify_genome, predict_orfs_with_prodigal) make thousands of jobs
+# ready at once — e.g. ~4,744 for MGnify human-gut v2.0.2 — and the pulp/CoinOR
+# solver's memory + CPU blow up, getting the login-node driver process
+# SIGKILL'd (bare "Killed", OOM/Arbiter2). Greedy just fills open job slots, so
+# driver footprint no longer scales with the number of ready jobs.
+scheduler: greedy
+
 # Retry transient failures (node OOM, preemption).
 restart-times: 2
 
