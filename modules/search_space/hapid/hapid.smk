@@ -329,6 +329,7 @@ if config.get("hapid_search_mode", "standard") == "standard":
                 --gen-spec-lib \
                 --rt-profiling \
                 --out-lib {params.out_lib} \
+                --out {params.tmpdir}/report \
                 --cut "K*,R*" \
                 --missed-cleavages 1 \
                 --min-pep-len 7 \

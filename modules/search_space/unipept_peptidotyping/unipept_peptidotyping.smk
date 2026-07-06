@@ -573,6 +573,7 @@ if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard":
             --gen-spec-lib \
             --rt-profiling \
             --out-lib {params.out_lib} \
+            --out {params.tmpdir}/report \
             --threads {threads} --verbose 1 >> {log} 2>&1
             """
 
@@ -807,6 +808,7 @@ if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard":
             --gen-spec-lib \
             --rt-profiling \
             --out-lib {params.out_lib} \
+            --out {params.tmpdir}/report \
             --threads {threads} --verbose 1 >> {log} 2>&1
             """
 

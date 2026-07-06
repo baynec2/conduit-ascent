@@ -111,3 +111,6 @@ run_*.sh
 **/target/
 
 #
+
+# DIA-NN default report.* output if any invocation is ever run without --out
+/report.*

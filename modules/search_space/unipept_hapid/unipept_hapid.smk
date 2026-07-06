@@ -240,6 +240,7 @@ if config.get("unipept_hapid_search_mode", "standard") == "standard":
             --gen-spec-lib \
             --rt-profiling \
             --out-lib {params.out_lib} \
+            --out {params.tmpdir}/report \
             --cut "" \
             --missed-cleavages 0 \
             --min-pep-len 5 \
