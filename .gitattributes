@@ -2,4 +2,3 @@ tests/data/sample1.raw filter=lfs diff=lfs merge=lfs -text
 tests/data/sample1.mzML filter=lfs diff=lfs merge=lfs -text
 tests/fixtures/peptidotyping_subset/*.tsv filter=lfs diff=lfs merge=lfs -text
 tests/fixtures/hapid_subset/*.hmm filter=lfs diff=lfs merge=lfs -text
-resources/hapid/ribP_elonF_profiles_refined_manually.hmm filter=lfs diff=lfs merge=lfs -text
