@@ -19,7 +19,7 @@ import os
 import re
 
 from Bio import SeqIO
-import pandas as pd
+import csv
 
 # Snakemake bindings
 TAXONOMY_PATH = snakemake.input.taxonomy
@@ -63,53 +63,51 @@ def tryptic_digest(sequence):
 
 
 def main():
-    # Read taxonomy to get genome list
-    tax_df = pd.read_csv(TAXONOMY_PATH, sep="\t")
-    genome_list = tax_df["genome"].astype(str).tolist()
+    # Read taxonomy to get genome list (first column is "genome"). Stream the
+    # file instead of loading it into pandas — we only need the genome column.
+    genome_list = []
+    with open(TAXONOMY_PATH, newline="") as tax:
+        reader = csv.DictReader(tax, delimiter="\t")
+        for rec in reader:
+            genome_list.append(str(rec["genome"]))
     logprint(f"Found {len(genome_list)} genomes in taxonomy.txt")
 
-    rows = []
     total_proteins = 0
     total_peptides = 0
 
-    for genome in genome_list:
-        faa_path = os.path.join(PRODIGAL_DIR, f"{genome}.faa")
-        if not os.path.exists(faa_path):
-            logprint(f"WARNING: No Prodigal output for genome '{genome}': {faa_path}")
-            continue
+    # Stream peptides straight to the gzip output as they are produced. Memory
+    # stays flat (one genome at a time) regardless of catalog size — the old
+    # approach accumulated every peptide of every genome into a list + pandas
+    # DataFrame, which OOM'd on full catalogs (thousands of genomes → tens of
+    # millions of peptides).
+    with gzip.open(OUTPUT_PATH, "wt", newline="") as out:
+        writer = csv.writer(out, delimiter="\t", lineterminator="\n")
+        writer.writerow(["peptide", "peptide_il", "genome", "protein_id"])
 
-        genome_proteins = 0
-        genome_peptides = 0
+        for genome in genome_list:
+            faa_path = os.path.join(PRODIGAL_DIR, f"{genome}.faa")
+            if not os.path.exists(faa_path):
+                logprint(f"WARNING: No Prodigal output for genome '{genome}': {faa_path}")
+                continue
 
-        for record in SeqIO.parse(faa_path, "fasta"):
-            genome_proteins += 1
-            peptides = tryptic_digest(str(record.seq))
+            genome_proteins = 0
+            genome_peptides = 0
 
-            for pep in peptides:
-                pep_il = pep.replace("I", "L")
-                rows.append((pep, pep_il, genome, record.id))
-                genome_peptides += 1
+            for record in SeqIO.parse(faa_path, "fasta"):
+                genome_proteins += 1
+                for pep in tryptic_digest(str(record.seq)):
+                    writer.writerow((pep, pep.replace("I", "L"), genome, record.id))
+                    genome_peptides += 1
 
-        total_proteins += genome_proteins
-        total_peptides += genome_peptides
-        logprint(
-            f"  {genome}: {genome_proteins} proteins → {genome_peptides} tryptic peptides"
-        )
+            total_proteins += genome_proteins
+            total_peptides += genome_peptides
+            logprint(
+                f"  {genome}: {genome_proteins} proteins → {genome_peptides} tryptic peptides"
+            )
 
     logprint(f"Total: {total_proteins} proteins, {total_peptides} peptides")
-
-    if not rows:
+    if total_peptides == 0:
         logprint("WARNING: No peptides generated from any genome")
-        # Write empty file with header
-        with gzip.open(OUTPUT_PATH, "wt") as f:
-            f.write("peptide\tpeptide_il\tgenome\tprotein_id\n")
-        log.close()
-        return
-
-    df = pd.DataFrame(rows, columns=["peptide", "peptide_il", "genome", "protein_id"])
-    logprint(f"Writing {len(df)} rows to {OUTPUT_PATH}")
-    df.to_csv(OUTPUT_PATH, sep="\t", index=False, compression="gzip")
-
     logprint("Tryptic digest complete")
     log.close()
 
