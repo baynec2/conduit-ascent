@@ -13,7 +13,7 @@ modules/
 │   ├── ncbi_taxonomy/     # User-supplied NCBI taxon IDs → UniProt proteomes
 │   ├── uniprot_proteome_ids/  # User-supplied UniProt proteome IDs directly
 │   ├── metaphlan/         # MetaPhlAn profiling output → NCBI taxon IDs
-│   ├── MAGs/              # Metagenome-assembled genomes
+│   ├── genomes/          # Any bacterial genome FASTAs (MAGs or reference), no selection; "MAGs" is a deprecated alias
 │   └── unipept_hapid/     # Unipept database search
 ├── diann/                 # DIA-NN spectral library build + main search
 ├── annotation/            # UniProt, eggNOG-mapper, external annotations

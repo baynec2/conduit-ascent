@@ -29,7 +29,8 @@ run_name:
 #   unipept_hapid          HAPiID-style GO-filtered first-pass
 #   genome_peptidotyping   peptidotyping on user-provided genomes (no UniProt)
 #   metaphlan            MetaPhlAn profiling → NCBI taxon IDs
-#   MAGs                 all user-provided MAGs, no selection
+#   genomes              all user-provided genome FASTAs (MAGs or reference), no selection
+#                        (the old name "MAGs" is still accepted as a deprecated alias)
 #   hapid                HAPiID marker-gene profiling → greedy genome selection
 search_space_method: ncbi_taxonomy_id
 # Sample annotation file (relative to experiment dir).
@@ -182,9 +183,9 @@ hapid_percent_spectra: 80
 
 
 # =============================================================================
-#  MAGs / bakta annotation
-#  Used by: MAGs · hapid · genome_peptidotyping
-#           (any method that produces MAGs to annotate, incl. mgnify_* variants)
+#  Genome / bakta annotation
+#  Used by: genomes · hapid · genome_peptidotyping
+#           (any method that produces genomes to annotate, incl. mgnify_* variants)
 # =============================================================================
 # Bakta database location and variant.
 # Bakta DB size: light ~2 GB, full ~84 GB. The light DB is sufficient for most
@@ -194,7 +195,7 @@ bakta_db_type: "light"
 
 # =============================================================================
 #  Shared genome-derived resource caches
-#  Used by: MAGs · hapid · genome_peptidotyping (when source == "mgnify")
+#  Used by: genomes · hapid · genome_peptidotyping (when source == "mgnify")
 # =============================================================================
 # Sharing only kicks in when genome_download_source == "mgnify" — MGnify accessions
 # are globally unique. For local MAGs we keep per-run paths; local names aren't
@@ -220,7 +221,7 @@ relative_abundance_threshold: 0.01
 # =============================================================================
 #  MGnify genome download  (optional pre-step)
 #  Activated when: genome_download_source == "mgnify"
-#  Consumed by:    MAGs · hapid · genome_peptidotyping (when the flag is set)
+#  Consumed by:    genomes · hapid · genome_peptidotyping (when the flag is set)
 # =============================================================================
 # Where to fetch genomes from. FALSE = user-provided MAGs only. "mgnify" = download.
 genome_download_source: FALSE

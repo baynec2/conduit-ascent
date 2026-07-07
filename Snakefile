@@ -51,14 +51,24 @@ ALLOWED_METHODS = [
     "uniprot_proteome_id",
     "unipept_peptidotyping",
     "unipept_hapid",
-    "MAGs",
+    "genomes",
     "metaphlan",
     "hapid",
     "genome_peptidotyping",
    # "16S"
 ]
-# Checking that the method is allowed.   
+# Checking that the method is allowed.
 METHOD = config["search_space_method"]
+# Backward-compat: the "MAGs" method was renamed to "genomes" — it accepts any
+# bacterial genome FASTA (isolate assemblies, reference genomes, or MAGs), so the
+# MAG-specific name was misleading. Accept the old value, warn, and normalize so
+# all downstream dispatch and generated artifacts see the canonical "genomes".
+if METHOD == "MAGs":
+    print("WARNING: search_space_method 'MAGs' is deprecated and will be removed "
+          "in a future release; use 'genomes' instead. Proceeding as 'genomes'.",
+          file=sys.stderr)
+    METHOD = "genomes"
+    config["search_space_method"] = "genomes"
 if METHOD not in ALLOWED_METHODS:
     raise ValueError(f"Method '{METHOD}' not allowed. Must be one of: {', '.join(ALLOWED_METHODS)}")
 
@@ -130,8 +140,8 @@ module unipept_hapid:
 module shared_unipept_resources:
   snakefile: "modules/search_space/_shared/unipept_resources.smk"
   config: config
-module mags:
-  snakefile: "modules/search_space/MAGs/MAGs.smk"
+module genomes:
+  snakefile: "modules/search_space/genomes/genomes.smk"
   config: config
 module hapid:
   snakefile: "modules/search_space/hapid/hapid.smk"
@@ -139,7 +149,7 @@ module hapid:
 module genome_peptidotyping:
   snakefile: "modules/search_space/genome_peptidotyping/genome_peptidotyping.smk"
   config: config
-# Genome download modules (optional pre-step for MAGs/hapid)
+# Genome download modules (optional pre-step for genomes/hapid)
 module mgnify_download:
   snakefile: "modules/genome_download/mgnify/mgnify.smk"
   config: config
@@ -156,8 +166,8 @@ module database_processing:
 module uniprot_annotation: 
   snakefile: "modules/annotation/uniprot/annotation_uniprot.smk"
   config: config
-module mag_annotation:
-  snakefile: "modules/annotation/MAGs/annotation_mags.smk"
+module genome_annotation:
+  snakefile: "modules/annotation/genomes/annotation_genomes.smk"
   config: config
 # This provides the ability to add additional annotations from external databases.
 module external_annotation:
@@ -259,37 +269,37 @@ if config["search_space_method"] == "ncbi_taxonomy_id":
     use rule * from external_annotation
 
 
-# Genome download pre-step (runs before MAG/HAPiID if configured)
+# Genome download pre-step (runs before genomes/HAPiID if configured)
 if config.get("genome_download_source") == "mgnify":
     use rule * from mgnify_download
 
 # Search space specific workflows to generate a search space
-if config["search_space_method"] == "MAGs":
-    use rule * from mags
+if config["search_space_method"] == "genomes":
+    use rule * from genomes
     use rule * from database_processing
     use rule * from diann
-    use rule * from mag_annotation
+    use rule * from genome_annotation
     use rule * from eggnogmapper_annotation
     use rule * from external_annotation
 
 
-# HAPiID: marker-gene profiling → greedy genome selection → MAGs DB construction
+# HAPiID: marker-gene profiling → greedy genome selection → genome DB construction
 if config["search_space_method"] == "hapid":
     use rule * from hapid
-    use rule * from mags
+    use rule * from genomes
     use rule * from database_processing
     use rule * from diann
-    use rule * from mag_annotation
+    use rule * from genome_annotation
     use rule * from eggnogmapper_annotation
     use rule * from external_annotation
 
-# Genome peptidotyping: two-pass peptide-based detection → selected genomes → MAGs DB construction
+# Genome peptidotyping: two-pass peptide-based detection → selected genomes → genome DB construction
 if config["search_space_method"] == "genome_peptidotyping":
     use rule * from genome_peptidotyping
-    use rule * from mags
+    use rule * from genomes
     use rule * from database_processing
     use rule * from diann
-    use rule * from mag_annotation
+    use rule * from genome_annotation
     use rule * from eggnogmapper_annotation
     use rule * from external_annotation
 

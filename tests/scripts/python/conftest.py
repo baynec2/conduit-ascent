@@ -10,7 +10,7 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", 
 
 for rel in [
     "modules/search_space/_shared/scripts",
-    "modules/search_space/MAGs/scripts",
+    "modules/search_space/genomes/scripts",
     "modules/search_space/unipept_hapid/scripts",
 ]:
     p = os.path.join(REPO_ROOT, rel)

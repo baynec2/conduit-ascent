@@ -11,7 +11,7 @@ Conduit is a scalable and modular workflow management system for metaproteomics 
     - **UniProt Proteome IDs**: Know specific proteome IDs? Conduit can build a search space directly from them.
     - **Peptidotyping**: A first-pass DIA-NN search using species-specific peptides to identify which taxa are present, then builds a refined search space.
     - **MetaPhlAn**: Have shotgun metagenomic data? Conduit runs MetaPhlAn profiling and uses the results to define the search space.
-    - **MAGs**: Have metagenome-assembled genomes? Conduit uses Bakta to annotate them and builds the search space from the predicted proteins.
+    - **Genomes**: Have bacterial genome FASTAs (metagenome-assembled or reference)? Conduit uses Bakta to annotate them and builds the search space from the predicted proteins.
 - **DIA-NN Integration**: Automated, spectral-library-free processing of DIA data.
 - **Taxonomic Annotation**: Multi-level taxonomic classification of detected proteins.
 - **Functional Annotation**: GO term, KEGG pathway, Pfam domain, CAZy, and eggNOG-mapper annotations.
@@ -125,7 +125,7 @@ These point to the Docker/Apptainer images used for each tool. You generally do 
 
 | Parameter | Description |
 |-----------|-------------|
-| `search_space_method` | **Required.** Strategy used to define the protein search space. Options: `ncbi_taxonomy_id`, `uniprot_proteome_id`, `unipept_peptidotyping`, `MAGs`, `metaphlan`. See details below. |
+| `search_space_method` | **Required.** Strategy used to define the protein search space. Options: `ncbi_taxonomy_id`, `uniprot_proteome_id`, `unipept_peptidotyping`, `genomes`, `metaphlan`. See details below. |
 
 #### `ncbi_taxonomy_id`
 Builds the database from UniProt proteomes matching the provided NCBI taxon IDs. Requires `experiments/{experiment}/input/ncbi_taxa_ids.txt`.
@@ -136,8 +136,8 @@ Builds the database from a user-supplied list of UniProt proteome IDs. Requires 
 #### `unipept_peptidotyping`
 Performs a first-pass DIA-NN search using species-specific peptides (derived from Unipept's UMGAP LCA index) to identify which taxa are present in the sample, then builds a refined database from the detected taxa. See peptidotyping-specific parameters below.
 
-#### `MAGs`
-Accepts user-provided genome FASTAs — either metagenome-assembled genomes (MAGs) or reference genomes. Bakta annotates each FASTA and the predicted proteins form the search space. Requires `experiments/{experiment}/input/MAG_files/`.
+#### `genomes`
+Accepts user-provided genome FASTAs — either metagenome-assembled genomes (MAGs) or reference genomes. Bakta annotates each FASTA and the predicted proteins form the search space. Requires `experiments/{experiment}/input/MAG_files/`. (The old method name `MAGs` is still accepted as a deprecated alias.)
 
 #### `metaphlan`
 Runs MetaPhlAn on shotgun metagenomic FASTQ files to profile the community, then builds a database from the detected taxa. Requires `experiments/{experiment}/input/fastq_files/`.
@@ -187,7 +187,7 @@ These parameters point to large reference databases that Conduit needs for certa
 | `metaphlan_database_dir` | `resources/metaphlan/` | ~54 GB | Directory for the MetaPhlAn reference database. Required for the `metaphlan` search space method. |
 | `unipept_sequences` | `resources/databases/sequences.tsv.lz4` | ~1.46 GB | Compressed Unipept sequence table. Required for peptidotyping. |
 | `unipept_taxons` | `resources/databases/taxons.tsv.lz4` | — | Compressed Unipept taxon table. Required for peptidotyping. |
-| `bakta_db_dir` | `resources/bakta/db/` | ~84 GB (full) / ~2 GB (light) | Bakta annotation database. Required for the `MAGs` method. Controlled by `bakta_db_type`. |
+| `bakta_db_dir` | `resources/bakta/db/` | ~84 GB (full) / ~2 GB (light) | Bakta annotation database. Required for the `genomes` method. Controlled by `bakta_db_type`. |
 | `bakta_db_type` | `"light"` | — | Which Bakta database to use: `"full"` (~84 GB) or `"light"` (~2 GB). The light database is faster to download but less comprehensive. |
 | `eggnogmapper_db_dir` | `resources/eggnogmapper/db/` | ~50 GB (full) / ~8 GB (bacteria) | eggNOG-mapper database directory for sequence-based functional annotation. |
 | `gbtk_database` | `resources/gbtk/` | ~140 GB | GTDB-Tk database. Reserved for future MAG taxonomy use. |
