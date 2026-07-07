@@ -64,7 +64,14 @@ __pycache__/
 Rplots.pdf
 
 # Ignore any database resources. Files are too large to be included in the repository.
-resources/
+# Exception: the manually-refined hapid HMM profile is a small, irreplaceable
+# source asset (no rule regenerates it), so it is tracked via git-LFS. The `/*`
+# form (instead of `resources/`) is required — git won't descend into a wholly
+# excluded directory, so the negation below would otherwise have no effect.
+resources/*
+!resources/hapid/
+resources/hapid/*
+!resources/hapid/ribP_elonF_profiles_refined_manually.hmm
 
 *.fasta
 *.speclib
