@@ -16,9 +16,10 @@ Output:
   - taxid_to_family_genus.tsv         (name-based lineage mapping)
 """
 
+import csv
 import os
-
-import pandas as pd
+import shlex
+import subprocess
 
 # Snakemake bindings
 PEPTIDE_MAPPING_PATH = snakemake.input.peptide_mapping
@@ -56,9 +57,12 @@ RANK_FILTERS = {
 
 def underscore_name(name):
     """Replace spaces with underscores and strip for use in FASTA headers."""
-    if pd.isna(name) or str(name).strip().upper() == "NA":
+    if name is None:
         return "NA"
-    return str(name).strip().replace(" ", "_")
+    s = str(name).strip()
+    if s == "" or s.upper() == "NA":
+        return "NA"
+    return s.replace(" ", "_")
 
 
 def compute_lca(lineages):
@@ -99,86 +103,83 @@ def compute_lca(lineages):
     return lca_rank, lca_name, parent_rank, parent_name
 
 
-def main():
-    logprint("Loading taxonomy")
-    tax_df = pd.read_csv(TAXONOMY_PATH, sep="\t")
-    logprint(f"  {len(tax_df)} genomes in taxonomy")
+def emit_peptide(pep_il, rep_peptide, genomes, genome_lineage, tsv_files,
+                 fasta_files, counts, pid):
+    """Compute the LCA for one peptide's genome set and write its rank outputs.
 
-    # Build genome → lineage dict
-    genome_lineage = {}
-    for _, row in tax_df.iterrows():
-        genome = str(row["genome"])
-        lineage = {}
-        for rank in RANKS:
-            if rank in row:
-                lineage[rank] = str(row[rank]).strip()
-            else:
-                lineage[rank] = "NA"
-        genome_lineage[genome] = lineage
+    Returns True if the peptide consumed the peptide id `pid` (i.e. it had a
+    valid LCA), False if it was skipped for lack of lineage. Whether a row is
+    actually written depends on the LCA rank (only family/genus/species ranks
+    are useful for detection); higher-level LCAs still consume an id, matching
+    the original numbering.
+    """
+    lineages = [genome_lineage[g] for g in genomes if g in genome_lineage]
+    if not lineages:
+        return False
 
-    logprint("Loading peptide-genome mapping")
-    pep_df = pd.read_csv(PEPTIDE_MAPPING_PATH, sep="\t", compression="gzip")
-    logprint(f"  {len(pep_df)} rows in peptide mapping")
+    lca_rank, lca_name, parent_rank, parent_name = compute_lca(lineages)
+    if lca_rank is None:
+        # No agreement at any rank (all NA) — skip
+        return False
 
-    # Group by peptide_il to find all genomes producing each peptide
-    logprint("Grouping peptides and computing LCA")
-    grouped = pep_df.groupby("peptide_il")
+    lca_name_u = underscore_name(lca_name)
+    parent_name_u = underscore_name(parent_name if parent_name else "NA")
 
-    peptide_records = []
-    peptide_id = 0
-    skipped_no_lineage = 0
+    # Map the LCA rank to our database rank categories
+    if lca_rank == "family":
+        db_rank = "family"
+    elif lca_rank == "genus":
+        db_rank = "genus"
+    elif lca_rank in ("species", "strain"):
+        db_rank = "species_strain"
+    else:
+        # Higher-level LCA (phylum, class, order, etc.) — id consumed, no row
+        return True
 
-    for pep_il, group in grouped:
-        genomes = group["genome"].unique().tolist()
-        # Pick one representative original peptide sequence
-        rep_peptide = group["peptide"].iloc[0]
-
-        # Get lineages for all genomes
-        lineages = []
-        for g in genomes:
-            if g in genome_lineage:
-                lineages.append(genome_lineage[g])
-        if not lineages:
-            skipped_no_lineage += 1
-            continue
-
-        lca_rank, lca_name, parent_rank, parent_name = compute_lca(lineages)
-        if lca_rank is None:
-            # No agreement at any rank (all NA) — skip
-            skipped_no_lineage += 1
-            continue
-
-        peptide_id += 1
-        peptide_records.append(
-            {
-                "id": peptide_id,
-                "peptide": rep_peptide,
-                "peptide_il": pep_il,
-                "lca_rank": lca_rank,
-                "lca_name": lca_name,
-                "parent_rank": parent_rank,
-                "parent_name": parent_name,
-            }
-        )
-
-    logprint(
-        f"  {len(peptide_records)} unique peptides with LCA assigned "
-        f"({skipped_no_lineage} skipped)"
+    fasta_header = (
+        f"gpep|{pid}|{lca_name_u} {lca_rank}_{lca_name_u} "
+        f"OS={lca_name} OX={lca_name_u} RK={lca_rank} PT={parent_name_u}"
     )
 
-    # ── Build taxid_to_family_genus.tsv ──────────────────────────────────────
-    # For every unique taxon that appears as an LCA, record its family and genus.
-    # This is used by infer_family_presence.R to map lca → family.
-    logprint("Building taxid_to_family_genus.tsv")
+    # TSV row (10 columns matching peptidotyping format); lca/lca_il and fa/fa_il
+    # are the same name-based identifier.
+    tsv_files[db_rank].write(
+        f"{pid}\t{rep_peptide}\t{lca_name_u}\t{lca_name_u}\t"
+        f"{lca_name_u}\t{lca_name_u}\t{lca_name}\t{lca_rank}\t"
+        f"{parent_name_u}\t{fasta_header}\n"
+    )
+    fasta_files[db_rank].write(f">{fasta_header}\n{rep_peptide}\n")
+    counts[db_rank] += 1
+    return True
 
-    # Collect all unique taxa from lineages
+
+def main():
+    logprint("Loading taxonomy")
+    # Stream taxonomy.txt (one row per genome) into a genome → lineage dict.
+    # This is small (bounded by genome count); no need for pandas.
+    genome_lineage = {}
+    with open(TAXONOMY_PATH, newline="") as tf:
+        reader = csv.DictReader(tf, delimiter="\t")
+        for row in reader:
+            genome = str(row["genome"])
+            lineage = {}
+            for rank in RANKS:
+                val = row.get(rank)
+                lineage[rank] = str(val).strip() if val is not None else "NA"
+            genome_lineage[genome] = lineage
+    logprint(f"  {len(genome_lineage)} genomes in taxonomy")
+
+    # ── Build taxid_to_family_genus.tsv ──────────────────────────────────────
+    # For every unique taxon that appears in a lineage, record its family and
+    # genus. Used by infer_family_presence.R to map lca → family. Depends only
+    # on the taxonomy, not the peptide mapping.
+    logprint("Building taxid_to_family_genus.tsv")
     all_taxa = {}  # name_u → (rank, family_u, genus_u)
     for genome, lineage in genome_lineage.items():
         family_u = underscore_name(lineage.get("family", "NA"))
         genus_u = underscore_name(lineage.get("genus", "NA"))
         for rank in RANKS:
-            name = lineage.get(rank, "NA")
-            name_u = underscore_name(name)
+            name_u = underscore_name(lineage.get(rank, "NA"))
             if name_u == "NA":
                 continue
             if name_u not in all_taxa:
@@ -187,23 +188,18 @@ def main():
     with open(TAXID_FAMILY_MAP, "w") as f:
         for name_u, (rank, family_u, genus_u) in sorted(all_taxa.items()):
             f.write(f"{name_u}\t{rank}\t{family_u}\t{genus_u}\n")
-
     logprint(f"  {len(all_taxa)} entries in taxid_to_family_genus.tsv")
 
-    # ── Generate rank-specific TSVs and FASTAs ───────────────────────────────
+    # ── Open rank-specific outputs ───────────────────────────────────────────
     TSV_HEADER = (
         "id\tsequence\tlca\tlca_il\tfa\tfa_il\tname\trank\tparent_id\tfasta_header\n"
     )
-
     output_map = {
         "family": (FAMILY_TSV, FAMILY_FASTA),
         "genus": (GENUS_TSV, GENUS_FASTA),
         "species_strain": (SPECIES_TSV, SPECIES_FASTA),
     }
-
     counts = {"family": 0, "genus": 0, "species_strain": 0}
-
-    # Open all output files
     tsv_files = {}
     fasta_files = {}
     for db_rank, (tsv_path, fasta_path) in output_map.items():
@@ -212,47 +208,71 @@ def main():
         tsv_files[db_rank].write(TSV_HEADER)
         fasta_files[db_rank] = open(fasta_path, "w")
 
-    for rec in peptide_records:
-        lca_rank = rec["lca_rank"]
-        lca_name = rec["lca_name"]
-        lca_name_u = underscore_name(lca_name)
-        parent_name_u = underscore_name(
-            rec["parent_name"] if rec["parent_name"] else "NA"
-        )
+    # ── Stream peptides grouped by peptide_il ────────────────────────────────
+    # The mapping is far too large to hold in memory (a full catalog is
+    # 10s-of-millions of rows), so we group by peptide via an external disk-based
+    # `sort` on the peptide_il column (field 2) and walk the sorted stream one
+    # peptide at a time. Memory stays bounded by the genome set of a single
+    # peptide. `sort` uses $TMPDIR (Snakemake points it at cluster scratch).
+    logprint("Sorting peptide mapping by peptide and computing LCA")
+    tmpdir = os.environ.get("TMPDIR", os.path.dirname(FAMILY_TSV))
+    sort_pipeline = (
+        "set -o pipefail; "
+        f"gzip -dc {shlex.quote(PEPTIDE_MAPPING_PATH)} | tail -n +2 | "
+        f"LC_ALL=C sort -t '\t' -k2,2 -T {shlex.quote(tmpdir)}"
+    )
+    proc = subprocess.Popen(
+        sort_pipeline, shell=True, executable="/bin/bash",
+        stdout=subprocess.PIPE, text=True,
+    )
 
-        # Map the LCA rank to our database rank categories
-        if lca_rank == "family":
-            db_rank = "family"
-        elif lca_rank == "genus":
-            db_rank = "genus"
-        elif lca_rank in ("species", "strain"):
-            db_rank = "species_strain"
-        else:
-            # Higher-level LCA (phylum, class, order, etc.) — not useful for detection
+    peptide_id = 0
+    skipped_no_lineage = 0
+    n_peptides = 0
+    cur_pep_il = None
+    rep_peptide = None
+    genomes = set()
+
+    for line in proc.stdout:
+        line = line.rstrip("\n")
+        if not line:
             continue
+        # peptide, peptide_il, genome, protein_id
+        peptide, pep_il, genome = line.split("\t")[:3]
+        if pep_il != cur_pep_il:
+            if cur_pep_il is not None:
+                n_peptides += 1
+                pid = peptide_id + 1
+                if emit_peptide(cur_pep_il, rep_peptide, genomes, genome_lineage,
+                                tsv_files, fasta_files, counts, pid):
+                    peptide_id = pid
+                else:
+                    skipped_no_lineage += 1
+            cur_pep_il = pep_il
+            rep_peptide = peptide  # first (sorted) original sequence for this peptide
+            genomes = set()
+        genomes.add(genome)
 
-        pid = rec["id"]
-        sequence = rec["peptide"]
+    # Flush the final peptide group
+    if cur_pep_il is not None:
+        n_peptides += 1
+        pid = peptide_id + 1
+        if emit_peptide(cur_pep_il, rep_peptide, genomes, genome_lineage,
+                        tsv_files, fasta_files, counts, pid):
+            peptide_id = pid
+        else:
+            skipped_no_lineage += 1
 
-        # Build FASTA header matching peptidotyping format
-        fasta_header = (
-            f"gpep|{pid}|{lca_name_u} {lca_rank}_{lca_name_u} "
-            f"OS={lca_name} OX={lca_name_u} RK={lca_rank} PT={parent_name_u}"
-        )
+    proc.stdout.close()
+    if proc.wait() != 0:
+        for fh in list(tsv_files.values()) + list(fasta_files.values()):
+            fh.close()
+        raise RuntimeError(f"sort pipeline failed with exit code {proc.returncode}")
 
-        # Write TSV row (10 columns matching peptidotyping format)
-        # lca and lca_il are the same (name-based identifier)
-        # fa and fa_il are set to the same value
-        tsv_files[db_rank].write(
-            f"{pid}\t{sequence}\t{lca_name_u}\t{lca_name_u}\t"
-            f"{lca_name_u}\t{lca_name_u}\t{lca_name}\t{lca_rank}\t"
-            f"{parent_name_u}\t{fasta_header}\n"
-        )
-
-        # Write FASTA
-        fasta_files[db_rank].write(f">{fasta_header}\n{sequence}\n")
-
-        counts[db_rank] += 1
+    logprint(
+        f"  {n_peptides} unique peptides; {peptide_id} with LCA assigned "
+        f"({skipped_no_lineage} skipped for no lineage)"
+    )
 
     for db_rank in output_map:
         tsv_files[db_rank].close()
