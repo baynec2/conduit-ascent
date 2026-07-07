@@ -2,13 +2,13 @@
 # Shared genome-resource cache helpers
 ################################################################################
 # Centralizes the per-(catalog) and per-(catalog,filter,max_genomes) cache-key
-# derivation used by MAGs.smk, hapid.smk, and genome_peptidotyping.smk so that
+# derivation used by genomes.smk, hapid.smk, and genome_peptidotyping.smk so that
 # expensive genome-derived artifacts (Prodigal/FGS FAA, HMMER tblout, bakta
 # annotations, LCA peptide DBs, hapid speclib) can be reused across runs that
 # share the same MGnify reference set.
 #
 # Sharing only activates when genome_download_source == "mgnify" — MGnify
-# accessions are globally unique. For local MAG runs the helpers fall back to
+# accessions are globally unique. For local genome runs the helpers fall back to
 # per-run paths so cross-experiment name collisions can't silently mix data.
 #
 # Include from each consumer module via:

@@ -6,7 +6,11 @@ include: "../_shared/genome_cache.smk"
 
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR = config["run_dir"]
-MAG_DIR = os.path.join(EXPERIMENT_DIR, "input/MAG_files")
+# User-provided genome FASTAs. Prefer input/genome_files/; fall back to the
+# legacy input/MAG_files/ name when present (deprecated).
+GENOME_DIR = os.path.join(EXPERIMENT_DIR, "input/genome_files")
+if not os.path.isdir(GENOME_DIR) and os.path.isdir(os.path.join(EXPERIMENT_DIR, "input/MAG_files")):
+    GENOME_DIR = os.path.join(EXPERIMENT_DIR, "input/MAG_files")
 
 sys.path.insert(0, os.path.join(workflow.basedir, "modules", "_shared"))
 from diann_staging import (
@@ -40,20 +44,20 @@ def _mgnify_genome_path(genome):
     return os.path.join(_MGNIFY_CATALOG_ROOT, "genomes", f"{genome}.fna")
 
 def _mgnify_taxonomy_path():
-    # Per-run, NOT shared — see MAGs.smk _mgnify_taxonomy_path docstring.
+    # Per-run, NOT shared — see genomes.smk _mgnify_taxonomy_path docstring.
     return os.path.join(RUN_DIR, "genome_download/mgnify/taxonomy.txt")
 
 def _taxonomy_input():
     """Taxonomy source: shared cache when mgnify, experiment-local otherwise."""
     if config.get("genome_download_source") == "mgnify":
         return _mgnify_taxonomy_path()
-    return os.path.join(MAG_DIR, "taxonomy.txt")
+    return os.path.join(GENOME_DIR, "taxonomy.txt")
 
 # Local canonicalize-checkpoint for the MGnify representatives list.
 # Snakemake 9 scopes the `checkpoints` proxy per-module, so reaching into
 # mgnify.smk's parse_mgnify_metadata from here raises AttributeError. Each
 # module must own the checkpoints it consumes — we re-import the upstream
-# file by static path. (Same pattern as MAGs.smk canonicalize_selected_genomes,
+# file by static path. (Same pattern as genomes.smk canonicalize_selected_genomes,
 # commit e2960561.)
 _MGNIFY_REPS_SRC = os.path.join(RUN_DIR, "genome_download/mgnify/species_representatives.txt")
 
@@ -69,7 +73,7 @@ if config.get("genome_download_source") == "mgnify":
             "mkdir -p $(dirname {log}) && cp {input} {output} 2> {log}"
 
 # Get all genome names — from MGnify representatives when source=mgnify, else
-# from user-provided FASTAs in MAG_DIR. The mgnify branch must NOT fall through
+# from user-provided FASTAs in GENOME_DIR. The mgnify branch must NOT fall through
 # to the local scan; see hapid.smk get_all_hapid_genomes() for context.
 def get_all_genome_names():
     if config.get("genome_download_source") == "mgnify":
@@ -78,20 +82,20 @@ def get_all_genome_names():
             return sorted([line.strip() for line in f if line.strip()])
     genomes = []
     for ext in ("fa", "fna", "fasta"):
-        for f in glob.glob(os.path.join(MAG_DIR, f"*.{ext}")):
+        for f in glob.glob(os.path.join(GENOME_DIR, f"*.{ext}")):
             genomes.append(os.path.splitext(os.path.basename(f))[0])
     return sorted(list(set(genomes)))
 
 # Get full path to genome FASTA given a genome name. MGnify-sourced genomes
-# live in the shared cache; user-provided genomes live in MAG_DIR.
+# live in the shared cache; user-provided genomes live in GENOME_DIR.
 def genome_fasta_path(wildcards):
     if config.get("genome_download_source") == "mgnify":
         return _mgnify_genome_path(wildcards.genome)
     for ext in ("fa", "fna", "fasta"):
-        candidate = os.path.join(MAG_DIR, f"{wildcards.genome}.{ext}")
+        candidate = os.path.join(GENOME_DIR, f"{wildcards.genome}.{ext}")
         if os.path.exists(candidate):
             return candidate
-    return os.path.join(MAG_DIR, f"{wildcards.genome}.fa")
+    return os.path.join(GENOME_DIR, f"{wildcards.genome}.fa")
 
 # Rank config — same as peptidotyping
 GENOME_PEPTIDOTYPING_RANK_CONFIG = {
@@ -753,7 +757,7 @@ rule infer_genome_peptidotyping_second_pass_presence:
 # Phase E: Genome Selection Checkpoint
 ################################################################################
 # Maps detected species/strain taxa back to input genomes.
-# This is a checkpoint — downstream MAGs rules re-evaluate which genomes to
+# This is a checkpoint — downstream genomes rules re-evaluate which genomes to
 # process based on this output.
 
 checkpoint select_genomes_by_peptidotyping:

@@ -8,7 +8,7 @@ import os
 # Snakemake bindings
 # -----------------------------
 BAKTA_DIRS    = snakemake.input.bakta_dirs
-TAXONOMY_PATH = snakemake.params.taxonomy   # mag_taxonomy.txt (has genome + organism_id cols)
+TAXONOMY_PATH = snakemake.params.taxonomy   # genome_taxonomy.txt (has genome + organism_id cols)
 
 FASTA_OUT = snakemake.output.fasta
 
@@ -22,12 +22,12 @@ def logprint(msg):
     print(msg, file=log)
 
 # -----------------------------
-# Map MAG name -> its bakta output dir, directly from the snakemake input.
+# Map genome name -> its bakta output dir, directly from the snakemake input.
 # Avoids reconstructing paths from a derived BASE_DIR, which broke for the
-# 1-MAG case (commonpath returns the dir itself, not its parent) and for the
-# 0-MAG case (IndexError on BAKTA_DIRS[0]).
+# 1-genome case (commonpath returns the dir itself, not its parent) and for the
+# 0-genome case (IndexError on BAKTA_DIRS[0]).
 # -----------------------------
-MAG_DIR_BY_NAME = {os.path.basename(d): d for d in BAKTA_DIRS}
+GENOME_DIR_BY_NAME = {os.path.basename(d): d for d in BAKTA_DIRS}
 
 # -----------------------------
 # Load taxonomy lookup (genome → species_name, organism_id)
@@ -41,22 +41,22 @@ logprint(f"Loaded taxonomy for {len(GENOME_SPECIES)} genomes from {TAXONOMY_PATH
 # Helper functions
 # -----------------------------
 
-def preprocess_bakta_annotations(MAG_dir, MAG):
+def preprocess_bakta_annotations(genome_dir, genome):
     """
     Extract CDS-only fastas and metadata from bakta output
     """
-    faa_path = os.path.join(MAG_dir, f"{MAG}.faa")
-    faa_clean_path = os.path.join(MAG_dir, f"{MAG}_cds.faa")
+    faa_path = os.path.join(genome_dir, f"{genome}.faa")
+    faa_clean_path = os.path.join(genome_dir, f"{genome}_cds.faa")
 
-    tsv_path = os.path.join(MAG_dir, f"{MAG}.tsv")
-    cds_tsv_path = os.path.join(MAG_dir, f"{MAG}_cds.tsv")
+    tsv_path = os.path.join(genome_dir, f"{genome}.tsv")
+    cds_tsv_path = os.path.join(genome_dir, f"{genome}_cds.tsv")
 
     if not os.path.exists(tsv_path):
-        logprint(f"[{MAG}] Missing TSV: {tsv_path}")
+        logprint(f"[{genome}] Missing TSV: {tsv_path}")
         return None, None
 
     if not os.path.exists(faa_path):
-        logprint(f"[{MAG}] Missing FAA: {faa_path}")
+        logprint(f"[{genome}] Missing FAA: {faa_path}")
         return None, None
 
     # Bakta TSV has 5-line header
@@ -69,7 +69,7 @@ def preprocess_bakta_annotations(MAG_dir, MAG):
     cds_ids = set(cds_meta["Locus Tag"])
 
     keep_ids = faa_ids.intersection(cds_ids)
-    logprint(f"[{MAG}] Found {len(keep_ids)} CDS IDs")
+    logprint(f"[{genome}] Found {len(keep_ids)} CDS IDs")
 
     filtered_records = [r for r in records if r.id in keep_ids]
     cds_meta_filtered = cds_meta[cds_meta["Locus Tag"].isin(keep_ids)]
@@ -80,15 +80,15 @@ def preprocess_bakta_annotations(MAG_dir, MAG):
     return faa_clean_path, cds_tsv_path
 
 
-def format_uniprot_metadata(MAG_dir, MAG):
+def format_uniprot_metadata(genome_dir, genome):
     """
     Creates a dataframe with UniProt-style metadata. organism_id is looked up
     from the taxonomy file (not computed from the genome name).
     """
-    cds_tsv_path = os.path.join(MAG_dir, f"{MAG}_cds.tsv")
+    cds_tsv_path = os.path.join(genome_dir, f"{genome}_cds.tsv")
 
     if not os.path.exists(cds_tsv_path):
-        logprint(f"[{MAG}] Missing CDS TSV: {cds_tsv_path}")
+        logprint(f"[{genome}] Missing CDS TSV: {cds_tsv_path}")
         return None
 
     cds_meta = pd.read_csv(cds_tsv_path, sep="\t")
@@ -98,10 +98,10 @@ def format_uniprot_metadata(MAG_dir, MAG):
     df["Product"] = cds_meta.set_index("Locus Tag")["Product"].reindex(locus_tags).fillna("NA")
     df["Gene"]    = cds_meta.set_index("Locus Tag")["Gene"].reindex(locus_tags).fillna("NA")
 
-    species_name = GENOME_SPECIES.get(MAG, "Unknown species")
-    org_id       = GENOME_ORG_ID.get(MAG, "0")
+    species_name = GENOME_SPECIES.get(genome, "Unknown species")
+    org_id       = GENOME_ORG_ID.get(genome, "0")
 
-    # MGnify metadata has empty species cells for some MAGs -> pandas reads NaN.
+    # MGnify metadata has empty species cells for some genomes -> pandas reads NaN.
     if pd.isna(species_name) or not isinstance(species_name, str):
         species_name = "Unknown species"
 
@@ -119,18 +119,18 @@ def format_uniprot_metadata(MAG_dir, MAG):
     return df
 
 
-def replace_faa_headers(MAG_dir, MAG, df):
+def replace_faa_headers(genome_dir, genome, df):
     """
     Replace FASTA headers with UniProt-style annotation.
     """
     if df is None:
         return None
 
-    faa_in  = os.path.join(MAG_dir, f"{MAG}_cds.faa")
-    faa_out = os.path.join(MAG_dir, f"{MAG}_uniprot.faa")
+    faa_in  = os.path.join(genome_dir, f"{genome}_cds.faa")
+    faa_out = os.path.join(genome_dir, f"{genome}_uniprot.faa")
 
     if not os.path.exists(faa_in):
-        logprint(f"[{MAG}] Missing CDS FAA: {faa_in}")
+        logprint(f"[{genome}] Missing CDS FAA: {faa_in}")
         return None
 
     records = list(SeqIO.parse(faa_in, "fasta"))
@@ -149,19 +149,19 @@ def replace_faa_headers(MAG_dir, MAG, df):
             updated += 1
 
     SeqIO.write(records, faa_out, "fasta")
-    logprint(f"[{MAG}] Updated {updated} headers → {faa_out}")
+    logprint(f"[{genome}] Updated {updated} headers → {faa_out}")
 
     return faa_out
 
 
-def concatenate_uniprot_fastas(mag_dirs_by_name, output_path):
+def concatenate_uniprot_fastas(genome_dirs_by_name, output_path):
     """
-    Combines all MAG uniprot fastas into one file. mag_dirs_by_name is the
-    {basename: full_path} mapping of bakta output dirs.
+    Combines all per-genome uniprot fastas into one file. genome_dirs_by_name is
+    the {basename: full_path} mapping of bakta output dirs.
     """
     files = []
-    for MAG, d in mag_dirs_by_name.items():
-        f = os.path.join(d, f"{MAG}_uniprot.faa")
+    for genome, d in genome_dirs_by_name.items():
+        f = os.path.join(d, f"{genome}_uniprot.faa")
         if os.path.exists(f):
             files.append(f)
 
@@ -182,23 +182,23 @@ def concatenate_uniprot_fastas(mag_dirs_by_name, output_path):
 # MAIN
 # -----------------------------
 def main():
-    MAG_list = list(GENOME_SPECIES.keys())
+    genome_list = list(GENOME_SPECIES.keys())
 
-    for MAG in MAG_list:
-        MAG_dir = MAG_DIR_BY_NAME.get(MAG)
-        if not MAG_dir or not os.path.isdir(MAG_dir):
-            logprint(f"[{MAG}] Skipping (no bakta directory in inputs)")
+    for genome in genome_list:
+        genome_dir = GENOME_DIR_BY_NAME.get(genome)
+        if not genome_dir or not os.path.isdir(genome_dir):
+            logprint(f"[{genome}] Skipping (no bakta directory in inputs)")
             continue
 
-        logprint(f"Processing {MAG}")
+        logprint(f"Processing {genome}")
 
-        preprocess_bakta_annotations(MAG_dir, MAG)
-        df = format_uniprot_metadata(MAG_dir, MAG)
-        replace_faa_headers(MAG_dir, MAG, df)
+        preprocess_bakta_annotations(genome_dir, genome)
+        df = format_uniprot_metadata(genome_dir, genome)
+        replace_faa_headers(genome_dir, genome, df)
 
-    concatenate_uniprot_fastas(MAG_DIR_BY_NAME, FASTA_OUT)
+    concatenate_uniprot_fastas(GENOME_DIR_BY_NAME, FASTA_OUT)
 
-    logprint("MAG UniProt processing complete.")
+    logprint("Genome UniProt processing complete.")
     log.close()
 
 

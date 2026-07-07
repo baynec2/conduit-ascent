@@ -137,7 +137,7 @@ Builds the database from a user-supplied list of UniProt proteome IDs. Requires 
 Performs a first-pass DIA-NN search using species-specific peptides (derived from Unipept's UMGAP LCA index) to identify which taxa are present in the sample, then builds a refined database from the detected taxa. See peptidotyping-specific parameters below.
 
 #### `genomes`
-Accepts user-provided genome FASTAs — either metagenome-assembled genomes (MAGs) or reference genomes. Bakta annotates each FASTA and the predicted proteins form the search space. Requires `experiments/{experiment}/input/MAG_files/`. (The old method name `MAGs` is still accepted as a deprecated alias.)
+Accepts user-provided genome FASTAs — either metagenome-assembled genomes (MAGs) or reference genomes. Bakta annotates each FASTA and the predicted proteins form the search space. Requires `experiments/{experiment}/input/genome_files/` (the legacy `MAG_files/` directory name is still accepted). The old method name `MAGs` is also still accepted as a deprecated alias.
 
 #### `metaphlan`
 Runs MetaPhlAn on shotgun metagenomic FASTQ files to profile the community, then builds a database from the detected taxa. Requires `experiments/{experiment}/input/fastq_files/`.
@@ -213,12 +213,12 @@ conduit-ascent/
 │   │   ├── uniprot_proteome_ids/     # From UniProt proteome IDs
 │   │   ├── peptidotyping/            # First-pass species detection
 │   │   ├── metaphlan/                # From MetaPhlAn metagenomic profiling
-│   │   ├── MAGs/                     # From metagenome-assembled genomes
+│   │   ├── genomes/                  # From user-provided genome FASTAs
 │   │   └── database_processing/      # Shared post-processing
 │   ├── diann/                        # DIA-NN identification and quantification
 │   ├── annotation/                   # Protein and taxonomic annotation
 │   │   ├── uniprot/                  # UniProt-based annotation
-│   │   ├── MAGs/                     # Bakta + UniProt annotation for MAG proteins
+│   │   ├── genomes/                  # Bakta + UniProt annotation for genome proteins
 │   │   ├── eggnogmapper/             # eggNOG-mapper functional annotation
 │   │   └── external_annotations/     # KEGG, Pfam, CAZy annotations
 │   └── build_conduit/                # Builds final Conduit RDS object
@@ -238,7 +238,7 @@ conduit-ascent/
 │       │   ├── ncbi_taxa_ids.txt     # Taxon IDs (ncbi_taxonomy_id method)
 │       │   ├── proteome_ids.txt      # Proteome IDs (uniprot_proteome_id method)
 │       │   ├── fastq_files/          # FASTQ files (metaphlan method)
-│       │   └── MAG_files/            # MAG FASTA files (MAGs method)
+│       │   └── genome_files/         # Genome FASTA files (genomes method)
 │       └── runs/
 │           └── {run_name}/           # All outputs for a given run
 │               ├── config/

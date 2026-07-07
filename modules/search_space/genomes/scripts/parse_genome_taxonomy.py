@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-parse_mag_taxonomy.py
+parse_genome_taxonomy.py
 
 Convert user-provided genome-level taxonomy into conduit's taxonomy.txt format.
 
 Input:  taxonomy.txt — TSV with columns:
           genome  domain  kingdom  phylum  class  order  family  genus  species
-Output: mag_taxonomy.txt — one row per genome, adds system-generated columns:
+Output: genome_taxonomy.txt — one row per genome, adds system-generated columns:
           organism_id (sequential integer, alphabetical order)
           proteome_id, proteome_type, download_info
-          genome column is RETAINED for traceability and use by MAG_uniprot_headers.py
+          genome column is RETAINED for traceability and use by genome_uniprot_headers.py
 """
 
 import os
@@ -50,7 +50,7 @@ def fill_taxonomy_defaults(tax_df, logf=None):
     return out
 
 
-def build_mag_taxonomy(tax_df, selected=None, logf=None):
+def build_genome_taxonomy(tax_df, selected=None, logf=None):
     """End-to-end pure transform: filter (optional) → assign_organism_ids → fill defaults → OUT_COLS subset."""
     if "genome" not in tax_df.columns:
         raise ValueError("Input taxonomy.txt must have a 'genome' column")
@@ -84,7 +84,7 @@ def main():
             selected = {line.strip() for line in fh if line.strip()}
         before = len(tax_df)
         missing = selected - set(tax_df["genome"].astype(str))
-        out_df = build_mag_taxonomy(tax_df, selected=selected, logf=log)
+        out_df = build_genome_taxonomy(tax_df, selected=selected, logf=log)
         logprint(
             f"Filtered taxonomy to {len(out_df)}/{before} genomes "
             f"using selected_genomes.txt ({len(selected)} entries)"
@@ -95,7 +95,7 @@ def main():
                 f"(first few: {sorted(missing)[:5]})"
             )
     else:
-        out_df = build_mag_taxonomy(tax_df, logf=log)
+        out_df = build_genome_taxonomy(tax_df, logf=log)
 
     out_df.to_csv(TAXONOMY_OUT, sep="\t", index=False)
 

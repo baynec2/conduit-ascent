@@ -4,7 +4,7 @@
 # Usage:
 #   bash tests/run_integration_tests.sh [method]
 #
-#   method: preflight | ncbi_taxonomy_id | uniprot_proteome_id | MAGs | metaphlan
+#   method: preflight | ncbi_taxonomy_id | uniprot_proteome_id | genomes | metaphlan
 #           | unipept_peptidotyping | all
 #   Defaults to "all" if not specified.
 #
@@ -26,7 +26,7 @@
 # edit paths to match your storage.
 #
 # Without a host profile, the portable base-config defaults apply — fine
-# for ncbi_taxonomy_id / uniprot_proteome_id / MAGs / metaphlan / hapid,
+# for ncbi_taxonomy_id / uniprot_proteome_id / genomes / metaphlan / hapid,
 # insufficient for unipept_peptidotyping family (those methods require the ~170 GB
 # UMGAP index, which lives off-repo on most machines).
 #
@@ -34,8 +34,8 @@
 # A pre-committed mock merged_profiles.txt is seeded into the run directory so that
 # downstream rules (call_ncbi_taxa_ids and beyond) are not also pruned from the DAG.
 #
-# The MAGs method requires a FASTA file at:
-#   experiments/integration_test/input/MAG_files/atcc_25922.fasta
+# The genomes method requires a FASTA file at:
+#   experiments/integration_test/input/genome_files/atcc_25922.fasta
 #
 # All methods read MS spectra from experiments/<exp>/input/ms_files/ — .raw and
 # .mzML are both accepted by DIA-NN. For integration tests this directory
@@ -245,7 +245,7 @@ run_uniprot_proteome_id() {
         fi
     fi
 }
-run_MAGs()                { run_integration_test MAGs; }
+run_genomes()             { run_integration_test genomes; }
 run_metaphlan() {
     # The integration_test sample1.fastq.gz is a 1k-read subset of an E. coli
     # sequencing run (sourced from experiments/s76/input/fastq_files/76.fastq.gz)
@@ -287,9 +287,9 @@ run_hapid() {
     fi
     run_integration_test hapid
 }
-run_mgnify_MAGs() {
+run_mgnify_genomes() {
     # Exercises the MGnify download path; mgnify_max_genomes: 3 keeps it cheap.
-    run_integration_test mgnify_MAGs
+    run_integration_test mgnify_genomes
 }
 run_mgnify_hapid() {
     if [ ! -f "$REPO_ROOT/resources/hapid/ribP_elonF_profiles_refined_manually.hmm" ]; then
@@ -303,13 +303,13 @@ case "$METHOD" in
     preflight)           run_preflight ;;
     ncbi_taxonomy_id)    run_ncbi_taxonomy_id ;;
     uniprot_proteome_id) run_uniprot_proteome_id ;;
-    MAGs)                run_MAGs ;;
+    genomes)             run_genomes ;;
     metaphlan)           run_metaphlan ;;
     unipept_peptidotyping) run_unipept_peptidotyping ;;
     genome_peptidotyping) run_genome_peptidotyping ;;
     unipept_hapid)       run_unipept_hapid ;;
     hapid)               run_hapid ;;
-    mgnify_MAGs)         run_mgnify_MAGs ;;
+    mgnify_genomes)      run_mgnify_genomes ;;
     mgnify_hapid)        run_mgnify_hapid ;;
     all)
         run_preflight
@@ -320,20 +320,20 @@ case "$METHOD" in
         fi
         run_ncbi_taxonomy_id
         run_uniprot_proteome_id
-        run_MAGs
+        run_genomes
         run_metaphlan
         run_unipept_peptidotyping
         run_genome_peptidotyping
         run_unipept_hapid
         run_hapid
-        run_mgnify_MAGs
+        run_mgnify_genomes
         run_mgnify_hapid
         ;;
     *)
         echo "Unknown method: $METHOD"
-        echo "Valid options: preflight | ncbi_taxonomy_id | uniprot_proteome_id | MAGs | metaphlan"
+        echo "Valid options: preflight | ncbi_taxonomy_id | uniprot_proteome_id | genomes | metaphlan"
         echo "             | unipept_peptidotyping | genome_peptidotyping | unipept_hapid | hapid"
-        echo "             | mgnify_MAGs | mgnify_hapid | all"
+        echo "             | mgnify_genomes | mgnify_hapid | all"
         exit 1
         ;;
 esac

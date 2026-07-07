@@ -6,7 +6,7 @@ Maps detected species/strain names from the second-pass FDR inference back to
 input genome names using the user-provided taxonomy.
 
 This is the checkpoint script — its output controls which genomes the
-downstream MAGs rules process.
+downstream genomes rules process.
 
 Input:
   - detected_species_strain_taxa_ids.txt (TSV: ncbi_taxonomy_id, detected_taxonomy)

@@ -55,7 +55,7 @@ jobs:
             if (any(df$failed > 0)) quit(status = 1)
           '
 
-      - name: Run Python unit tests (MAGs + unipept_hapid script helpers)
+      - name: Run Python unit tests (genomes + unipept_hapid script helpers)
         run: |
           pip install pytest pandas biopython
           python -m pytest tests/scripts/python -v
@@ -66,7 +66,7 @@ jobs:
       - name: Generate DAGs
         run: |
           mkdir -p dag_output
-          for method in ncbi_taxonomy_id uniprot_proteome_id unipept_peptidotyping unipept_hapid MAGs metaphlan hapid; do
+          for method in ncbi_taxonomy_id uniprot_proteome_id unipept_peptidotyping unipept_hapid genomes metaphlan hapid; do
             snakemake \
               --snakefile Snakefile \
               --configfile "tests/configs/integration_test_${method}.yaml" \

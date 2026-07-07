@@ -1,5 +1,5 @@
 ################################################################################
-# Append Additional Organisms or Proteomes to MAG FASTA & Taxonomy
+# Append Additional Organisms or Proteomes to Genome FASTA & Taxonomy
 ################################################################################
 
 ## Snakemake logging setup -----------------------------------------------------
@@ -37,8 +37,8 @@ append_proteomes <- function(fasta_set, taxonomy, proteome_ids, fasta_dir) {
 }
 
 ## Inputs ---------------------------------------------------------------------
-mag_fasta_fp <- snakemake@input[["mag_fasta"]]
-mag_taxonomy_fp <- snakemake@input[["mag_taxonomy"]]
+genome_fasta_fp <- snakemake@input[["genome_fasta"]]
+genome_taxonomy_fp <- snakemake@input[["genome_taxonomy"]]
 
 ## Outputs --------------------------------------------------------------------
 fasta_fp <- snakemake@output[["fasta"]]
@@ -53,7 +53,7 @@ additional_ncbi_taxa_id <- snakemake@config[["append_additional_ncbi_taxa_id"]]
 
 conduitR::log_with_timestamp("Running append_additional_organisms_or_proteomes.R")
 conduitR::log_with_timestamp(
-  paste0("Input files: ", mag_fasta_fp, " ", mag_taxonomy_fp)
+  paste0("Input files: ", genome_fasta_fp, " ", genome_taxonomy_fp)
 )
 conduitR::log_with_timestamp(
   paste0("Output files: ", fasta_fp, " ", taxonomy_fp)
@@ -61,15 +61,15 @@ conduitR::log_with_timestamp(
 
 ## Read inputs ----------------------------------------------------------------
 # FASTA via Biostrings
-fasta <- Biostrings::readAAStringSet(mag_fasta_fp)
+fasta <- Biostrings::readAAStringSet(genome_fasta_fp)
 
 # Taxonomy table
-taxonomy <- readr::read_delim(mag_taxonomy_fp, col_types = readr::cols())
+taxonomy <- readr::read_delim(genome_taxonomy_fp, col_types = readr::cols())
 
 ## Control flow ---------------------------------------------------------------
 if (is_missing(additional_proteome_id) && is_missing(additional_ncbi_taxa_id)) {
   conduitR::log_with_timestamp(
-    "No additional proteomes or taxa specified; passing MAGs through unchanged"
+    "No additional proteomes or taxa specified; passing genomes through unchanged"
   )
 
 } else if (!is_missing(additional_proteome_id) && is_missing(additional_ncbi_taxa_id)) {

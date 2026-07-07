@@ -9,7 +9,11 @@ include: "../_shared/genome_cache.smk"
 # ==============================================================================
 EXPERIMENT_DIR  = config["experiment_dir"]
 RUN_DIR         = config["run_dir"]
-HAPID_DIR       = os.path.join(EXPERIMENT_DIR, "input/MAG_files")
+# User-provided genome FASTAs (hapid selects a subset of these). Prefer
+# input/genome_files/; fall back to the legacy input/MAG_files/ name (deprecated).
+HAPID_DIR = os.path.join(EXPERIMENT_DIR, "input/genome_files")
+if not os.path.isdir(HAPID_DIR) and os.path.isdir(os.path.join(EXPERIMENT_DIR, "input/MAG_files")):
+    HAPID_DIR = os.path.join(EXPERIMENT_DIR, "input/MAG_files")
 
 sys.path.insert(0, os.path.join(workflow.basedir, "modules", "_shared"))
 from diann_staging import (
@@ -546,7 +550,7 @@ rule annotate_hapid_greedy_selection:
 
 # Apply the hapid_percent_spectra cutoff and emit a one-genome-per-line list.
 # Lives in this module so it has in-scope access to the greedy-selection
-# checkpoint output; downstream MAGs rules consume the resulting file purely
+# checkpoint output; downstream genomes rules consume the resulting file purely
 # as a static input path.
 rule hapid_filter_selected_genomes:
     input:

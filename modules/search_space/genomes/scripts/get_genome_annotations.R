@@ -1,7 +1,7 @@
 ################################################################################
-# Get MAG Annotations From Bakta Output
+# Get Genome Annotations From Bakta Output
 ################################################################################
-## Opening Log File 
+## Opening Log File
 # Open the log file to write both stdout and stderr
 logfile <- snakemake@log[[1]]
 zz <- file(logfile, open = "a")
@@ -11,31 +11,31 @@ sink(zz, type = "message")  # redirect stderr/messages
 # Get input and output files from Snakemake workflow
 bakta_dirs <- snakemake@input[["bakta_dirs"]]
 # Output
-mag_annotations_fp <- snakemake@output[["mag_annotations"]]
+genome_annotations_fp <- snakemake@output[["genome_annotations"]]
 
 start_time <- Sys.time()
-mag_names <- basename(bakta_dirs)
-cds_files <- paste0(bakta_dirs,"/",mag_names,".tsv")
+genome_names <- basename(bakta_dirs)
+cds_files <- paste0(bakta_dirs,"/",genome_names,".tsv")
 
-conduitR::log_with_timestamp("Running get_mag_annotations.R script")
+conduitR::log_with_timestamp("Running get_genome_annotations.R script")
 conduitR::log_with_timestamp(paste0("Input files: ", cds_files))
-conduitR::log_with_timestamp(paste0("Output file: ", mag_annotations_fp))
+conduitR::log_with_timestamp(paste0("Output file: ", genome_annotations_fp))
 
-conduitR::log_with_timestamp("Consolidating MAG annotations into one file")
+conduitR::log_with_timestamp("Consolidating genome annotations into one file")
 
-# Function to read in annotation files and give them magname
+# Function to read in annotation files and give them genome name
 read_annotation_files = function(filepath){
-mag_name <- gsub(".tsv","",basename(filepath))
+genome_name <- gsub(".tsv","",basename(filepath))
     data <- readr::read_tsv(filepath,skip=5) |>
-    dplyr::mutate(mag = mag_name)
+    dplyr::mutate(genome = genome_name)
     return(data)
 }
 
 combined_annotations <- purrr::map_df(cds_files,read_annotation_files)|>
-dplyr::select(mag,dplyr::everything())
+dplyr::select(genome,dplyr::everything())
 
-# Formatting 
-conduitR::log_with_timestamp("Formatting MAG annotations")
+# Formatting
+conduitR::log_with_timestamp("Formatting genome annotations")
 
 long_annotations = combined_annotations |>
     tidyr::separate_rows(DbXrefs, sep = ",\\s*") |> # each DbXref in its own row
@@ -62,17 +62,17 @@ if (length(unsupported) > 0) {
 }
 
 # Step 2: Separate db prefix from value
-mag_annotations <- long_annotations |>
+genome_annotations <- long_annotations |>
   dplyr::filter(xref_name != "unsupported_annotation") |>
 tidyr::pivot_wider(names_from = xref_name,values_from = DbXrefs, values_fn = list(DbXrefs = ~paste(., collapse = ";")))
 
-conduitR::log_with_timestamp("Writing MAG annotations to file.")
+conduitR::log_with_timestamp("Writing genome annotations to file.")
 
-readr::write_delim(mag_annotations,mag_annotations_fp)
+readr::write_delim(genome_annotations,genome_annotations_fp)
 
 end_time <- Sys.time()
 
-conduitR::log_with_timestamp("Completed get_mag_annotations.R script. Time taken: %.2f minutes", 
+conduitR::log_with_timestamp("Completed get_genome_annotations.R script. Time taken: %.2f minutes",
     as.numeric(difftime(end_time, start_time, units = "mins")))
 
 # closing logfile connection

@@ -1,7 +1,7 @@
 # Integration test: genomes method with MGnify genome download
 # mgnify_max_genomes is capped small for fast CI-style runs; bump as needed.
 experiment: integration_test
-run_name: mgnify_MAGs
+run_name: mgnify_genomes
 search_space_method: genomes
 genome_download_source: mgnify
 mgnify_catalog: "human-gut/v2.0.2"

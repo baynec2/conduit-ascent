@@ -100,10 +100,14 @@ tests/fixtures/peptidotyping_subset/family_rank_peptide_counts.tsv
 tests/fixtures/peptidotyping_subset/taxid_to_family_genus.tsv
 tests/fixtures/peptidotyping_subset/logs/
 
-# bakta + check_mag_fastas leftovers under input/MAG_files/
+# bakta + check_genome_fastas leftovers under input/genome_files/ (the legacy
+# input/MAG_files/ name is still accepted via the deprecated fallback)
+experiments/*/input/genome_files/.fastas_checked
+experiments/*/input/genome_files/logs/
 experiments/*/input/MAG_files/.fastas_checked
 experiments/*/input/MAG_files/logs/
 # Samba/SMB temp files (Windows clients leave these when copying)
+experiments/*/input/genome_files/.smb*
 experiments/*/input/MAG_files/.smb*
 
 # Local baseline / scratch archives dropped during refactor work

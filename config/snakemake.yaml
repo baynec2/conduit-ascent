@@ -198,7 +198,7 @@ bakta_db_type: "light"
 #  Used by: genomes · hapid · genome_peptidotyping (when source == "mgnify")
 # =============================================================================
 # Sharing only kicks in when genome_download_source == "mgnify" — MGnify accessions
-# are globally unique. For local MAGs we keep per-run paths; local names aren't
+# are globally unique. For local genomes we keep per-run paths; local names aren't
 # guaranteed unique across experiments.
 #
 # Per-genome artifacts (Prodigal/FGS FAA, HMMER tblout, bakta annotations).
@@ -223,7 +223,7 @@ relative_abundance_threshold: 0.01
 #  Activated when: genome_download_source == "mgnify"
 #  Consumed by:    genomes · hapid · genome_peptidotyping (when the flag is set)
 # =============================================================================
-# Where to fetch genomes from. FALSE = user-provided MAGs only. "mgnify" = download.
+# Where to fetch genomes from. FALSE = user-provided genomes only. "mgnify" = download.
 genome_download_source: FALSE
 # MGnify catalog string. The string IS the version pin (no extra version key needed).
 # e.g. "human-gut/v2.0.2", "chicken-gut/v1.0.1"

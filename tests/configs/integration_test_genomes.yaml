@@ -2,5 +2,5 @@
 # All other config is inherited from config/snakemake.yaml (auto-loaded by
 # the Snakefile) and the active profile (profiles/<hostname>/).
 experiment: integration_test
-run_name: MAGs
+run_name: genomes
 search_space_method: genomes

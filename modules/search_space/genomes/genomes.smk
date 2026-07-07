@@ -7,11 +7,16 @@ include: "../_shared/genome_cache.smk"
 # Experiment specific directories
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR = config["run_dir"]
-MAG_DIR = os.path.join(EXPERIMENT_DIR,"input/MAG_files")
+# User-provided genome FASTAs. Prefer input/genome_files/; fall back to the
+# legacy input/MAG_files/ name when present (deprecated) so existing experiment
+# dirs keep working without manual migration.
+GENOME_DIR = os.path.join(EXPERIMENT_DIR, "input/genome_files")
+if not os.path.isdir(GENOME_DIR) and os.path.isdir(os.path.join(EXPERIMENT_DIR, "input/MAG_files")):
+    GENOME_DIR = os.path.join(EXPERIMENT_DIR, "input/MAG_files")
 # Resource specific directories.
 BAKTA_DIR = config["bakta_db_dir"]
 # Bakta annotations are shared across runs when source == "mgnify" (genome IDs are
-# globally unique). For local MAGs they fall back to per-run paths to avoid
+# globally unique). For local genomes they fall back to per-run paths to avoid
 # cross-experiment name collisions. See _shared/genome_cache.smk.
 BAKTA_OUT_ROOT = per_genome_cache_root("bakta")
 DB_OUT_ROOT = os.path.join(RUN_DIR,"database_resources")
@@ -25,8 +30,8 @@ _MGNIFY_CATALOG_SLUG = config.get("mgnify_catalog", "").replace("/", "_")
 _MGNIFY_CATALOG_ROOT = (os.path.join(_MGNIFY_CACHE_DIR, _MGNIFY_CATALOG_SLUG)
                         if _MGNIFY_CATALOG_SLUG else "")
 
-def _mgnify_genome_path(mag):
-    return os.path.join(_MGNIFY_CATALOG_ROOT, "genomes", f"{mag}.fna")
+def _mgnify_genome_path(genome):
+    return os.path.join(_MGNIFY_CATALOG_ROOT, "genomes", f"{genome}.fna")
 
 def _mgnify_taxonomy_path():
     # Per-run, NOT shared — the file is a filtered projection by per-run
@@ -66,7 +71,7 @@ def _selected_genomes_source():
         return os.path.join(RUN_DIR, "genome_download/mgnify/species_representatives.txt")
     return None
 
-# Local checkpoint so get_mag_list() stays inside this module's checkpoints
+# Local checkpoint so get_genome_list() stays inside this module's checkpoints
 # proxy (Snakemake 9 scopes it per-module). Output is temp() so the checkpoint
 # re-runs every invocation — otherwise lambdas calling .get() resolve to "<TBD>"
 # when its output persists from a prior run while upstream regenerates input.
@@ -77,58 +82,58 @@ if _selected_genomes_source() is not None:
         output:
             temp(os.path.join(DB_OUT_ROOT, "selected_genomes.txt"))
         log:
-            os.path.join(RUN_DIR, "logs/search_space/MAGs/canonicalize_selected_genomes.log")
+            os.path.join(RUN_DIR, "logs/search_space/genomes/canonicalize_selected_genomes.log")
         shell:
             "mkdir -p $(dirname {log}) && cp {input} {output} 2> {log}"
 
-# Get MAG names (basenames without extension) for wildcards
-def get_mag_list():
+# Get genome names (basenames without extension) for wildcards
+def get_genome_list():
     if _selected_genomes_source() is not None:
         list_file = checkpoints.canonicalize_selected_genomes.get().output[0]
         with open(list_file) as fh:
             return sorted([line.strip() for line in fh if line.strip()])
-    # Plain MAGs method: use all user-provided FASTAs in MAG_DIR.
-    mags = []
+    # Plain genomes method: use all user-provided FASTAs in GENOME_DIR.
+    genomes = []
     for ext in ("fa", "fna", "fasta"):
-        for f in glob.glob(os.path.join(MAG_DIR, f"*.{ext}")):
-            mags.append(os.path.splitext(os.path.basename(f))[0])
-    return sorted(set(mags))
+        for f in glob.glob(os.path.join(GENOME_DIR, f"*.{ext}")):
+            genomes.append(os.path.splitext(os.path.basename(f))[0])
+    return sorted(set(genomes))
 
-# Get full path to MAG file given a MAG name (wildcard). MGnify-sourced
-# genomes live in the shared cache; user-provided MAGs live in MAG_DIR.
-def mag_fasta_path(wildcards):
+# Get full path to a genome FASTA given a genome name (wildcard). MGnify-sourced
+# genomes live in the shared cache; user-provided genomes live in GENOME_DIR.
+def genome_fasta_path(wildcards):
     if config.get("genome_download_source") == "mgnify":
-        return _mgnify_genome_path(wildcards.mag)
+        return _mgnify_genome_path(wildcards.genome)
     for ext in ("fa", "fna", "fasta"):
-        candidate = os.path.join(MAG_DIR, f"{wildcards.mag}.{ext}")
+        candidate = os.path.join(GENOME_DIR, f"{wildcards.genome}.{ext}")
         if os.path.exists(candidate):
             return candidate
-    return os.path.join(MAG_DIR, f"{wildcards.mag}.fa")
+    return os.path.join(GENOME_DIR, f"{wildcards.genome}.fa")
 
-rule check_mag_fastas:
+rule check_genome_fastas:
     input:
-        MAG_DIR,
+        GENOME_DIR,
         *([os.path.join(RUN_DIR, "genome_download/mgnify/.mgnify_download_complete")]
           if config.get("genome_download_source") == "mgnify" else [])
     output:
-        touch(os.path.join(MAG_DIR, ".fastas_checked"))
+        touch(os.path.join(GENOME_DIR, ".fastas_checked"))
     log:
-        os.path.join(MAG_DIR, "logs/check_mag_fastas.log")
+        os.path.join(GENOME_DIR, "logs/check_genome_fastas.log")
     container: config["containers"]["bakta"]
     shell:
         r"""
         mkdir -p $(dirname {log})
-        echo "Checking MAG FASTA files in {input}" > {log} 2>&1
+        echo "Checking genome FASTA files in {input}" > {log} 2>&1
 
         # Snakemake input files are already expanded as a space-separated list
         files=({input})
 
         if [ ${{#files[@]}} -eq 0 ]; then
-            echo "ERROR: No MAG FASTA files found in {input}" | tee -a {log}
+            echo "ERROR: No genome FASTA files found in {input}" | tee -a {log}
             exit 1
         fi
 
-        echo "MAG FASTA files found:" >> {log}
+        echo "genome FASTA files found:" >> {log}
         printf "%s\n" "${{files[@]}}" >> {log}
 
         touch {output}
@@ -152,7 +157,7 @@ rule download_bakta_resources:
         """
         mkdir -p $(dirname {log})
         echo "Starting Bakta DB download..." > {log}
-        
+
         # Download the database
         bakta_db download --output {params.bakta_db_dir} --type {params.bakta_db_type} >> {log} 2>&1
 
@@ -162,123 +167,123 @@ rule download_bakta_resources:
 # from any directory (e.g. experiments/CB019) and so the container sees the same path.
 
 
-rule annotate_mags_with_bakta:
+rule annotate_genomes_with_bakta:
     input:
-        mags_ok = os.path.join(MAG_DIR, ".fastas_checked"),
-        mag_fa = mag_fasta_path,
+        genomes_ok = os.path.join(GENOME_DIR, ".fastas_checked"),
+        genome_fa = genome_fasta_path,
         # Depend on the bakta DB so Snakemake schedules download_bakta_resources
         # when it's missing (and skips it when the DB is already staged at
         # bakta_db_dir). Without this the download rule is an orphan — nothing
         # requests its output, so the DB is never fetched and bakta fails.
         bakta_db = expand(os.path.join(bakta_db_final, "{file}"), file=REQUIRED_BAKTA_FILES)
     output:
-        directory(os.path.join(BAKTA_OUT_ROOT, "{mag}"))
+        directory(os.path.join(BAKTA_OUT_ROOT, "{genome}"))
     params:
         bakta_db_final = bakta_db_final
     log:
-        os.path.join(BAKTA_OUT_ROOT, "logs/{mag}_bakta.log")
+        os.path.join(BAKTA_OUT_ROOT, "logs/{genome}_bakta.log")
     threads: workflow.cores
     container:
         config["containers"]["bakta"]
     shell:
         r"""
         mkdir -p $(dirname {log})
-        echo "Annotating {input.mag_fa}" > {log}
-        
+        echo "Annotating {input.genome_fa}" > {log}
+
         # Ensure writable temp directory for tRNAscan-SE and other tools
         export TMPDIR=$(mktemp -d -p /tmp)
         export TEMP=$TMPDIR
         export TMP=$TMPDIR
-        
+
         # Suppress matplotlib cache warnings (optional)
         export MPLCONFIGDIR=$TMPDIR/matplotlib
         mkdir -p $MPLCONFIGDIR
-        
+
         echo "Using temp directory: $TMPDIR" >> {log}
 
         bakta \
             --db {params.bakta_db_final} \
             --threads {threads} \
             --output {output} \
-            --prefix {wildcards.mag} \
-            {input.mag_fa} >> {log} 2>&1
-        
+            --prefix {wildcards.genome} \
+            {input.genome_fa} >> {log} 2>&1
+
         BAKTA_EXIT=$?
-        
+
         # Cleanup
         rm -rf $TMPDIR
-        
+
         if [ $BAKTA_EXIT -ne 0 ]; then
             echo "Bakta failed with exit code $BAKTA_EXIT" >> {log}
             exit $BAKTA_EXIT
         fi
 
-        echo "Finished {wildcards.mag}" >> {log}
+        echo "Finished {wildcards.genome}" >> {log}
         """
 
-def _mag_taxonomy_input():
+def _genome_taxonomy_input():
     """Taxonomy source: shared cache when mgnify, experiment-local otherwise."""
     if config.get("genome_download_source") == "mgnify":
         return _mgnify_taxonomy_path()
-    return os.path.join(MAG_DIR, "taxonomy.txt")
+    return os.path.join(GENOME_DIR, "taxonomy.txt")
 
-def _parse_mag_taxonomy_inputs(wildcards):
+def _parse_genome_taxonomy_inputs(wildcards):
     # Snakemake input functions are always called with a wildcards arg, even
     # when the rule has no wildcards — accept and ignore it.
-    inputs = {"taxonomy": _mag_taxonomy_input()}
+    inputs = {"taxonomy": _genome_taxonomy_input()}
     # When an upstream selector (hapid / genome_peptidotyping / mgnify reps) is
     # in play, filter taxonomy.txt to the selected subset so the final taxonomy
-    # mirrors what's actually in database.fasta. Pure-MAGs runs have no
-    # selector and the user-provided taxonomy already matches MAG_files/.
+    # mirrors what's actually in database.fasta. Pure-genomes runs have no
+    # selector and the user-provided taxonomy already matches genome_files/.
     if _selected_genomes_source() is not None:
         inputs["selected_genomes"] = os.path.join(DB_OUT_ROOT, "selected_genomes.txt")
     return inputs
 
 
-rule parse_mag_taxonomy:
+rule parse_genome_taxonomy:
     input:
-        unpack(_parse_mag_taxonomy_inputs)
+        unpack(_parse_genome_taxonomy_inputs)
     output:
         # Intermediate: consumed by create_uniprot_style_database (needs the
-        # `genome` column for per-MAG species lookup) and by
+        # `genome` column for per-genome species lookup) and by
         # append_additional_organisms_or_proteomes (drops `genome`, writes
         # taxonomy.txt). Snakemake auto-deletes after both finish.
-        temp(os.path.join(DB_OUT_ROOT, "mag_taxonomy.txt"))
+        temp(os.path.join(DB_OUT_ROOT, "genome_taxonomy.txt"))
     log:
-        os.path.join(RUN_DIR, "logs/search_space/MAGs/parse_mag_taxonomy.log")
+        os.path.join(RUN_DIR, "logs/search_space/genomes/parse_genome_taxonomy.log")
     container:
         config["containers"]["bakta"]
     script:
-        "scripts/parse_mag_taxonomy.py"
+        "scripts/parse_genome_taxonomy.py"
 
 rule create_uniprot_style_database:
     input:
         bakta_dirs = lambda wildcards: [
-            os.path.join(BAKTA_OUT_ROOT, mag) for mag in get_mag_list()
+            os.path.join(BAKTA_OUT_ROOT, genome) for genome in get_genome_list()
         ],
-        taxonomy = os.path.join(DB_OUT_ROOT, "mag_taxonomy.txt")
+        taxonomy = os.path.join(DB_OUT_ROOT, "genome_taxonomy.txt")
     output:
         # Intermediate: consumed by append_additional_organisms_or_proteomes,
         # which writes the final database.fasta. Auto-deleted after.
-        fasta = temp(os.path.join(DB_OUT_ROOT, "mag_database.fasta"))
+        fasta = temp(os.path.join(DB_OUT_ROOT, "genome_database.fasta"))
     params:
-        taxonomy = os.path.join(DB_OUT_ROOT, "mag_taxonomy.txt")
+        taxonomy = os.path.join(DB_OUT_ROOT, "genome_taxonomy.txt")
     log:
-        os.path.join(RUN_DIR,"logs/search_space/MAGs/create_uniprot_style_database.log")
+        os.path.join(RUN_DIR,"logs/search_space/genomes/create_uniprot_style_database.log")
     container:
         config["containers"]["bakta"]
     script:
-        "scripts/MAG_uniprot_headers.py"
+        "scripts/genome_uniprot_headers.py"
 
 rule append_additional_organisms_or_proteomes:
     input:
-        # Modifying the mag database to also have uniprot information.
-        mag_fasta = os.path.join(DB_OUT_ROOT, "mag_database.fasta"),
-        mag_taxonomy = os.path.join(DB_OUT_ROOT,"mag_taxonomy.txt")
+        # Modifying the genome database to also have uniprot information.
+        genome_fasta = os.path.join(DB_OUT_ROOT, "genome_database.fasta"),
+        genome_taxonomy = os.path.join(DB_OUT_ROOT,"genome_taxonomy.txt")
     output:
         fasta = os.path.join(DB_OUT_ROOT,"database.fasta"),
         taxonomy = os.path.join(DB_OUT_ROOT,"taxonomy.txt")
-    log: os.path.join(RUN_DIR,"logs/search_space/MAGs/append_additional_data.log")
+    log: os.path.join(RUN_DIR,"logs/search_space/genomes/append_additional_data.log")
     # conduitR::get_proteome_ids_from_organism_ids() sizes its worker pool as
     # future::availableCores() - 1; guarantee >=2 cores so it never resolves to 0
     # workers (which would error) on a single-core allocation.
@@ -287,18 +292,18 @@ rule append_additional_organisms_or_proteomes:
     script:
         "scripts/append_additional_organisms_or_proteomes.R"
 
-rule get_mag_annotations:
+rule get_genome_annotations:
     input:
         bakta_dirs = lambda wildcards: [
-            os.path.join(BAKTA_OUT_ROOT, mag) for mag in get_mag_list()
+            os.path.join(BAKTA_OUT_ROOT, genome) for genome in get_genome_list()
         ],
     output:
-        # Per-run: filtered to this experiment's selected genomes (get_mag_list).
+        # Per-run: filtered to this experiment's selected genomes (get_genome_list).
         # Don't write under BAKTA_OUT_ROOT — that path may be a shared cache.
-        mag_annotations = os.path.join(DB_OUT_ROOT, "mag_annotations.txt")
+        genome_annotations = os.path.join(DB_OUT_ROOT, "genome_annotations.txt")
     log:
-        os.path.join(RUN_DIR,"logs/search_space/MAGs/get_mag_annotations.log")
+        os.path.join(RUN_DIR,"logs/search_space/genomes/get_genome_annotations.log")
     container:
         config["containers"]["conduitr"]
     script:
-        "scripts/get_mag_annotations.R"
+        "scripts/get_genome_annotations.R"

@@ -5,7 +5,6 @@ import os
 # ==============================================================================
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR        = config["run_dir"]
-MAG_DIR        = os.path.join(EXPERIMENT_DIR, "input/MAG_files")
 MGNIFY_OUT     = os.path.join(RUN_DIR, "genome_download/mgnify")
 
 MGNIFY_FTP_BASE = config.get("mgnify_ftp_base",

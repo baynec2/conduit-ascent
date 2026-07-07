@@ -28,14 +28,14 @@ Snakemake R scripts source siblings via `snakemake@source("./file_lib.R")`. Pyth
 | `testthat/test-call_ncbi_taxa_ids_lib.R` | `parse_metaphlan_profiles` | `modules/search_space/metaphlan/scripts/call_ncbi_taxa_ids_lib.R` |
 | `testthat/test-get_uniprot_proteome_ids_lib.R` | `parse_organism_ids` | `modules/search_space/ncbi_taxonomy/scripts/get_uniprot_proteome_ids_lib.R` |
 | `test_parse_eggnogmapper_annotations.R` | inline regression cases | `modules/annotation/eggnogmapper/scripts/parse_eggnogmapper_annotations.R` |
-| `python/test_parse_mag_taxonomy.py` | `build_mag_taxonomy`, `assign_organism_ids`, `filter_to_selected_genomes`, `fill_taxonomy_defaults` | `modules/search_space/MAGs/scripts/parse_mag_taxonomy.py` |
+| `python/test_parse_genome_taxonomy.py` | `build_genome_taxonomy`, `assign_organism_ids`, `filter_to_selected_genomes`, `fill_taxonomy_defaults` | `modules/search_space/genomes/scripts/parse_genome_taxonomy.py` |
 | `python/test_build_taxon_spectrum_mapping.py` | `build_taxon_spectrum_mapping` | `modules/search_space/unipept_hapid/scripts/build_taxon_spectrum_mapping.py` |
 | `python/test_cover_all_spectra_greedy.py` | `greedy_cover` | `modules/search_space/_shared/scripts/coverAllSpectra_greedy.py` |
 | `test_awk_pipelines.sh` | FASTA header generation + rank-priority awk pipelines from `unipept_peptidotyping.smk` | `modules/search_space/unipept_peptidotyping/unipept_peptidotyping.smk` |
 
 ### Gaps
 
-- `modules/search_space/MAGs/scripts/MAG_uniprot_headers.py` — needs bakta `.tsv` / `.faa` fixtures; deferred.
+- `modules/search_space/genomes/scripts/genome_uniprot_headers.py` — needs bakta `.tsv` / `.faa` fixtures; deferred.
 - Other R/python scripts in `modules/` don't yet have a `*_lib.R` factoring.
 - AWK tests duplicate the pipeline code from the `.smk`; if the `.smk` changes, the test must be updated in lockstep (no shared source).
 
