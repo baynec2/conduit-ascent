@@ -4,22 +4,16 @@
 # to annotate the data. This works conviently with the rest of the conduit 
 # infastructure. 
 ################################################################################
-## Cap parallel workers to this job's Snakemake thread allocation.
-# conduitR::annotate_uniprot_ids() (called via get_annotations_from_uniprot())
-# sizes its worker pool from parallel::detectCores() - 1, which reports ALL
-# physical cores on the node and ignores the cgroup / Slurm allocation. On HPC
-# this requests far more workers than allocated and parallelly aborts
-# ("Attempting to set up N localhost parallel workers with only 1 CPU core...").
-# Overriding detectCores() in the parallel namespace makes detectCores() - 1
-# resolve to snakemake@threads, so the worker pool matches the allocation and
-# the existing conduitR code path is unchanged. Remove once conduitR sizes its
-# pool from parallelly::availableCores().
-n_workers <- snakemake@threads[[1]]
-utils::assignInNamespace(
-  "detectCores",
-  function(...) n_workers + 1L,
-  ns = "parallel"
-)
+## Cap conduitR's parallel worker pool to this rule's Snakemake allocation.
+# conduitR sizes its future/furrr pools from future::availableCores() - 1
+# (= parallelly::availableCores()), which otherwise reports every physical core
+# on the node and oversubscribes when Snakemake scheduled this rule with fewer
+# threads. Setting the `custom` availableCores() method makes it return this
+# rule's thread count, so the pool matches the allocation on both local and
+# SLURM runs (parallelly takes the min across methods, so it never exceeds the
+# node's real core count).
+n_threads <- as.integer(snakemake@threads[[1]])
+options(parallelly.availableCores.custom = function() n_threads)
 
 ## Opening Log File
 # Open the log file to write both stdout and stderr

@@ -8,6 +8,16 @@ zz <- file(logfile, open = "a")
 sink(zz,append = TRUE)       # redirect stdout
 sink(zz, type = "message")  # redirect stderr/messages
 
+## Cap conduitR's parallel worker pool to this rule's Snakemake allocation.
+# conduitR::get_proteome_ids_from_organism_ids() sizes its future/furrr pool
+# from future::availableCores() - 1 (= parallelly::availableCores()), which
+# otherwise reports every physical core on the node and oversubscribes when
+# Snakemake scheduled this rule with fewer threads. Setting the `custom`
+# availableCores() method makes it return this rule's thread count (parallelly
+# takes the min across methods, so it never exceeds the node's real cores).
+n_threads <- as.integer(snakemake@threads[[1]])
+options(parallelly.availableCores.custom = function() n_threads)
+
 start_time <- Sys.time()
 
 # Now everything from print(), message(), warning() will go into the log file
