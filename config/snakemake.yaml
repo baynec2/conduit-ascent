@@ -143,9 +143,30 @@ min_taxon_db_peptides: 10
 # Each gate is recorded in the per-pass *_fdr_results.tsv via the
 # filter_reason column, so it's trivial to see which gate rejected which taxon.
 #
-# qvalue_threshold — picked q-value cutoff for a presence call. 0.05 is
-# deliberately permissive: a lineage dropped here is unrecoverable in the later
-# species / full-proteome stages, so the first pass favours recall.
+# method — the presence-call rule applied to the picked target winners:
+#   "enrichment" (default, recommended): a lineage passes when its per-peptide
+#       score (score / n_unique_peptides_all) is at least `margin`x the pooled
+#       decoy noise rate (median per-peptide score across decoy reps). This is a
+#       per-taxon evidence test that does not depend on rank position, so unlike
+#       the q-value gate it is not defeated by the small-N quantization of the
+#       taxon-scale q-value, and unlike the score-fraction filter it does not
+#       discard high-confidence taxa that fall past an abundance cutoff.
+#   "qvalue": the global ranked-list picked q-value gate (uses qvalue_threshold).
+# Validated on single-strain + defined-community ground truth: enrichment
+# recovers high-confidence members the q-value + score-fraction cascade
+# discarded (e.g. E. coli, Phocaeicola) at the cost of a few cheap congener
+# false positives (re-filtered by the final full-proteome search).
+peptidotyping_first_pass_method:  enrichment
+peptidotyping_second_pass_method: enrichment
+# margin — under method: enrichment, the multiple of the decoy noise rate a
+# lineage's per-peptide score must exceed. Lower = higher recall / more false
+# positives; ~1.5-2 spans the recall/precision trade-off on ground truth.
+peptidotyping_first_pass_margin:  2
+peptidotyping_second_pass_margin: 2
+# qvalue_threshold — picked q-value cutoff for a presence call under
+# method: qvalue (ignored under method: enrichment). 0.05 is deliberately
+# permissive: a lineage dropped here is unrecoverable in the later species /
+# full-proteome stages, so the first pass favours recall.
 peptidotyping_first_pass_qvalue_threshold:  0.05
 peptidotyping_second_pass_qvalue_threshold: 0.05
 # min_peptides — minimum distinct peptides (n_unique_peptides_all) required to

@@ -22,18 +22,29 @@ taxid_family_map_fp      <- snakemake@input[["taxid_family_map"]]
 ncbi_taxonomy_id_fp      <- snakemake@output[["ncbi_taxonomy_id"]]
 fdr_results_fp           <- snakemake@output[["fdr_results"]]
 
-# Picked target-decoy FDR params (see config/snakemake.yaml).
+# Presence-call params (see config/snakemake.yaml).
+# `method` selects the presence rule: "qvalue" (global ranked-list q-value gate)
+# or "enrichment" (per-taxon per-peptide score >= margin x pooled decoy noise
+# rate — robust at taxon scale; the recommended default).
+method                   <- snakemake@params[["method"]]
+margin                   <- snakemake@params[["margin"]]
 qvalue_threshold         <- snakemake@params[["qvalue_threshold"]]
 min_peptides             <- snakemake@params[["min_peptides"]]
 # Optional abundance-based coverage filter (disabled by default).
 score_fraction_threshold <- snakemake@params[["score_fraction_threshold"]]
 max_taxa                 <- snakemake@params[["max_taxa"]]
 
+if (is.null(method) || length(method) == 0 || is.na(method) || method == "") {
+  method <- "enrichment"
+}
+method <- match.arg(as.character(method), c("qvalue", "enrichment"))
+margin                   <- normalize_param(margin)
 qvalue_threshold         <- normalize_param(qvalue_threshold)
 min_peptides             <- normalize_param(min_peptides)
 score_fraction_threshold <- normalize_param(score_fraction_threshold)
 max_taxa                 <- normalize_param(max_taxa)
 
+if (is.na(margin))           margin           <- 2
 if (is.na(qvalue_threshold)) qvalue_threshold <- 0.05
 if (is.na(min_peptides))     min_peptides     <- 2
 
@@ -53,8 +64,8 @@ conduitR::log_with_timestamp("taxid→family map:   %s", taxid_family_map_fp)
 conduitR::log_with_timestamp("Output (detected):  %s", ncbi_taxonomy_id_fp)
 conduitR::log_with_timestamp("Output (FDR table): %s", fdr_results_fp)
 conduitR::log_with_timestamp(
-  "Picked FDR: qvalue_threshold=%s, min_peptides=%s; coverage filter: score_fraction_threshold=%s, max_taxa=%s",
-  format(qvalue_threshold), format(min_peptides),
+  "Presence rule: method=%s, margin=%s, qvalue_threshold=%s, min_peptides=%s; coverage filter: score_fraction_threshold=%s, max_taxa=%s",
+  method, format(margin), format(qvalue_threshold), format(min_peptides),
   format(score_fraction_threshold), format(max_taxa)
 )
 
@@ -111,8 +122,8 @@ if (nrow(psms) == 0) {
 # outranking a true low-abundance family's target. The min_peptides gate is on
 # n_unique_peptides_all.
 conduitR::log_with_timestamp(
-  "Running picked FDR at family level (qvalue_threshold=%s, min_peptides=%s)",
-  format(qvalue_threshold), format(min_peptides)
+  "Running picked FDR at family level (method=%s, margin=%s, qvalue_threshold=%s, min_peptides=%s)",
+  method, format(margin), format(qvalue_threshold), format(min_peptides)
 )
 
 fdr_result <- conduitR::calc_taxon_fdr(
@@ -121,7 +132,9 @@ fdr_result <- conduitR::calc_taxon_fdr(
   decoy            = psms$decoy,
   peptide          = psms$Stripped.Sequence,
   qvalue_threshold = qvalue_threshold,
-  min_peptides     = min_peptides
+  min_peptides     = min_peptides,
+  method           = method,
+  margin           = margin
 )
 
 conduitR::log_with_timestamp(
