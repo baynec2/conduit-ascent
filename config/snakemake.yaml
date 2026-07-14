@@ -159,15 +159,20 @@ min_taxon_db_peptides: 10
 peptidotyping_first_pass_method:  enrichment
 peptidotyping_second_pass_method: enrichment
 # margin — under method: enrichment, the multiple of the decoy noise rate a
-# lineage's per-peptide score must exceed. Lower = higher recall but MORE
-# families pass gate 1, which enlarges the gate-2 species/strain database. That
-# database is searched library-free by DIA-NN, whose memory scales with the
-# candidate-precursor count, so an over-permissive margin can OOM the search
-# (margin 1.5 -> 36 families -> ~105M peptides -> >125 GB on the defined-community
-# pool). 2.5 keeps ~9 families (close to the historically searchable size);
-# lower margins are viable only with a smaller reference or more RAM.
-peptidotyping_first_pass_margin:  2.5
-peptidotyping_second_pass_margin: 2.5
+# lineage's per-peptide score must exceed. It trades three things at once:
+# lower margin -> higher recall, more false positives, and MORE families pass
+# gate 1, which enlarges the gate-2 species/strain database. That database is
+# searched library-free by DIA-NN, whose memory scales with the candidate
+# peptide count, so an over-permissive margin can OOM the search.
+# Calibrated on the equimolar defined-community pool (see supplementary
+# margin-sweep figure): full 10/10 recovery spans M = 1.75-2.25 (the recall
+# cliff, where E. coli/Phocaeicola drop at the species/strain gate, is at 2.5);
+# the tractability floor is ~M = 1.75 (25 families / 11.9 GB; M = 1.5 -> 38
+# families / 24.9 GB OOM'd at 126 GB on a 125 GB host). 2.0 sits centred in the
+# full-recall plateau (max headroom from both the OOM floor and the recall
+# cliff); 2.25 is the false-positive-minimal full-recall point.
+peptidotyping_first_pass_margin:  2.0
+peptidotyping_second_pass_margin: 2.0
 # qvalue_threshold — picked q-value cutoff for a presence call under
 # method: qvalue (ignored under method: enrichment). 0.05 is deliberately
 # permissive: a lineage dropped here is unrecoverable in the later species /
