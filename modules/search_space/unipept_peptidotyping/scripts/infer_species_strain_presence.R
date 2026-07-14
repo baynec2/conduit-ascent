@@ -126,7 +126,7 @@ if (nrow(psms) == 0) {
 # =============================================================================
 # Picked target-decoy FDR at species/strain level
 # =============================================================================
-# conduitR::calc_taxon_fdr aggregates per-(taxon, decoy) scores and applies the
+# conduitR::call_taxon_presence aggregates per-(taxon, decoy) scores and applies the
 # picked target-decoy competition in one call (see its docs for the rationale:
 # a high-abundance taxon's reversed decoy no longer outranks a true
 # low-abundance taxon's target). The min_peptides gate is on
@@ -136,7 +136,7 @@ conduitR::log_with_timestamp(
   method, format(margin), format(qvalue_threshold), format(min_peptides)
 )
 
-fdr_result <- conduitR::calc_taxon_fdr(
+fdr_result <- conduitR::call_taxon_presence(
   pep              = psms$PEP,
   taxon            = psms$species_taxid,
   decoy            = psms$decoy,
@@ -162,7 +162,7 @@ if (fdr_result$n_missing_pair > 0) {
 # Confident-peptide count per (target) taxon: number of distinct peptide
 # sequences each with at least one precursor PSM at Q.Value <= 0.01. This is
 # the count users typically mean when they say "N peptides per taxon"; it sits
-# alongside the broader n_unique_peptides_all from calc_taxon_fdr (which
+# alongside the broader n_unique_peptides_all from call_taxon_presence (which
 # includes weak-PEP contributions) so the audit trail surfaces both.
 # Informational only — the presence gate (min_peptides) is on
 # n_unique_peptides_all.

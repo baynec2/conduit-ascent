@@ -115,7 +115,7 @@ if (nrow(psms) == 0) {
 # =============================================================================
 # Picked target-decoy FDR at family level
 # =============================================================================
-# conduitR::calc_taxon_fdr aggregates per-(family, decoy) scores and applies the
+# conduitR::call_taxon_presence aggregates per-(family, decoy) scores and applies the
 # picked target-decoy competition in one call: each family keeps only the
 # higher-scoring of its {target, decoy} pair, then all representatives compete
 # in one ranked list. This stops a high-abundance family's reversed decoy from
@@ -126,7 +126,7 @@ conduitR::log_with_timestamp(
   method, format(margin), format(qvalue_threshold), format(min_peptides)
 )
 
-fdr_result <- conduitR::calc_taxon_fdr(
+fdr_result <- conduitR::call_taxon_presence(
   pep              = psms$PEP,
   taxon            = psms$family_taxid,
   decoy            = psms$decoy,

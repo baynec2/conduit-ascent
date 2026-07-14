@@ -1,13 +1,13 @@
 # Integration tests for apply_picked_presence_filter() — the glue that turns a
-# conduitR::calc_taxon_fdr picked result into the per-pass audit table. The full
+# conduitR::call_taxon_presence picked result into the per-pass audit table. The full
 # picked-FDR acceptance criteria (Poaceae rescue, 413 passers, etc.) are
-# asserted in conduitR's test-calc_taxon_fdr.R against the real
+# asserted in conduitR's test-call_taxon_presence.R against the real
 # first_pass_fdr_results.tsv; here we check schema preservation and the
 # carried_forward / filter_reason wiring.
 
 source(testthat::test_path("..", "..", "scripts", "presence_lib.R"))
 
-# Build a picked result the way the scripts do: calc_taxon_fdr on PSM-level
+# Build a picked result the way the scripts do: call_taxon_presence on PSM-level
 # input. Four taxa, each (except D) with target + decoy peptides:
 #   A: strong target, weak decoy  -> target wins, passes
 #   B: target wins pick but only 1 peptide -> min_peptides reject at floor 2
@@ -24,7 +24,7 @@ make_picked <- function(qthr = 0.5, minpep = 2) {
     "C", TRUE,  "Cd1", 0.02, "C", TRUE, "Cd2", 0.03,
     "D", FALSE, "D1", 0.001, "D", FALSE, "D2", 0.002
   )
-  conduitR::calc_taxon_fdr(
+  conduitR::call_taxon_presence(
     pep = psm$pep, taxon = psm$taxon, decoy = psm$decoy, peptide = psm$peptide,
     qvalue_threshold = qthr, min_peptides = minpep
   )

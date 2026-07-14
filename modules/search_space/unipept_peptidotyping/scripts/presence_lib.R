@@ -40,20 +40,20 @@ extract_species_strain_psms <- function(precursors) {
 
 # Optional score-coverage filter + audit-table assembly for a picked-FDR pass.
 # The picked target-decoy competition itself now lives in conduitR (see
-# conduitR::calc_taxon_fdr, which aggregates PSM scores and applies the picked
+# conduitR::call_taxon_presence, which aggregates PSM scores and applies the picked
 # strategy in one call); this helper takes that call's per-(taxon, decoy)
 # `$results` table and turns it into the schema-stable audit table the pipeline
 # writes, applying the optional abundance-based coverage filter on top.
 #
 # Inputs:
-#   picked_results — the `$results` tibble from conduitR::calc_taxon_fdr (cols:
+#   picked_results — the `$results` tibble from conduitR::call_taxon_presence (cols:
 #                  taxon, score, n_unique_peptides_all, decoy, picked_winner,
 #                  fdr, qvalue, pass). `pass` is taken as the authoritative
 #                  presence call; this helper does not re-run the FDR math.
 #   q01_counts   — tibble(taxon, n_unique_peptides_q01) of confident-peptide
 #                  counts (informational column carried into the audit table;
 #                  NOT the gate — the min_peptides gate was on
-#                  n_unique_peptides_all, inside calc_taxon_fdr).
+#                  n_unique_peptides_all, inside call_taxon_presence).
 #   min_peptides — the min-peptides floor used upstream; needed only to label
 #                  the filter_reason of non-passing target winners (min_peptides
 #                  vs fdr).
