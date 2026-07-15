@@ -110,7 +110,17 @@ checkpoint parse_mgnify_metadata:
 # Snakemake-dedupe to a single download.
 rule download_mgnify_genome:
     input:
-        representatives = os.path.join(MGNIFY_OUT, "species_representatives.txt")
+        # ancient(): species_representatives.txt is a PER-RUN checkpoint output
+        # (regenerated with a fresh mtime every run) but the genome it gates
+        # lands in the SHARED, persistent cache. Without ancient() Snakemake's
+        # mtime rerun-trigger sees the freshly-stamped representatives file as
+        # "newer" than the cached .fna and re-downloads all ~4,744 genomes on
+        # every run that isn't the one which first populated the cache — which
+        # in turn invalidates the shared FGS/HMMER/LCA artifacts downstream.
+        # ancient() keeps the DAG edge (so the checkpoint still fires and the
+        # accession wildcards resolve) while ignoring the timestamp. The genome
+        # content depends only on the accession wildcard, so this is safe.
+        representatives = ancient(os.path.join(MGNIFY_OUT, "species_representatives.txt"))
     output:
         genome = os.path.join(MGNIFY_CACHE_GENOMES, "{accession}.fna")
     params:

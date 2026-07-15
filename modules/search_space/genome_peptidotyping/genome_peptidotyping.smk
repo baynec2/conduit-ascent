@@ -53,6 +53,16 @@ def _taxonomy_input():
         return _mgnify_taxonomy_path()
     return os.path.join(GENOME_DIR, "taxonomy.txt")
 
+def _cache_taxonomy_input():
+    """Taxonomy input for rules whose OUTPUT lands in the SHARED per-genome-set
+    cache (GP_SET_DIR). For the mgnify case the taxonomy.txt is a per-run file
+    (regenerated every run with a fresh mtime), so wrap it in ancient() to stop
+    its timestamp from invalidating the shared LCA-peptide DBs. Content is safe:
+    the genome-set slug (catalog+filter+max) fixes which genomes — and thus
+    which taxonomy rows — the shared artifacts derive from."""
+    t = _taxonomy_input()
+    return ancient(t) if config.get("genome_download_source") == "mgnify" else t
+
 # Local canonicalize-checkpoint for the MGnify representatives list.
 # Snakemake 9 scopes the `checkpoints` proxy per-module, so reaching into
 # mgnify.smk's parse_mgnify_metadata from here raises AttributeError. Each
@@ -134,7 +144,7 @@ rule tryptic_digest_genomes:
             os.path.join(GP_PRODIGAL_DIR, f"{genome}.faa")
             for genome in get_all_genome_names()
         ],
-        taxonomy = _taxonomy_input()
+        taxonomy = _cache_taxonomy_input()
     output:
         peptide_mapping = os.path.join(GP_SET_DIR, "peptide_genome_mapping.tsv.gz")
     params:
@@ -150,7 +160,7 @@ rule tryptic_digest_genomes:
 rule compute_peptide_lca_and_build_dbs:
     input:
         peptide_mapping = os.path.join(GP_SET_DIR, "peptide_genome_mapping.tsv.gz"),
-        taxonomy = _taxonomy_input()
+        taxonomy = _cache_taxonomy_input()
     output:
         family_tsv      = os.path.join(GP_SET_DIR, "family_lca_filtered_peptides.tsv"),
         family_fasta    = os.path.join(GP_SET_DIR, "family_peptidotyping_db.fasta"),
@@ -327,7 +337,13 @@ rule build_genome_peptidotyping_effective_detection_rank_db:
 rule generate_genome_peptidotyping_first_pass_speclib:
     input:
         fasta = os.path.join(GP_SET_DIR, "effective_first_pass_database.fasta"),
-        config_file = os.path.join(RUN_DIR, "config/diann_spectral_library_base.cfg")
+        # ancient() when mgnify: the config snapshot is per-run but this speclib
+        # lands in the shared GP_SET_DIR cache — don't let the snapshot's fresh
+        # mtime rebuild the (expensive) predicted speclib every run. The fasta
+        # (also GP_SET_DIR) remains a real content dependency.
+        config_file = (ancient(os.path.join(RUN_DIR, "config/diann_spectral_library_base.cfg"))
+                       if config.get("genome_download_source") == "mgnify"
+                       else os.path.join(RUN_DIR, "config/diann_spectral_library_base.cfg"))
     output:
         os.path.join(GP_SET_DIR, "first_pass_database.predicted.speclib")
     params:

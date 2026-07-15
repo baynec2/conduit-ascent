@@ -132,7 +132,13 @@ rule press_hapid_hmm_profiles:
 rule predict_orfs_with_fraggenescan:
     input:
         genome_fa = hapid_fasta_path,
-        fastas_ok = os.path.join(HAPID_DIR, ".fastas_checked")
+        # ancient(): .fastas_checked is a per-run sentinel (re-touched every run,
+        # transitively via .mgnify_download_complete) but this FAA lands in the
+        # SHARED per-genome cache. Without ancient() its fresh mtime re-runs
+        # FragGeneScan for all genomes every run. It's purely an ordering guard
+        # (ensures the genome FASTAs exist); the FAA content depends only on
+        # genome_fa, so ignoring its timestamp is safe.
+        fastas_ok = ancient(os.path.join(HAPID_DIR, ".fastas_checked"))
     output:
         os.path.join(HAPID_FGS_DIR, "{genome}.faa")
     params:

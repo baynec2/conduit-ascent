@@ -169,7 +169,11 @@ rule download_bakta_resources:
 
 rule annotate_genomes_with_bakta:
     input:
-        genomes_ok = os.path.join(GENOME_DIR, ".fastas_checked"),
+        # ancient(): .fastas_checked is a per-run sentinel but bakta annotations
+        # land in the SHARED per-genome cache when source == mgnify (BAKTA_OUT_ROOT).
+        # Ignore its timestamp so a fresh run doesn't re-annotate cached genomes;
+        # it's an ordering guard only (annotation content depends on genome_fa).
+        genomes_ok = ancient(os.path.join(GENOME_DIR, ".fastas_checked")),
         genome_fa = genome_fasta_path,
         # Depend on the bakta DB so Snakemake schedules download_bakta_resources
         # when it's missing (and skips it when the DB is already staged at
