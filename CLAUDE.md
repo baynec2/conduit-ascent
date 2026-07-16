@@ -14,7 +14,7 @@ modules/
 │   ├── uniprot_proteome_ids/  # User-supplied UniProt proteome IDs directly
 │   ├── metaphlan/         # MetaPhlAn profiling output → NCBI taxon IDs
 │   ├── genomes/          # Any bacterial genome FASTAs (MAGs or reference), no selection; "MAGs" is a deprecated alias
-│   └── unipept_hapid/     # Unipept database search
+│   └── unipept_hapid/     # Unipept database search (method: unipept_hapiid; "unipept_hapid" is a deprecated alias, dir name kept)
 ├── diann/                 # DIA-NN spectral library build + main search
 ├── annotation/            # UniProt, eggNOG-mapper, external annotations
 └── build_conduit/         # Final conduit object construction (uses conduitR)

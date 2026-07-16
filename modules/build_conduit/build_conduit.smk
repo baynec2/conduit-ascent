@@ -18,9 +18,9 @@ def search_space_detection_inputs(wildcards):
             "peptidotyping_first_pass":  os.path.join(base, "genome_peptidotyping/first_pass_fdr_results.tsv"),
             "peptidotyping_second_pass": os.path.join(base, "genome_peptidotyping/second_pass_fdr_results.tsv"),
         }
-    if m == "unipept_hapid":
+    if m == "unipept_hapiid":
         return {"hapid_greedy_selection": os.path.join(base, "unipept_hapid/unipept_hapid_greedy_selection.tsv")}
-    if m == "hapid":
+    if m == "hapiid":
         return {"hapid_greedy_selection": os.path.join(base, "hapid/hapid_greedy_selection.tsv")}
     return {}
 

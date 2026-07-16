@@ -61,7 +61,7 @@ The peptidotyping subset fixture is 17 MB committed via LFS; the test mzML is 1.
 
 ### Adding a smoke method
 
-1. Create `tests/configs/smoke_<method>.yaml` modelled after `smoke_unipept_peptidotyping.yaml`. Override `peptidotyping_resource_dir` / `hapid_hmm_profiles` etc. to fixture paths if the method needs them.
+1. Create `tests/configs/smoke_<method>.yaml` modelled after `smoke_unipept_peptidotyping.yaml`. Override `peptidotyping_resource_dir` / `hapiid_hmm_profiles` etc. to fixture paths if the method needs them.
 2. Add a `run_<method>` function to `tests/run_smoke_tests.sh` and wire it into the dispatch `case`.
 3. If the method needs a fixture, build it under `tests/fixtures/<method>_subset/` and LFS-track it via `.gitattributes`.
 

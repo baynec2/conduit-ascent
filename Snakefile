@@ -50,10 +50,10 @@ ALLOWED_METHODS = [
     "ncbi_taxonomy_id",
     "uniprot_proteome_id",
     "unipept_peptidotyping",
-    "unipept_hapid",
+    "unipept_hapiid",
     "genomes",
     "metaphlan",
-    "hapid",
+    "hapiid",
     "genome_peptidotyping",
    # "16S"
 ]
@@ -69,6 +69,34 @@ if METHOD == "MAGs":
           file=sys.stderr)
     METHOD = "genomes"
     config["search_space_method"] = "genomes"
+# Backward-compat: the "hapid"/"unipept_hapid" methods were misspelled; the
+# canonical names are now "hapiid"/"unipept_hapiid". Accept the old spellings,
+# warn, and normalize so all downstream dispatch and generated artifacts use the
+# canonical name. (On-disk cache/resource paths intentionally keep the "hapid"
+# spelling so existing caches are preserved.)
+_HAPIID_METHOD_ALIASES = {"hapid": "hapiid", "unipept_hapid": "unipept_hapiid"}
+if METHOD in _HAPIID_METHOD_ALIASES:
+    _canonical = _HAPIID_METHOD_ALIASES[METHOD]
+    print(f"WARNING: search_space_method '{METHOD}' is deprecated and will be "
+          f"removed in a future release; use '{_canonical}' instead. "
+          f"Proceeding as '{_canonical}'.", file=sys.stderr)
+    METHOD = _canonical
+    config["search_space_method"] = _canonical
+# Backward-compat config-key aliases: the user-facing tuning keys were renamed
+# hapid_* → hapiid_* (and unipept_hapid_* → unipept_hapiid_*). Internal modules
+# still read the legacy key names, so populate a legacy key from its canonical
+# counterpart whenever the user hasn't set the legacy name directly. This lets
+# both spellings work; a user-set legacy key always wins.
+_HAPIID_KEY_ALIASES = {
+    "hapiid_search_mode":          "hapid_search_mode",
+    "unipept_hapiid_search_mode":  "unipept_hapid_search_mode",
+    "hapiid_hmm_profiles":         "hapid_hmm_profiles",
+    "hapiid_percent_spectra":      "hapid_percent_spectra",
+    "hapiid_infinidia_config":     "hapid_infinidia_config",
+}
+for _new_key, _old_key in _HAPIID_KEY_ALIASES.items():
+    if _old_key not in config and _new_key in config:
+        config[_old_key] = config[_new_key]
 if METHOD not in ALLOWED_METHODS:
     raise ValueError(f"Method '{METHOD}' not allowed. Must be one of: {', '.join(ALLOWED_METHODS)}")
 
@@ -136,7 +164,7 @@ module unipept_peptidotyping:
 module unipept_hapid:
   snakefile: "modules/search_space/unipept_hapid/unipept_hapid.smk"
   config: config
-# Shared Unipept resource build (used by both unipept_peptidotyping and unipept_hapid).
+# Shared Unipept resource build (used by both unipept_peptidotyping and unipept_hapiid).
 module shared_unipept_resources:
   snakefile: "modules/search_space/_shared/unipept_resources.smk"
   config: config
@@ -149,7 +177,7 @@ module hapid:
 module genome_peptidotyping:
   snakefile: "modules/search_space/genome_peptidotyping/genome_peptidotyping.smk"
   config: config
-# Genome download modules (optional pre-step for genomes/hapid)
+# Genome download modules (optional pre-step for genomes/hapiid)
 module mgnify_download:
   snakefile: "modules/genome_download/mgnify/mgnify.smk"
   config: config
@@ -234,8 +262,8 @@ if config["search_space_method"] == "unipept_peptidotyping":
     use rule * from eggnogmapper_annotation
     use rule * from external_annotation
 
-# unipept_hapid: HAPiID-inspired GO-filtered first pass directly at species/strain level
-if config["search_space_method"] == "unipept_hapid":
+# unipept_hapiid: HAPiID-inspired GO-filtered first pass directly at species/strain level
+if config["search_space_method"] == "unipept_hapiid":
     use rule * from shared_unipept_resources
     use rule * from unipept_hapid
     use rule * from ncbi_search_space
@@ -284,7 +312,7 @@ if config["search_space_method"] == "genomes":
 
 
 # HAPiID: marker-gene profiling → greedy genome selection → genome DB construction
-if config["search_space_method"] == "hapid":
+if config["search_space_method"] == "hapiid":
     use rule * from hapid
     use rule * from genomes
     use rule * from database_processing

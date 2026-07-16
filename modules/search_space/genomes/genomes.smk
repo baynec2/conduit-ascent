@@ -65,7 +65,7 @@ def _selected_genomes_source():
     method = config.get("search_space_method")
     if method == "genome_peptidotyping":
         return os.path.join(RUN_DIR, "database_resources/genome_peptidotyping/detected_genomes.txt")
-    if method == "hapid":
+    if method == "hapiid":
         return os.path.join(RUN_DIR, "database_resources/hapid/selected_genomes.txt")
     if config.get("genome_download_source") == "mgnify":
         return os.path.join(RUN_DIR, "genome_download/mgnify/species_representatives.txt")

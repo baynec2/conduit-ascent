@@ -26,12 +26,14 @@ run_name:
 #   ncbi_taxonomy_id     user-provided NCBI taxon IDs → UniProt proteomes
 #   uniprot_proteome_id  user-provided UniProt proteome IDs
 #   unipept_peptidotyping  UMGAP-LCA peptide-based species detection
-#   unipept_hapid          HAPiID-style GO-filtered first-pass
+#   unipept_hapiid         HAPiID-style GO-filtered first-pass
 #   genome_peptidotyping   peptidotyping on user-provided genomes (no UniProt)
 #   metaphlan            MetaPhlAn profiling → NCBI taxon IDs
 #   genomes              all user-provided genome FASTAs (MAGs or reference), no selection
 #                        (the old name "MAGs" is still accepted as a deprecated alias)
-#   hapid                HAPiID marker-gene profiling → greedy genome selection
+#   hapiid               HAPiID marker-gene profiling → greedy genome selection
+#                        (the old names "hapid"/"unipept_hapid" are still accepted as
+#                         deprecated aliases; on-disk cache/resource paths keep "hapid")
 search_space_method: ncbi_taxonomy_id
 # Sample annotation file (relative to experiment dir).
 sample_annotation: input/sample_annotation.txt
@@ -63,7 +65,7 @@ diann_library_search_base_config: config/diann_library_search_base.cfg
 # Shared flags for the peptidotyping InfiniDIA DIA-NN search (both passes).
 peptidotyping_infinidia_config: config/peptidotyping_infinidia.cfg
 # Shared flags for the HAPiID InfiniDIA DIA-NN search.
-hapid_infinidia_config: config/hapid_infinidia.cfg
+hapiid_infinidia_config: config/hapid_infinidia.cfg
 # Main DIA-NN search mode. Options:
 #   standard   use run_diann_config below
 #   infinidia  use config/run_diann_infinidia.cfg (--pre-search --pre-filter)
@@ -79,8 +81,8 @@ run_diann_config: config/run_diann.cfg
 # Defaults preserve historical behavior of each method.
 unipept_peptidotyping_search_mode: "infinidia"
 genome_peptidotyping_search_mode:  "infinidia"
-unipept_hapid_search_mode:         "standard"
-hapid_search_mode:                 "standard"
+unipept_hapiid_search_mode:        "standard"
+hapiid_search_mode:                "standard"
 
 # --- Host / target filtering (optional; applies to every method) ---
 # Append an extra UniProt proteome to the database (e.g., a host reference).
@@ -117,7 +119,7 @@ pfam_clans_url:      "https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/Pfam37.0
 
 # =============================================================================
 #  PEPTIDOTYPING FAMILY
-#  Used by: unipept_peptidotyping · unipept_hapid · genome_peptidotyping
+#  Used by: unipept_peptidotyping · unipept_hapiid · genome_peptidotyping
 # =============================================================================
 # Location of UMGAP-derived sequences.tsv.lz4 + taxons.tsv.lz4 (~170 GB combined).
 # For per-machine off-repo storage, set PEPTIDOTYPING_RESOURCE_DIR env var when
@@ -204,13 +206,13 @@ peptidotyping_second_pass_max_taxa: null
 
 # =============================================================================
 #  HAPiID
-#  Used by: hapid · mgnify_hapid
+#  Used by: hapiid (incl. the mgnify-sourced variant)
 # =============================================================================
 # HMM profiles for marker-gene identification (ribosomal proteins, elongation factors).
-hapid_hmm_profiles: "resources/hapid/ribP_elonF_profiles_refined_manually.hmm"
+hapiid_hmm_profiles: "resources/hapid/ribP_elonF_profiles_refined_manually.hmm"
 # Greedy genome-selection cutoff — take the smallest set of genomes that covers this
 # fraction of marker-gene-annotated spectra.
-hapid_percent_spectra: 80
+hapiid_percent_spectra: 80
 
 
 # =============================================================================
