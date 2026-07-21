@@ -29,6 +29,7 @@ method                   <- snakemake@params[["method"]]
 margin                   <- snakemake@params[["margin"]]
 qvalue_threshold         <- snakemake@params[["qvalue_threshold"]]
 min_peptides             <- snakemake@params[["min_peptides"]]
+min_confident_peptides   <- snakemake@params[["min_confident_peptides"]]
 # Optional abundance-based coverage filter (disabled by default).
 score_fraction_threshold <- snakemake@params[["score_fraction_threshold"]]
 max_taxa                 <- snakemake@params[["max_taxa"]]
@@ -36,16 +37,23 @@ max_taxa                 <- snakemake@params[["max_taxa"]]
 if (is.null(method) || length(method) == 0 || is.na(method) || method == "") {
   method <- "enrichment"
 }
-method <- match.arg(as.character(method), c("qvalue", "enrichment"))
+method <- match.arg(as.character(method), c("qvalue", "enrichment", "count"))
 margin                   <- normalize_param(margin)
 qvalue_threshold         <- normalize_param(qvalue_threshold)
 min_peptides             <- normalize_param(min_peptides)
+min_confident_peptides   <- normalize_param(min_confident_peptides)
 score_fraction_threshold <- normalize_param(score_fraction_threshold)
 max_taxa                 <- normalize_param(max_taxa)
 
-if (is.na(margin))           margin           <- 2
-if (is.na(qvalue_threshold)) qvalue_threshold <- 0.05
-if (is.na(min_peptides))     min_peptides     <- 2
+if (is.na(margin))                 margin                 <- 2
+if (is.na(qvalue_threshold))       qvalue_threshold       <- 0.05
+if (is.na(min_peptides))           min_peptides           <- 2
+if (is.na(min_confident_peptides)) min_confident_peptides <- 10
+
+# For method = "count", the picked target-decoy competition is not the gate, but
+# we still run it (as "qvalue") to populate the audit table's score/fdr/qvalue
+# columns. The count gate is applied in apply_picked_presence_filter.
+audit_method <- if (method == "count") "qvalue" else method
 
 if (!is.na(score_fraction_threshold) && !is.na(max_taxa)) {
   stop(sprintf(
@@ -62,9 +70,9 @@ conduitR::log_with_timestamp("Input parquet:      %s", second_pass_diann_parquet
 conduitR::log_with_timestamp("Output (detected):  %s", detected_species_strains_fp)
 conduitR::log_with_timestamp("Output (FDR table): %s", fdr_results_fp)
 conduitR::log_with_timestamp(
-  "Presence rule: method=%s, margin=%s, qvalue_threshold=%s, min_peptides=%s; coverage filter: score_fraction_threshold=%s, max_taxa=%s",
+  "Presence rule: method=%s, margin=%s, qvalue_threshold=%s, min_peptides=%s, min_confident_peptides=%s; coverage filter: score_fraction_threshold=%s, max_taxa=%s",
   method, format(margin), format(qvalue_threshold), format(min_peptides),
-  format(score_fraction_threshold), format(max_taxa)
+  format(min_confident_peptides), format(score_fraction_threshold), format(max_taxa)
 )
 
 # =============================================================================
@@ -143,7 +151,7 @@ fdr_result <- conduitR::call_taxon_presence(
   peptide          = psms$Stripped.Sequence,
   qvalue_threshold = qvalue_threshold,
   min_peptides     = min_peptides,
-  method           = method,
+  method           = audit_method,
   margin           = margin
 )
 
@@ -181,7 +189,9 @@ picked_out <- apply_picked_presence_filter(
   q01_counts               = q01_peptide_counts,
   min_peptides             = min_peptides,
   score_fraction_threshold = score_fraction_threshold,
-  max_taxa                 = max_taxa
+  max_taxa                 = max_taxa,
+  method                   = method,
+  min_confident_peptides   = min_confident_peptides
 )
 
 conduitR::log_with_timestamp(

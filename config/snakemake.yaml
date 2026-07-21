@@ -145,21 +145,28 @@ min_taxon_db_peptides: 10
 # Each gate is recorded in the per-pass *_fdr_results.tsv via the
 # filter_reason column, so it's trivial to see which gate rejected which taxon.
 #
-# method — the presence-call rule applied to the picked target winners:
-#   "enrichment" (default, recommended): a lineage passes when its per-peptide
-#       score (score / n_unique_peptides_all) is at least `margin`x the pooled
-#       decoy noise rate (median per-peptide score across decoy reps). This is a
-#       per-taxon evidence test that does not depend on rank position, so unlike
-#       the q-value gate it is not defeated by the small-N quantization of the
-#       taxon-scale q-value, and unlike the score-fraction filter it does not
-#       discard high-confidence taxa that fall past an abundance cutoff.
-#   "qvalue": the global ranked-list picked q-value gate (uses qvalue_threshold).
-# Validated on single-strain + defined-community ground truth: enrichment
-# recovers high-confidence members the q-value + score-fraction cascade
-# discarded (e.g. E. coli, Phocaeicola) at the cost of a few cheap congener
-# false positives (re-filtered by the final full-proteome search).
-peptidotyping_first_pass_method:  enrichment
-peptidotyping_second_pass_method: enrichment
+# method — the presence-call rule:
+#   "count" (default, recommended): a taxon is present iff it has at least
+#       `min_confident_peptides` distinct CONFIDENT peptides (DIA-NN Q.Value
+#       <= 0.01). This rests on DIA-NN's own precursor FDR (a real, validated
+#       FDR) and does NOT use the reported decoy null at all — which is the
+#       point: InfiniDIA's --pre-filter censors the reported decoys (~135 of
+#       ~972k survive in the s76 2nd pass), so any decoy-magnitude statistic
+#       (enrichment) is unreliable and any decoy-count FDR (qvalue) is thin /
+#       quantized. Confident-peptide COUNT survives the censoring and cleanly
+#       separates real taxa (10s-1000s of peptides) from noise (decoy taxa top
+#       out ~16). Recall-oriented: the presence call is a candidate-selection
+#       screen; close relatives sharing peptides ("congener halo") may ride
+#       along and are resolved by the final full-proteome search.
+#   "enrichment": per-peptide score >= margin x pooled decoy noise rate. BROKEN
+#       under InfiniDIA — the censored decoy null inflates the noise rate and
+#       drops true high-peptide-count organisms (e.g. E. coli in s76 -> empty
+#       DB). Kept for provenance / non-InfiniDIA use only.
+#   "qvalue": global ranked-list picked q-value gate (uses qvalue_threshold).
+#       Recovers signal but its taxon-level q-value is NOT a trustworthy FDR
+#       under the censored null (see docs); use "count".
+peptidotyping_first_pass_method:  count
+peptidotyping_second_pass_method: count
 # margin — under method: enrichment, the multiple of the decoy noise rate a
 # lineage's per-peptide score must exceed. It trades three things at once:
 # lower margin -> higher recall, more false positives, and MORE families pass
@@ -190,6 +197,17 @@ peptidotyping_second_pass_qvalue_threshold: 0.05
 # gating on confident peptides is the deeper fix if 10 proves insufficient.
 peptidotyping_first_pass_min_peptides:  10
 peptidotyping_second_pass_min_peptides: 10
+# min_confident_peptides — under method: count, the minimum number of distinct
+# CONFIDENT peptides (DIA-NN Q.Value <= 0.01) a taxon must have to be called
+# present. This is the count that "N peptides per taxon" usually means, and the
+# gate rests on DIA-NN's validated precursor FDR. 10 favours recall: across the
+# s75-s86 single-species controls every true organism had >=37 confident
+# peptides while decoy taxa topped out at 16, so 10 recovers 9/9 with margin;
+# raising toward 20 tightens the congener halo at a small recall cost on
+# low-abundance members (validate on a complex sample before raising). Ignored
+# unless method: count.
+peptidotyping_first_pass_min_confident_peptides:  10
+peptidotyping_second_pass_min_confident_peptides: 10
 # Optional score-coverage filter applied to whatever survives the picked FDR.
 # For each pass, set AT MOST ONE of *_score_fraction_threshold / *_max_taxa —
 # setting both for the same pass is an error. Both null (the default) disables

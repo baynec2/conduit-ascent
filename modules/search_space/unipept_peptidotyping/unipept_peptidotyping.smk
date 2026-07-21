@@ -696,6 +696,7 @@ rule infer_first_pass_presence:
         margin                   = config.get("peptidotyping_first_pass_margin", 2),
         qvalue_threshold         = config.get("peptidotyping_first_pass_qvalue_threshold", 0.05),
         min_peptides             = config.get("peptidotyping_first_pass_min_peptides", 10),
+        min_confident_peptides   = config.get("peptidotyping_first_pass_min_confident_peptides", 10),
         score_fraction_threshold = config.get("peptidotyping_first_pass_score_fraction_threshold", None),
         max_taxa                 = config.get("peptidotyping_first_pass_max_taxa", None),
         pass_label               = "first_pass"
@@ -929,6 +930,7 @@ rule infer_second_pass_presence:
         margin                   = config.get("peptidotyping_second_pass_margin", 2),
         qvalue_threshold         = config.get("peptidotyping_second_pass_qvalue_threshold", 0.05),
         min_peptides             = config.get("peptidotyping_second_pass_min_peptides", 10),
+        min_confident_peptides   = config.get("peptidotyping_second_pass_min_confident_peptides", 10),
         score_fraction_threshold = config.get("peptidotyping_second_pass_score_fraction_threshold", None),
         max_taxa                 = config.get("peptidotyping_second_pass_max_taxa", None),
         pass_label               = "second_pass"

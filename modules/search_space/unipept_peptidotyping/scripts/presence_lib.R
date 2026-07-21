@@ -75,7 +75,9 @@ extract_species_strain_psms <- function(precursors) {
 apply_picked_presence_filter <- function(picked_results, q01_counts,
                                          min_peptides,
                                          score_fraction_threshold = NA_real_,
-                                         max_taxa = NA_real_) {
+                                         max_taxa = NA_real_,
+                                         method = "picked",
+                                         min_confident_peptides = NA_real_) {
   if (!is.na(score_fraction_threshold) && !is.na(max_taxa)) {
     stop("Set at most one of score_fraction_threshold / max_taxa (both null disables the coverage filter).")
   }
@@ -84,6 +86,42 @@ apply_picked_presence_filter <- function(picked_results, q01_counts,
     dplyr::left_join(q01_counts, by = "taxon") |>
     dplyr::mutate(n_unique_peptides_q01 = ifelse(is.na(n_unique_peptides_q01),
                                                  0L, as.integer(n_unique_peptides_q01)))
+
+  # --- Count-based presence (method = "count") -------------------------------
+  # A target taxon is present iff it has at least `min_confident_peptides`
+  # distinct confident (DIA-NN Q.Value <= 0.01) peptides. This bypasses the
+  # picked target-decoy competition entirely: on InfiniDIA output the reported
+  # decoy null is censored by --pre-filter, which corrupts any decoy-magnitude
+  # statistic (enrichment) and thins the decoy-count FDR (qvalue). Confident
+  # peptide COUNT, resting on DIA-NN's own (uncensored) precursor FDR, survives
+  # the censoring and separates real taxa from noise. The picked fdr/qvalue
+  # columns are still carried through for the audit trail but are not the gate.
+  if (identical(method, "count")) {
+    if (is.na(min_confident_peptides)) {
+      stop("method = 'count' requires min_confident_peptides")
+    }
+    res <- res |>
+      dplyr::mutate(
+        score_fraction            = NA_real_,
+        cumulative_score_fraction = NA_real_,
+        carried_forward = !decoy & (n_unique_peptides_q01 >= min_confident_peptides),
+        filter_reason = dplyr::case_when(
+          decoy                                           ~ "decoy",
+          n_unique_peptides_q01 >= min_confident_peptides ~ "",
+          TRUE                                            ~ "count"
+        )
+      )
+    detected_taxa <- res$taxon[res$carried_forward]
+    return(list(
+      augmented     = res,
+      detected_taxa = detected_taxa,
+      filter_mode   = sprintf("count (min_confident_peptides=%s)",
+                              format(min_confident_peptides)),
+      filter_value  = as.numeric(min_confident_peptides),
+      n_passers     = length(detected_taxa),
+      n_carried     = length(detected_taxa)
+    ))
+  }
 
   # Base rejection reason, before the optional coverage filter. Precedence:
   # discarded pick loser > decoy winner > passed > too-few-peptides > fails
