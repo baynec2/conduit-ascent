@@ -64,6 +64,9 @@ diann_spectral_library_base_config: config/diann_spectral_library_base.cfg
 diann_library_search_base_config: config/diann_library_search_base.cfg
 # Shared flags for the peptidotyping InfiniDIA DIA-NN search (both passes).
 peptidotyping_infinidia_config: config/peptidotyping_infinidia.cfg
+# Shared flags for the peptidotyping standard-mode DIA-NN search (both passes).
+# Used when *_peptidotyping_search_mode == "standard".
+peptidotyping_standard_config: config/peptidotyping_standard.cfg
 # Shared flags for the HAPiID InfiniDIA DIA-NN search.
 hapiid_infinidia_config: config/hapid_infinidia.cfg
 # Main DIA-NN search mode. Options:

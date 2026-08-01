@@ -550,7 +550,7 @@ if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard":
             raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
             fasta = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
             spectral_library = os.path.join(PT_OUT, "first_pass_database.predicted.speclib"),
-            config_file = "config/peptidotyping_standard.cfg"
+            config_file = os.path.join(RUN_DIR,"config/peptidotyping_standard.cfg")
         output:
             empirical_lib = os.path.join(PT_OUT, "first_pass_empirical.parquet")
         params:
@@ -581,7 +581,7 @@ if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard":
         input:
             empirical_lib = os.path.join(PT_OUT, "first_pass_empirical.parquet"),
             fasta = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
-            config_file = "config/peptidotyping_standard.cfg",
+            config_file = os.path.join(RUN_DIR,"config/peptidotyping_standard.cfg"),
             raw = lambda w: raw_path_for_sample(EXPERIMENT_DIR, w.sample)
         output:
             quant = os.path.join(PT_FIRST_QUANTS, "{sample}.quant")
@@ -615,7 +615,7 @@ if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard":
             ),
             empirical_lib = os.path.join(PT_OUT, "first_pass_empirical.parquet"),
             fasta = os.path.join(config["peptidotyping_resource_dir"],"effective_first_pass_database.fasta"),
-            config_file = "config/peptidotyping_standard.cfg",
+            config_file = os.path.join(RUN_DIR,"config/peptidotyping_standard.cfg"),
             raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files")
         output:
             first_pass_diann_parquet = os.path.join(PT_OUT, "first_pass_diann.parquet")
@@ -789,7 +789,7 @@ if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard":
             raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
             fasta         = os.path.join(PT_OUT, "second_pass_database.fasta"),
             spectral_library = os.path.join(PT_OUT, "second_pass_database.predicted.speclib"),
-            config_file = "config/peptidotyping_standard.cfg"
+            config_file = os.path.join(RUN_DIR,"config/peptidotyping_standard.cfg")
         output:
             empirical_lib = os.path.join(PT_OUT, "second_pass_empirical.parquet")
         params:
@@ -819,7 +819,7 @@ if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard":
         input:
             empirical_lib = os.path.join(PT_OUT, "second_pass_empirical.parquet"),
             fasta = os.path.join(PT_OUT, "second_pass_database.fasta"),
-            config_file = "config/peptidotyping_standard.cfg",
+            config_file = os.path.join(RUN_DIR,"config/peptidotyping_standard.cfg"),
             raw = lambda w: raw_path_for_sample(EXPERIMENT_DIR, w.sample)
         output:
             quant = os.path.join(PT_SECOND_QUANTS, "{sample}.quant")
@@ -852,7 +852,7 @@ if config.get("unipept_peptidotyping_search_mode", "infinidia") == "standard":
             ),
             empirical_lib = os.path.join(PT_OUT, "second_pass_empirical.parquet"),
             fasta = os.path.join(PT_OUT, "second_pass_database.fasta"),
-            config_file = "config/peptidotyping_standard.cfg",
+            config_file = os.path.join(RUN_DIR,"config/peptidotyping_standard.cfg"),
             raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files")
         output:
             second_pass_diann_parquet = os.path.join(PT_OUT, "second_pass_diann.parquet")
