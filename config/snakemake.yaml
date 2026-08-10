@@ -36,9 +36,10 @@ run_name:
 #                         deprecated aliases; on-disk cache/resource paths keep "hapid")
 search_space_method: ncbi_taxonomy_id
 # Sample annotation file (relative to experiment dir).
+# NOTE: build_conduit.smk hardcodes input/sample_annotation.txt and ignores this
+# key, so pointing it elsewhere passes the Snakefile's checks and then fails in
+# generate_qfeatures_from_diann_parquet. Treat it as fixed until that is fixed.
 sample_annotation: input/sample_annotation.txt
-# Output dir (relative to experiment dir).
-output_dir: output/
 
 # --- Container images ---
 # Moving tags like :alpha / :develop are OK for active dev; pin to @sha256:... for reproducibility.
@@ -93,17 +94,14 @@ hapiid_search_mode:                "standard"
 append_additional_proteome_id: FALSE
 # Append an extra NCBI taxon ID to the database (same idea, different key).
 # FALSE = none.  Examples: Human = 9606, Mouse = 10090.
+# NOTE: on the genome-sourced methods (genomes/hapiid/genome_peptidotyping) this
+# and append_additional_proteome_id are mutually exclusive — setting both raises
+# in append_additional_organisms_or_proteomes.R. On the UniProt-based methods
+# they apply at different stages and stack.
 append_additional_ncbi_taxa_id: FALSE
-# Exclude a UniProt proteome ID from the database. Useful in peptidotyping when a
-# host is detected by the first pass but you don't want its proteome in the final DB.
-# FALSE = none.
-exclude_proteome_id: FALSE
-# Exclude an NCBI taxon ID from the database. FALSE = none.
-exclude_ncbi_taxa_id: FALSE
 
 # --- Annotation resources (eggnog-mapper runs for every method) ---
 eggnogmapper_db_dir: "resources/eggnogmapper/db"       # ~50 GB (full) or ~8 GB (bacteria only)
-eggnog_database:     "resources/annotation/eggnog/e5.og_annotations.tsv"  # ~200 MB
 pfam_db_url:         "https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/pfamA.txt.gz"
 cazy_db_url:         "https://pro.unl.edu/dbCAN2/download/Databases/CAZyDB.07302020.fam-activities.txt"
 eggnog_db_url:       "http://eggnog6.embl.de/download/eggnog_5.0/e5.og_annotations.tsv"
