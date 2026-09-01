@@ -11,7 +11,9 @@ CAZY_DB_URL = config.get(
 )
 EGGNOG_DB_URL = config.get(
     "eggnog_db_url",
-    "http://eggnog6.embl.de/download/eggnog_5.0/e5.og_annotations.tsv",
+    # eggnog6.embl.de 301s to eggnogdb.org, which 404s this path; eggnog5
+    # still serves it. Same move that broke the emapperdb download.
+    "http://eggnog5.embl.de/download/eggnog_5.0/e5.og_annotations.tsv",
 )
 
 # Authoritative term-name dictionaries used to fill `description` for the

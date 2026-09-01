@@ -104,7 +104,9 @@ append_additional_ncbi_taxa_id: FALSE
 eggnogmapper_db_dir: "resources/eggnogmapper/db"       # ~50 GB (full) or ~8 GB (bacteria only)
 pfam_db_url:         "https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/pfamA.txt.gz"
 cazy_db_url:         "https://pro.unl.edu/dbCAN2/download/Databases/CAZyDB.07302020.fam-activities.txt"
-eggnog_db_url:       "http://eggnog6.embl.de/download/eggnog_5.0/e5.og_annotations.tsv"
+# eggnog6.embl.de now 301s to eggnogdb.org, which 404s for this file (and for
+# the emapperdb-5.0.2 files); eggnog5.embl.de still serves both.
+eggnog_db_url:       "http://eggnog5.embl.de/download/eggnog_5.0/e5.og_annotations.tsv"
 
 # Authoritative term-name dictionaries used to fill `description` for the
 # eggNOG-mapper-derived annotation types (go/kegg_*/pfam/ec_number/brite).
