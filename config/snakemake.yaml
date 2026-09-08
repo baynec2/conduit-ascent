@@ -49,7 +49,26 @@ containers:
   # DIA-NN inside. There is deliberately no `diann` key here: the DIA-NN
   # container is resolved from `diann_path` at parse time (see below) and
   # written into containers.diann by modules/_shared/diann_env.py.
-  diann_runtime: "docker://baynec2/diann_runtime:7ce6ed8"
+  #
+  # Pinned by DIGEST, not by tag, and it is the only one here that is.
+  #
+  # CI tags every image with the sha of the commit that built it, so a tag
+  # always names some OTHER commit than the one you are reading — this file
+  # cannot name its own. That lag reads as a mistake and invites a "fix"
+  # that just moves it along by one. A digest has no commit in it to
+  # disagree with.
+  #
+  # It also pins the bytes, which matters more here than for the others:
+  # this image installs dotnet-sdk-8.0 from apt, so two builds of the same
+  # Dockerfile are NOT the same image. The three published so far all differ
+  # (7ce6ed8, d88dc9c, 16f3d0e — one per merge, identical source), and which
+  # .NET a search ran against is not something to leave to whichever build
+  # happened to be tagged last.
+  #
+  # This is the 7ce6ed8 build. To move it, take the digest of the tag you
+  # want from `docker buildx imagetools inspect baynec2/diann_runtime:<sha>`
+  # (or the Hub API) — the multi-arch index digest, not the per-platform one.
+  diann_runtime: "docker://baynec2/diann_runtime@sha256:ca639dce2e65416856acfd1ee4fb6f8de19bf6d671b2e0c94739b2a73f23309a"
   bakta:        "docker://baynec2/bakta:f5f961d"
   metaphlan:    "docker://baynec2/metaphlan:f5f961d"
   eggnogmapper: "docker://baynec2/eggnogmapper:f5f961d"
