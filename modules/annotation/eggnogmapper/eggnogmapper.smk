@@ -40,13 +40,28 @@ rule download_eggnogmapper_db:
         # fetch a different set of files than the rule promises.
         db_files = " ".join(REQUIRED_EGGNOG_FILES)
     shell:
-        # set -e, because this rule used to report success on total failure:
-        # `wget -q ... && gunzip ...` short-circuits when wget fails, the
-        # script runs on to the final echo, and the shell exits 0. The only
-        # thing that caught it was snakemake noticing the declared outputs
-        # were missing — and `-q` had meanwhile swallowed wget's error, so
-        # the log read "Starting..." / "finished!" with a 0-byte .gz beside
-        # it and nothing naming the cause.
+        # This rule used to report success on total failure, and the reason
+        # is worth stating precisely, because the obvious diagnosis is wrong.
+        #
+        # `set -e` was never missing: snakemake already prefixes every shell
+        # directive with `set -euo pipefail` (shell.py). The problem is that
+        # `set -e` is *ignored* for a failing command in an AND-OR list, so
+        # the old `wget -q ... && gunzip ...` swallowed wget's failure
+        # regardless:
+        #
+        #     $ bash -euo pipefail -c 'false && echo b; echo REACHED; exit 0'
+        #     REACHED
+        #
+        # Execution fell through to the final echo and the shell exited 0.
+        # The only thing that caught it was snakemake noticing the declared
+        # outputs were missing — and `-q` had meanwhile swallowed wget's
+        # error, so the log read "Starting..." / "finished!" beside a 0-byte
+        # .gz with nothing naming the cause.
+        #
+        # The fix is therefore the restructuring below — one command per
+        # statement, no `&&` chain — not the `set -euo pipefail` line, which
+        # duplicates snakemake's and is kept only to make the intent explicit
+        # if that prefix ever changes.
         #
         # -nv rather than -q: quiet enough for an 11 GB download, loud enough
         # to record an HTTP error. -c to resume, because these two files are
