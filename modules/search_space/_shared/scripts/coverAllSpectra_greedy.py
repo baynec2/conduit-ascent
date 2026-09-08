@@ -99,36 +99,6 @@ def main(argv):
     ]
     covered_spectra_df.to_csv(out_f, sep="\t", index=False)
 
-    # Optional: generate visualization if plotly is available
-    try:
-        import plotly.graph_objects as go
-
-        fig = go.Figure()
-        fig.add_trace(
-            go.Scatter(
-                x=covered_spectra_df["genome"],
-                y=covered_spectra_df["cumulative_pct"],
-                mode="lines+markers",
-            )
-        )
-        fig.update_layout(
-            yaxis=dict(range=[0, 100]),
-            width=max(400, len(covered_spectra_df) * 5),
-            xaxis_title="top N genomes",
-            yaxis_title="percentage of cumulative spectra covered",
-            height=800,
-            title={
-                "text": "Cumulative % of spectra covered by genomes (greedy approach)",
-                "y": 0.96,
-                "x": 0.02,
-            },
-        )
-        out_dir = out_f.rsplit("/", 1)[0] + "/"
-        out_fname = out_f.rsplit("/", 1)[-1].replace(".tsv", "")
-        fig.write_image(out_dir + out_fname + "_cumulativePercentSpecsCovered.png")
-    except Exception:
-        pass  # Visualization is optional
-
     return 0
 
 
