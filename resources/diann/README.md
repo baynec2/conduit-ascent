@@ -9,9 +9,14 @@ licence from the authors.
     https://github.com/vdemichev/DiaNN/releases
     (DIA-NN-<version>-Academia-Linux.zip)
 
-Unzip it here and make the CLI executable:
+Careful with that page: the newest *release* shown is 2.0 (January 2025), but that is
+not the newest DIA-NN. Every build since is attached as an asset to that same `2.0`
+tag, so the download URL always says `2.0` whatever version you want. Look at the
+Assets list, not the release title.
 
-    unzip DIA-NN-2.5.0-Academia-Linux.zip -d resources/diann
+    curl -fL -o /tmp/diann.zip \
+      https://github.com/vdemichev/DiaNN/releases/download/2.0/DIA-NN-2.5.0-Academia-Linux.zip
+    unzip /tmp/diann.zip -d resources/diann && rm /tmp/diann.zip
     chmod +x resources/diann/diann-2.5.0/diann-linux
 
 That produces `resources/diann/diann-2.5.0/`, which is the default value of
@@ -26,6 +31,12 @@ adds the bind for you:
 
 Tested versions: 2.3.0 and 2.5.0. Below 2.2 is rejected — those builds silently
 ignore `--pre-search` / `--pre-filter`.
+
+Conduit checks that whatever you install runs, accepts every flag it passes, and
+writes the report columns it reads. Those are structural checks only: a new DIA-NN
+release can change scoring, FDR or quantification and pass all of them. DIA-NN
+releases often and we do not test every version, so pin one version for the duration
+of a study and treat an upgrade as a change worth measuring.
 
 See "Obtaining DIA-NN" in the repository README for the full story, including
 the two other supported shapes (a self-contained executable, or your own

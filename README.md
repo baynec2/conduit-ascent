@@ -62,13 +62,19 @@ cd conduit-ascent
 ### 2b. Obtain DIA-NN
 
 Conduit does not ship DIA-NN. Download it, unzip it into `resources/diann/`, and you
-are done — see [Obtaining DIA-NN](#obtaining-dia-nn) for the details.
+are done — see [Obtaining DIA-NN](#obtaining-dia-nn) for the details, including why the
+download URL says `2.0` no matter which version you are fetching.
 
 ```bash
 mkdir -p resources/diann
-unzip ~/Downloads/DIA-NN-2.5.0-Academia-Linux.zip -d resources/diann
+curl -fL -o /tmp/diann.zip \
+  https://github.com/vdemichev/DiaNN/releases/download/2.0/DIA-NN-2.5.0-Academia-Linux.zip
+unzip /tmp/diann.zip -d resources/diann && rm /tmp/diann.zip
 chmod +x resources/diann/diann-2.5.0/diann-linux
 ```
+
+By downloading DIA-NN you are accepting its licence directly from its authors; free for
+academic use, commercial use requires a licence from them.
 
 ### 3. Create an experiment directory
 
@@ -333,9 +339,33 @@ free for academic use; commercial use requires a licence from its authors.
 - Download: <https://github.com/vdemichev/DiaNN/releases> (`DIA-NN-<version>-Academia-Linux.zip`)
 - Licence: <https://github.com/vdemichev/DiaNN/blob/master/LICENSE.txt>
 
+> **The releases page is misleading — read this before you download.** The newest *release*
+> shown is **2.0**, dated January 2025. That is not the newest DIA-NN. Every build since —
+> 2.0.1 through 2.6.1, twelve Linux builds at the time of writing — is published as an
+> **asset attached to that same `2.0` tag**, not as its own release. So the download URL
+> always carries `2.0` in the path regardless of which version you are fetching:
+>
+> ```
+> https://github.com/vdemichev/DiaNN/releases/download/2.0/DIA-NN-2.5.0-Academia-Linux.zip
+>                                             ^^^ always 2.0, never the version you want
+> ```
+>
+> Scroll to the **Assets** list on the `2.0` release to see what is actually available, or
+> list them from the command line:
+>
+> ```bash
+> gh api repos/vdemichev/DiaNN/releases/tags/2.0 \
+>   --jq '.assets[].name | select(test("Academia-Linux"))'
+> ```
+>
+> Taking the release title at face value lands you on 2.0, which Conduit rejects as below
+> the 2.2 minimum.
+
 Tested versions: **2.3.0** and **2.5.0**. Anything below **2.2** is rejected — earlier
 builds silently ignore `--pre-search` / `--pre-filter`, which would turn every InfiniDIA
-search into a plain library search with no error.
+search into a plain library search with no error. See
+[What gets checked, and when](#what-gets-checked-and-when) for what "tested" does and does
+not mean.
 
 ### Where to put it
 
@@ -405,6 +435,39 @@ Set `diann_compat_check: warn` to report and continue, or `off` to skip it entir
 The DIA-NN version, mode, resolved path, and flag findings are recorded in each run's
 `manifest.json` under `diann` — the version is no longer pinned by an image tag, so runs
 have to capture what actually executed.
+
+#### What these checks do not tell you
+
+They are **basic structural checks**, and it is worth being clear about their limits.
+
+They confirm that a given DIA-NN *runs*, that it understands every flag Conduit passes, and
+that its report carries the columns Conduit reads. They say nothing about whether it
+produces the **same numbers** as the version you used last. A release can change scoring,
+FDR estimation, RT modelling, or quantification and still pass every check here without a
+warning — the interface is identical, the science is not.
+
+DIA-NN releases often — twelve Linux builds since 2.0 — and we do not test every one.
+"Tested" means someone ran Conduit end to end on that version and was satisfied with the
+result; it is a short list, maintained by hand in `DIANN_TESTED_VERSIONS`
+(`modules/_shared/diann_env.py`). An untested version that passes the checks gets a
+**warning, not a blessing**: it means "nothing structural is wrong", not "this is known to
+be equivalent".
+
+Two practical consequences:
+
+- **Pin one version for the duration of a study.** Results from different DIA-NN versions
+  are not automatically comparable, and `manifest.json` records which version produced each
+  run so you can tell them apart after the fact.
+- **Upgrading is a change worth measuring.** Both versions can be installed side by side and
+  selected per run, so the comparison is cheap:
+
+  ```bash
+  snakemake --config diann_path=resources/diann/diann-2.5.0 run_name=v250 ...
+  snakemake --config diann_path=resources/diann/diann-2.6.1 run_name=v261 ...
+  ```
+
+  Then diff what you actually care about — precursor and protein-group counts, taxon calls,
+  quantities — before treating the new version as a drop-in replacement.
 
 ---
 
