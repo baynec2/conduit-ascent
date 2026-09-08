@@ -42,39 +42,57 @@ search_space_method: ncbi_taxonomy_id
 sample_annotation: input/sample_annotation.txt
 
 # --- Container images ---
-# Moving tags like :alpha / :develop are OK for active dev; pin to @sha256:... for reproducibility.
+# Pinned by DIGEST, not by tag. Both halves of that matter:
+#
+#   1. A tag cannot name this commit. CI tags each image with the sha of the
+#      commit that built it, and the image for a commit does not exist until
+#      after that commit is pushed — so a tag here always names some EARLIER
+#      commit and looks perpetually out of date. Bumping it just makes a new
+#      commit and recreates the gap. A digest has no commit in it to lag.
+#
+#   2. These builds are not reproducible, so a tag is not a version. Almost
+#      every Dockerfile below resolves its packages at build time — `bakta`,
+#      `metaphlan` and `fraggenescan_hmmer` install their tools with no
+#      version at all, `umgap` curls whatever rustup ships today, and
+#      `diann_runtime` takes dotnet-sdk-8.0 as a major version. Two builds
+#      of the SAME Dockerfile are therefore different images: compare
+#      fraggenescan_hmmer at 660f4cb and f5f961d — byte-identical source,
+#      two digests. Without a digest, which metaphlan profiled your samples
+#      depends on which build happened to be tagged last.
+#
+# The tag each digest came from is in the comment beside it, because that is
+# the part a human can read and grep the CI logs for. To move one, take the
+# digest of the tag you want — the multi-arch index digest, not a
+# per-platform one:
+#
+#   docker buildx imagetools inspect baynec2/<image>:<sha>
+#
+# Digests fix WHICH BUILD you get. They do not make a rebuild reproducible —
+# that needs versions pinned inside the Dockerfiles, which is tracked
+# separately. eggnog-mapper=2.1.12 is currently the only one that does it.
 containers:
-  conduitr:     "docker://baynec2/conduitr:a5cfeae"
+  # a5cfeae
+  conduitr:           "docker://baynec2/conduitr@sha256:919a3014f3177d1a70054b7cb0083a1ab726637831b3eae0ae01717a1fd45a59"
   # Runtime deps (.NET 8, libgomp, locales) for a user-supplied DIA-NN — no
   # DIA-NN inside. There is deliberately no `diann` key here: the DIA-NN
   # container is resolved from `diann_path` at parse time (see below) and
   # written into containers.diann by modules/_shared/diann_env.py.
-  #
-  # Pinned by DIGEST, not by tag, and it is the only one here that is.
-  #
-  # CI tags every image with the sha of the commit that built it, so a tag
-  # always names some OTHER commit than the one you are reading — this file
-  # cannot name its own. That lag reads as a mistake and invites a "fix"
-  # that just moves it along by one. A digest has no commit in it to
-  # disagree with.
-  #
-  # It also pins the bytes, which matters more here than for the others:
-  # this image installs dotnet-sdk-8.0 from apt, so two builds of the same
-  # Dockerfile are NOT the same image. The three published so far all differ
-  # (7ce6ed8, d88dc9c, 16f3d0e — one per merge, identical source), and which
-  # .NET a search ran against is not something to leave to whichever build
-  # happened to be tagged last.
-  #
-  # This is the 7ce6ed8 build. To move it, take the digest of the tag you
-  # want from `docker buildx imagetools inspect baynec2/diann_runtime:<sha>`
-  # (or the Hub API) — the multi-arch index digest, not the per-platform one.
-  diann_runtime: "docker://baynec2/diann_runtime@sha256:ca639dce2e65416856acfd1ee4fb6f8de19bf6d671b2e0c94739b2a73f23309a"
-  bakta:        "docker://baynec2/bakta:f5f961d"
-  metaphlan:    "docker://baynec2/metaphlan:f5f961d"
-  eggnogmapper: "docker://baynec2/eggnogmapper:f5f961d"
-  umgap:        "docker://baynec2/umgap:e46d512"
-  fraggenescan_hmmer: "docker://baynec2/fraggenescan_hmmer:f5f961d"
-  taxonkit:     "docker://quay.io/biocontainers/taxonkit:0.20.0--h9ee0642_1"
+  # 7ce6ed8
+  diann_runtime:      "docker://baynec2/diann_runtime@sha256:ca639dce2e65416856acfd1ee4fb6f8de19bf6d671b2e0c94739b2a73f23309a"
+  # f5f961d
+  bakta:              "docker://baynec2/bakta@sha256:a3cddc954dac24306816e2f97a523a7ca71033f52ca79da5efa307169e7b3155"
+  # f5f961d
+  metaphlan:          "docker://baynec2/metaphlan@sha256:8d856eaabd1b247c2ed6b8d15a9c2ec756d2c58f35c1d213a24c0c049e62b1f3"
+  # f5f961d
+  eggnogmapper:       "docker://baynec2/eggnogmapper@sha256:996e1f4dff1eb7ce7279d7c558d6839218d3c4545b75e6305fcc1c198ef51d34"
+  # e46d512
+  umgap:              "docker://baynec2/umgap@sha256:5c4d4aa963312d5b74139c017c93ea753c7b4c7dfb1939a73790918041c4e364"
+  # f5f961d
+  fraggenescan_hmmer: "docker://baynec2/fraggenescan_hmmer@sha256:f68de9968457481c31001bbf99c6892fe1b30ef49cc58c9d0caba7f5c93c482e"
+  # 0.20.0--h9ee0642_1 — biocontainers tags already carry a build hash, so
+  # this one was effectively immutable already; pinned by digest anyway so
+  # there is one rule here rather than one rule and an exception.
+  taxonkit:           "docker://quay.io/biocontainers/taxonkit@sha256:c27f1ecebde5e98ba09693dd3046814464a9d3ad2c944fba5a0be560ee643c7d"
 
 # --- DIA-NN installation (user-supplied) ---
 # conduit-ascent does not distribute DIA-NN. Its licence permits one backup
