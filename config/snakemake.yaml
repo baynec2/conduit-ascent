@@ -49,7 +49,7 @@ containers:
   # DIA-NN inside. There is deliberately no `diann` key here: the DIA-NN
   # container is resolved from `diann_path` at parse time (see below) and
   # written into containers.diann by modules/_shared/diann_env.py.
-  diann_runtime: "docker://baynec2/diann_runtime:REPLACE_AFTER_CI_BUILD"
+  diann_runtime: "docker://baynec2/diann_runtime:7ce6ed8"
   bakta:        "docker://baynec2/bakta:f5f961d"
   metaphlan:    "docker://baynec2/metaphlan:f5f961d"
   eggnogmapper: "docker://baynec2/eggnogmapper:f5f961d"
