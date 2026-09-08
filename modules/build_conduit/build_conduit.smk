@@ -31,6 +31,9 @@ def search_space_detection_inputs(wildcards):
 rule generate_qfeatures_from_diann_parquet:
   input:
     diann_parquet=os.path.join(RUN_DIR,"diann_output/diann.parquet"),
+    # Fail on a column mismatch here, with the missing names, rather than
+    # inside diann_to_qfeatures() with an "object not found".
+    report_schema_check=os.path.join(RUN_DIR,"logs/diann/report_schema_check.json"),
     sample_annotation=os.path.join(EXPERIMENT_DIR,"input/sample_annotation.txt")
   output:
     qf = os.path.join(RUN_DIR,"output_files/qf.rds")

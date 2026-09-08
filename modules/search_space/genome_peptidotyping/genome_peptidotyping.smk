@@ -356,7 +356,7 @@ rule generate_genome_peptidotyping_first_pass_speclib:
     shell:
         """
         mkdir -p $(dirname {log})
-        diann --cfg {input.config_file} \
+        {config[diann_cmd]} --cfg {input.config_file} \
             --fasta {input.fasta} \
             --out-lib {params.out_lib} \
             --cut "" \
@@ -382,7 +382,7 @@ rule generate_genome_peptidotyping_second_pass_speclib:
     shell:
         """
         mkdir -p $(dirname {log})
-        diann --cfg {input.config_file} \
+        {config[diann_cmd]} --cfg {input.config_file} \
             --fasta {input.fasta} \
             --out-lib {params.out_lib} \
             --cut "" \
@@ -419,7 +419,7 @@ if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard":
             """
             mkdir -p $(dirname {log}) $(dirname {output.empirical_lib})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
-            diann --cfg {input.config_file} \
+            {config[diann_cmd]} --cfg {input.config_file} \
                 --fasta {input.fasta} \
                 --dir {input.raw_files_dir} \
                 --temp {params.tmpdir} \
@@ -450,7 +450,7 @@ if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard":
             """
             mkdir -p $(dirname {log})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir} $(dirname {output.quant})
-            diann --cfg {input.config_file} \
+            {config[diann_cmd]} --cfg {input.config_file} \
                 --f {input.raw} \
                 --lib {input.empirical_lib} \
                 --fasta {input.fasta} \
@@ -491,7 +491,7 @@ if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard":
             mkdir -p $(dirname {log})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
             {params.symlink_cmds}
-            diann --cfg {input.config_file} \
+            {config[diann_cmd]} --cfg {input.config_file} \
                 --dir {input.raw_files_dir} \
                 --lib {input.empirical_lib} \
                 --fasta {input.fasta} \
@@ -523,7 +523,7 @@ else:  # infinidia — monolithic
             """
             mkdir -p $(dirname {log}) $(dirname {output.first_pass_diann_parquet})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
-            diann --cfg {input.config_file} \
+            {config[diann_cmd]} --cfg {input.config_file} \
                 --fasta {input.fasta} \
                 --dir {input.raw_files_dir} \
                 --temp {params.tmpdir} \
@@ -628,7 +628,7 @@ if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard":
             """
             mkdir -p $(dirname {log}) $(dirname {output.empirical_lib})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
-            diann --cfg {input.config_file} \
+            {config[diann_cmd]} --cfg {input.config_file} \
                 --fasta {input.fasta} \
                 --dir {input.raw_files_dir} \
                 --temp {params.tmpdir} \
@@ -659,7 +659,7 @@ if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard":
             """
             mkdir -p $(dirname {log})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir} $(dirname {output.quant})
-            diann --cfg {input.config_file} \
+            {config[diann_cmd]} --cfg {input.config_file} \
                 --f {input.raw} \
                 --lib {input.empirical_lib} \
                 --fasta {input.fasta} \
@@ -700,7 +700,7 @@ if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard":
             mkdir -p $(dirname {log})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
             {params.symlink_cmds}
-            diann --cfg {input.config_file} \
+            {config[diann_cmd]} --cfg {input.config_file} \
                 --dir {input.raw_files_dir} \
                 --lib {input.empirical_lib} \
                 --fasta {input.fasta} \
@@ -740,7 +740,7 @@ else:  # infinidia — monolithic
                 echo "second_pass_database.fasta has no proteins — writing empty parquet marker" >> {log} 2>&1
                 : > {output.second_pass_diann_parquet}
             else
-                diann --cfg {input.config_file} \
+                {config[diann_cmd]} --cfg {input.config_file} \
                     --fasta {input.fasta} \
                     --dir {input.raw_files_dir} \
                     --temp {params.tmpdir} \

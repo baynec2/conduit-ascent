@@ -52,6 +52,20 @@ if [ -d "$_host_profile" ] && [ -f "$_host_profile/config.yaml" ]; then
     PROFILE_ARGS+=(--profile "$_host_profile")
 fi
 
+# ── DIA-NN availability gate ──────────────────────────────────────────────────
+# Conduit no longer ships DIA-NN (licence: one backup copy, no sublicensing).
+# A smoke run performs a real DIA-NN search, so skip cleanly rather than fail
+# when no installation is reachable. See "Obtaining DIA-NN" in the README.
+if [ -z "${CONDUIT_DIANN_PATH:-}" ] \
+   && ! compgen -G "$REPO_ROOT/resources/diann/*/diann-linux" > /dev/null 2>&1 \
+   && ! compgen -G "$REPO_ROOT/resources/diann/*.AppImage" > /dev/null 2>&1 \
+   && ! grep -q 'diann_path' "$_host_profile/config.yaml" 2>/dev/null; then
+    echo "SKIP: no DIA-NN installation found (set CONDUIT_DIANN_PATH, or unzip" >&2
+    echo "      DIA-NN-<version>-Academia-Linux.zip into resources/diann/)." >&2
+    echo "      https://github.com/vdemichev/DiaNN/releases" >&2
+    exit 0
+fi
+
 # ── Profile-level resource keys that the smoke run still needs ────────────────
 # The host profile passes these via `--config K=V ...`. When the smoke runner
 # adds its own `--config peptidotyping_resource_dir=...`, snakemake REPLACES

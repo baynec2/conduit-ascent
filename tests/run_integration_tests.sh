@@ -73,6 +73,49 @@ if [ -d "$_host_profile" ] && [ -f "$_host_profile/config.yaml" ]; then
     PROFILE_ARGS+=(--profile "$_host_profile")
 fi
 
+# ── DIA-NN availability gate ──────────────────────────────────────────────────
+# Conduit no longer ships DIA-NN (licence: one backup copy, no sublicensing), so
+# there is nothing to pull and the binary cannot live in CI. Every integration
+# test runs a real DIA-NN search, so skip the suite outright — cleanly, not as a
+# failure — when no installation is reachable.
+#
+# Reachable means either $CONDUIT_DIANN_PATH is set, or an actual DIA-NN has
+# been unzipped into resources/diann/, or the active profile pins diann_path.
+# (resources/diann/README.md is tracked, so "the directory is non-empty" is not
+# evidence of an install — look for the binary itself.)
+diann_available() {
+    [ -n "${CONDUIT_DIANN_PATH:-}" ] && return 0
+    compgen -G "$REPO_ROOT/resources/diann/*/diann-linux" > /dev/null 2>&1 && return 0
+    compgen -G "$REPO_ROOT/resources/diann/*.AppImage" > /dev/null 2>&1 && return 0
+    if [ ${#PROFILE_ARGS[@]} -ne 0 ] \
+       && grep -q 'diann_path' "$_host_profile/config.yaml" 2>/dev/null; then
+        return 0
+    fi
+    return 1
+}
+
+if ! diann_available; then
+    cat >&2 <<'MSG'
+SKIP: no DIA-NN installation found, so the integration tests cannot run.
+
+Conduit does not distribute DIA-NN — its licence permits one backup copy and
+forbids sublicensing. Download it yourself and point the tests at it:
+
+  https://github.com/vdemichev/DiaNN/releases   (DIA-NN-<version>-Academia-Linux.zip)
+
+  mkdir -p resources/diann
+  unzip DIA-NN-2.5.0-Academia-Linux.zip -d resources/diann
+  chmod +x resources/diann/diann-2.5.0/diann-linux
+
+or, for an install elsewhere:
+
+  export CONDUIT_DIANN_PATH=/path/to/diann-2.5.0
+
+See "Obtaining DIA-NN" in the README.
+MSG
+    exit 0
+fi
+
 # ── Peptidotyping resource pre-check ──────────────────────────────────────────
 # Skip unipept_peptidotyping-family tests with a helpful message when the index is
 # unavailable. With a host profile active, trust the profile (it's responsible

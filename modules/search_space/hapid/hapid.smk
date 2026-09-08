@@ -289,7 +289,7 @@ rule create_hapid_profiling_spectral_library:
         mkdir -p "$OUT_DIR"
         mkdir -p "$(dirname "$LOG")"
         cd "$OUT_DIR"
-        diann \
+        {config[diann_cmd]} \
             --cfg "$CFG" \
             --fasta "$INPUT_FA" \
             --threads {threads} \
@@ -330,7 +330,7 @@ if config.get("hapid_search_mode", "standard") == "standard":
             mkdir -p $(dirname {output.empirical_lib})
             mkdir -p $(dirname {log})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
-            diann \
+            {config[diann_cmd]} \
                 --cfg {input.cfg} \
                 --fasta {input.fasta} \
                 --dir {input.raw_dir} \
@@ -367,7 +367,7 @@ if config.get("hapid_search_mode", "standard") == "standard":
             """
             mkdir -p $(dirname {log})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir} $(dirname {output.quant})
-            diann \
+            {config[diann_cmd]} \
                 --cfg {input.cfg} \
                 --f {input.raw} \
                 --lib {input.empirical_lib} \
@@ -415,7 +415,7 @@ if config.get("hapid_search_mode", "standard") == "standard":
             mkdir -p $(dirname {log})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
             {params.symlink_cmds}
-            diann \
+            {config[diann_cmd]} \
                 --cfg {input.cfg} \
                 --dir {input.raw_dir} \
                 --lib {input.empirical_lib} \
@@ -454,7 +454,7 @@ else:  # infinidia — monolithic
             mkdir -p $(dirname {output[0]})
             mkdir -p $(dirname {log})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
-            diann \
+            {config[diann_cmd]} \
                 --cfg {input.cfg} \
                 --fasta {input.fasta} \
                 --dir {input.raw_dir} \

@@ -12,6 +12,7 @@ for rel in [
     "modules/search_space/_shared/scripts",
     "modules/search_space/genomes/scripts",
     "modules/search_space/unipept_hapid/scripts",
+    "modules/_shared",
 ]:
     p = os.path.join(REPO_ROOT, rel)
     if p not in sys.path:

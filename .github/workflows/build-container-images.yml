@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       containers:
-        description: 'Which containers to (re)build. Comma-separated tool names (e.g. "bakta,metaphlan") or "all".'
+        description: 'Which containers to (re)build. Comma-separated tool names (e.g. "bakta,diann_runtime") or "all". Note: there is no "diann" image — DIA-NN is user-supplied (see issue #63); diann_runtime carries only its host dependencies.'
         required: true
         default: 'all'
         type: string
@@ -51,8 +51,10 @@ jobs:
               done
             fi
           else
-            # push event: only rebuild Dockerfiles changed in this commit
-            files=$(git diff --name-only HEAD~1 HEAD -- 'containers/*/Dockerfile')
+            # push event: only rebuild Dockerfiles changed in this commit.
+            # --diff-filter=d drops deletions: a removed container (e.g. the
+            # DIA-NN image retired in #63) has no Dockerfile left to build.
+            files=$(git diff --name-only --diff-filter=d HEAD~1 HEAD -- 'containers/*/Dockerfile')
           fi
           {
             echo 'files<<EOF'
@@ -66,6 +68,7 @@ jobs:
           sha=$(git rev-parse --short HEAD)
           while IFS= read -r f; do
             [ -z "$f" ] && continue
+            [ -f "$f" ] || { echo "Skipping $f (no longer present)"; continue; }
             tool=$(echo "$f" | awk -F'/' '{print $2}')
             echo "Building $tool:$sha from $f"
             docker buildx build \

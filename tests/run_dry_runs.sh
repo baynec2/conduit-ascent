@@ -21,6 +21,11 @@ if [ -d "$_host_profile" ] && [ -f "$_host_profile/config.yaml" ]; then
     PROFILE_ARGS+=(--profile "$_host_profile")
 fi
 
+# No DIA-NN gate here, unlike run_integration_tests.sh / run_smoke_tests.sh: a
+# dry run never executes DIA-NN, and the Snakefile's preflight downgrades a
+# missing installation to a warning under --dry-run so the DAG still builds.
+# That is what lets these run in CI, which cannot hold the binary.
+
 # ── macOS AppleDouble dropout: .yaml files starting with "._" are junk metadata, skip them.
 
 run_dry_run() {

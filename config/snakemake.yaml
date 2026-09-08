@@ -45,13 +45,47 @@ sample_annotation: input/sample_annotation.txt
 # Moving tags like :alpha / :develop are OK for active dev; pin to @sha256:... for reproducibility.
 containers:
   conduitr:     "docker://baynec2/conduitr:a5cfeae"
-  diann:        "docker://baynec2/diann:f5f961d"
+  # Runtime deps (.NET 8, libgomp, locales) for a user-supplied DIA-NN — no
+  # DIA-NN inside. There is deliberately no `diann` key here: the DIA-NN
+  # container is resolved from `diann_path` at parse time (see below) and
+  # written into containers.diann by modules/_shared/diann_env.py.
+  diann_runtime: "docker://baynec2/diann_runtime:REPLACE_AFTER_CI_BUILD"
   bakta:        "docker://baynec2/bakta:f5f961d"
   metaphlan:    "docker://baynec2/metaphlan:f5f961d"
   eggnogmapper: "docker://baynec2/eggnogmapper:f5f961d"
   umgap:        "docker://baynec2/umgap:e46d512"
   fraggenescan_hmmer: "docker://baynec2/fraggenescan_hmmer:f5f961d"
   taxonkit:     "docker://quay.io/biocontainers/taxonkit:0.20.0--h9ee0642_1"
+
+# --- DIA-NN installation (user-supplied) ---
+# conduit-ascent does not distribute DIA-NN. Its licence permits one backup
+# copy and forbids sublicensing, so the binary cannot ship in a public image
+# (issue #63); you download it from
+#   https://github.com/vdemichev/DiaNN/releases
+# and accept its terms yourself. Free for academic use; commercial use needs a
+# licence from the authors.
+#
+# One key, three autodetected shapes:
+#   A. a directory holding diann-linux (recommended) — bind-mounted into the
+#      containers.diann_runtime image, which supplies .NET 8 + libgomp
+#   B. an executable file (e.g. DIA-NN.AppImage) — run on the host, no container
+#   C. "docker://…" or "….sif" — a full image you built yourself, used as-is
+#
+# Resolution order, first wins:
+#   snakemake --config diann_path=...   >   $CONDUIT_DIANN_PATH   >   this key
+#
+# The default keeps the install under resources/, which is inside the working
+# directory and therefore already visible inside the container — no extra
+# apptainer bind is needed. An out-of-tree path gets one added automatically.
+diann_path: resources/diann/diann-2.5.0
+
+# Compatibility gate for the user-supplied DIA-NN, run once before any search:
+#   strict  fail the run if the version is too old or any flag we pass is
+#           unsupported (DIA-NN ignores unknown flags rather than erroring, so
+#           an unchecked mismatch silently changes the science)
+#   warn    report the same findings and continue
+#   off     skip the check entirely
+diann_compat_check: strict
 
 # --- DIA-NN cfg-file pointers (rarely changed per-experiment) ---
 # Every cfg below is snapshotted into RUN_DIR/config/ at run start (see
