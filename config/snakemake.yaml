@@ -77,18 +77,18 @@ containers:
   # DIA-NN inside. There is deliberately no `diann` key here: the DIA-NN
   # container is resolved from `diann_path` at parse time (see below) and
   # written into containers.diann by modules/_shared/diann_env.py.
-  # 7ce6ed8
-  diann_runtime:      "docker://baynec2/diann_runtime@sha256:ca639dce2e65416856acfd1ee4fb6f8de19bf6d671b2e0c94739b2a73f23309a"
-  # f5f961d
-  bakta:              "docker://baynec2/bakta@sha256:a3cddc954dac24306816e2f97a523a7ca71033f52ca79da5efa307169e7b3155"
-  # f5f961d
-  metaphlan:          "docker://baynec2/metaphlan@sha256:8d856eaabd1b247c2ed6b8d15a9c2ec756d2c58f35c1d213a24c0c049e62b1f3"
-  # f5f961d
-  eggnogmapper:       "docker://baynec2/eggnogmapper@sha256:996e1f4dff1eb7ce7279d7c558d6839218d3c4545b75e6305fcc1c198ef51d34"
-  # e46d512
-  umgap:              "docker://baynec2/umgap@sha256:5c4d4aa963312d5b74139c017c93ea753c7b4c7dfb1939a73790918041c4e364"
-  # f5f961d
-  fraggenescan_hmmer: "docker://baynec2/fraggenescan_hmmer@sha256:f68de9968457481c31001bbf99c6892fe1b30ef49cc58c9d0caba7f5c93c482e"
+  # 14165ea
+  diann_runtime:      "docker://baynec2/diann_runtime@sha256:6f9bb07a6b00180edabac2a730ef51274e9e4b96c7e954666be9a1e5d7ff3bbb"
+  # 14165ea
+  bakta:              "docker://baynec2/bakta@sha256:39e81cde128d89f2f6675566d99388ae83f8804d59695fedcbd2a60f89d165d6"
+  # 14165ea
+  metaphlan:          "docker://baynec2/metaphlan@sha256:079f46bb3f82f8491e04af6be1110b74b5aed3b675ddca98c4ff7d1660b9fcc5"
+  # 14165ea
+  eggnogmapper:       "docker://baynec2/eggnogmapper@sha256:340601fdf5a43d6712e060ca71d84b758b657ca2a686bfed6c80a54626ccd3f3"
+  # 14165ea
+  umgap:              "docker://baynec2/umgap@sha256:e858b171ead56c51bb0c0257fbb6d78a960cf5b823084eaf58c3883faba7ce30"
+  # 14165ea
+  fraggenescan_hmmer: "docker://baynec2/fraggenescan_hmmer@sha256:63b9c5b8bc3c72ed242d4e2feb13540f8750a0bc33933d44acd082388ca3e222"
   # 0.20.0--h9ee0642_1 — biocontainers tags already carry a build hash, so
   # this one was effectively immutable already; pinned by digest anyway so
   # there is one rule here rather than one rule and an exception.
