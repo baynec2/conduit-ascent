@@ -197,7 +197,7 @@ rule generate_hapid_spectral_library:
     threads: workflow.cores
     shell:
         """
-        diann --cfg {input.config_file} \
+        {config[diann_cmd]} --cfg {input.config_file} \
         --fasta {input.fasta} \
         --threads {threads} \
         --out-lib {config[peptidotyping_resource_dir]}hapid_peptidotyping \
@@ -232,7 +232,7 @@ if config.get("unipept_hapid_search_mode", "standard") == "standard":
             """
             mkdir -p $(dirname {log}) $(dirname {output.empirical_lib})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
-            diann --cfg {input.config_file} \
+            {config[diann_cmd]} --cfg {input.config_file} \
             --fasta {input.fasta} \
             --dir {input.raw_files_dir} \
             --temp {params.tmpdir} \
@@ -265,7 +265,7 @@ if config.get("unipept_hapid_search_mode", "standard") == "standard":
             """
             mkdir -p $(dirname {log})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir} $(dirname {output.quant})
-            diann --cfg {input.config_file} \
+            {config[diann_cmd]} --cfg {input.config_file} \
             --f {input.raw} \
             --lib {input.empirical_lib} \
             --fasta {input.fasta} \
@@ -308,7 +308,7 @@ if config.get("unipept_hapid_search_mode", "standard") == "standard":
             mkdir -p $(dirname {log})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
             {params.symlink_cmds}
-            diann --cfg {input.config_file} \
+            {config[diann_cmd]} --cfg {input.config_file} \
             --dir {input.raw_files_dir} \
             --lib {input.empirical_lib} \
             --fasta {input.fasta} \
@@ -342,7 +342,7 @@ else:  # infinidia — monolithic
             """
             mkdir -p $(dirname {log}) $(dirname {output.hapid_diann_parquet})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
-            diann --cfg {input.config_file} \
+            {config[diann_cmd]} --cfg {input.config_file} \
             --fasta {input.fasta} \
             --dir {input.raw_files_dir} \
             --temp {params.tmpdir} \

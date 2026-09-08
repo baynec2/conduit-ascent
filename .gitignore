@@ -69,7 +69,12 @@ Rplots.pdf
 # form (instead of `resources/`) is required — git won't descend into a wholly
 # excluded directory, so the negation below would otherwise have no effect.
 resources/*
+# Instructions for the user-supplied DIA-NN install (issue #63); everything
+# they unzip alongside it stays ignored.
+!resources/diann/
 !resources/hapid/
+resources/diann/*
+!resources/diann/README.md
 resources/hapid/*
 !resources/hapid/ribP_elonF_profiles_refined_manually.hmm
 

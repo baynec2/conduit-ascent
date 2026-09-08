@@ -29,8 +29,9 @@ Conduit is a scalable and modular workflow management system for metaproteomics 
 
 - Snakemake (≥7.0.0)
 - Apptainer/Singularity (≥1.1.0)
+- **DIA-NN** — you download this yourself; see [Obtaining DIA-NN](#obtaining-dia-nn)
 
-All other dependencies (R, Python, DIA-NN, MetaPhlAn, Bakta, eggNOG-mapper, etc.) are handled automatically via Apptainer containers. You only need Snakemake and Apptainer installed on your **Linux** system.
+All other dependencies (R, Python, MetaPhlAn, Bakta, eggNOG-mapper, etc.) are handled automatically via Apptainer containers. You only need Snakemake, Apptainer, and your own copy of DIA-NN on your **Linux** system.
 
 > **Note:** Conduit does not run on macOS. Windows is not recommended but may work without containers.
 
@@ -57,6 +58,23 @@ conda install -c bioconda apptainer
 git clone https://github.com/baynec2/conduit-ascent.git
 cd conduit-ascent
 ```
+
+### 2b. Obtain DIA-NN
+
+Conduit does not ship DIA-NN. Download it, unzip it into `resources/diann/`, and you
+are done — see [Obtaining DIA-NN](#obtaining-dia-nn) for the details, including why the
+download URL says `2.0` no matter which version you are fetching.
+
+```bash
+mkdir -p resources/diann
+curl -fL -o /tmp/diann.zip \
+  https://github.com/vdemichev/DiaNN/releases/download/2.0/DIA-NN-2.5.0-Academia-Linux.zip
+unzip /tmp/diann.zip -d resources/diann && rm /tmp/diann.zip
+chmod +x resources/diann/diann-2.5.0/diann-linux
+```
+
+By downloading DIA-NN you are accepting its licence directly from its authors; free for
+academic use, commercial use requires a licence from them.
 
 ### 3. Create an experiment directory
 
@@ -98,7 +116,7 @@ The main configuration file controls all aspects of the workflow. Below is a ful
 ```yaml
 containers:
   conduitr:           "docker://baynec2/conduitr:a5cfeae"
-  diann:              "docker://baynec2/diann:f5f961d"
+  diann_runtime:      "docker://baynec2/diann_runtime:<sha>"
   bakta:              "docker://baynec2/bakta:f5f961d"
   metaphlan:          "docker://baynec2/metaphlan:f5f961d"
   eggnogmapper:       "docker://baynec2/eggnogmapper:f5f961d"
@@ -109,6 +127,12 @@ containers:
 
 These point to the Docker/Apptainer images used for each tool. You generally do not need to
 change them unless you are pinning to a specific version or using a private registry.
+
+There is deliberately no `diann` key. DIA-NN is supplied by you (see
+[Obtaining DIA-NN](#obtaining-dia-nn)) and the workflow derives its container from
+`diann_path` at parse time. `diann_runtime` holds only DIA-NN's *host* dependencies
+(.NET 8, libgomp, locales) — no DIA-NN binary — and is what your extracted DIA-NN
+directory gets bind-mounted into.
 
 Tags are short commit SHAs rather than moving tags like `:latest`. Apptainer caches images
 by URI, so a moving tag would not refresh once cached and you would silently keep running
@@ -299,6 +323,151 @@ These parameters point to large reference databases that Conduit needs for certa
 These paths are machine-specific, so they belong in your Snakemake **profile** rather than
 in an experiment config — the profile's `config:` block overrides both the base config and
 the experiment config. See `profiles/nanopore-catalyst/config.yaml` for a worked example.
+
+---
+
+## Obtaining DIA-NN
+
+Conduit does not distribute DIA-NN, and no Conduit container contains it.
+
+DIA-NN's licence permits **one copy for backup purposes** and forbids renting, leasing,
+lending, or sublicensing the software. Publishing a public registry image with the binary
+inside is none of those things, so the binary is not ours to ship. You download it yourself
+and accept its terms directly — which is where licence acceptance belongs anyway. DIA-NN is
+free for academic use; commercial use requires a licence from its authors.
+
+- Download: <https://github.com/vdemichev/DiaNN/releases> (`DIA-NN-<version>-Academia-Linux.zip`)
+- Licence: <https://github.com/vdemichev/DiaNN/blob/master/LICENSE.txt>
+
+> **The releases page is misleading — read this before you download.** The newest *release*
+> shown is **2.0**, dated January 2025. That is not the newest DIA-NN. Every build since —
+> 2.0.1 through 2.6.1, twelve Linux builds at the time of writing — is published as an
+> **asset attached to that same `2.0` tag**, not as its own release. So the download URL
+> always carries `2.0` in the path regardless of which version you are fetching:
+>
+> ```
+> https://github.com/vdemichev/DiaNN/releases/download/2.0/DIA-NN-2.5.0-Academia-Linux.zip
+>                                             ^^^ always 2.0, never the version you want
+> ```
+>
+> Scroll to the **Assets** list on the `2.0` release to see what is actually available, or
+> list them from the command line:
+>
+> ```bash
+> gh api repos/vdemichev/DiaNN/releases/tags/2.0 \
+>   --jq '.assets[].name | select(test("Academia-Linux"))'
+> ```
+>
+> Taking the release title at face value lands you on 2.0, which Conduit rejects as below
+> the 2.2 minimum.
+
+Tested versions: **2.3.0** and **2.5.0**. Anything below **2.2** is rejected — earlier
+builds silently ignore `--pre-search` / `--pre-filter`, which would turn every InfiniDIA
+search into a plain library search with no error. See
+[What gets checked, and when](#what-gets-checked-and-when) for what "tested" does and does
+not mean.
+
+### Where to put it
+
+One config key, `diann_path`, names your copy. Three shapes are autodetected:
+
+| Shape | Detected when | What happens |
+|---|---|---|
+| **A — directory** *(recommended)* | the path is a directory containing `diann-linux` | Runs inside the `diann_runtime` image with your directory bind-mounted in |
+| **B — executable** | the path is an executable file | Runs directly on the host, no container. Use for `DIA-NN.AppImage` (self-contained) or a host that already has .NET 8 |
+| **C — image** | the path starts with `docker://` or ends in `.sif` | Used as the container as-is. Migration path if you already built your own full image |
+
+Mode A is what most people want:
+
+```bash
+mkdir -p resources/diann
+unzip DIA-NN-2.5.0-Academia-Linux.zip -d resources/diann
+chmod +x resources/diann/diann-2.5.0/diann-linux
+```
+
+which gives the default layout, so nothing else needs configuring:
+
+```
+resources/diann/diann-2.5.0/
+├── diann-linux                      # the CLI Conduit invokes
+├── libtorch_cpu.so, libc10.so, ...  # bundled, found via RUNPATH=$ORIGIN
+└── models/
+```
+
+`diann-linux` is a framework-dependent .NET binary and also needs libgomp, so pointing at
+it on a bare host is not enough on its own. That is what `containers.diann_runtime`
+supplies: Debian/Ubuntu + .NET 8 + libgomp + locales, and **no DIA-NN**. Your directory is
+bind-mounted in and the binary is executed from the mount, so nothing license-restricted
+ever enters an image we publish — and you avoid an `apptainer build --fakeroot` (restricted
+at many HPC sites) and a multi-GB local image build.
+
+Keeping the install under `resources/` matters: that path is inside the working directory
+and therefore already visible inside the container. An out-of-tree path still works — the
+preflight appends the bind for you.
+
+### Selecting a different location
+
+First match wins:
+
+```bash
+snakemake --config diann_path=/opt/diann-2.5.0 ...   # 1. command line
+export CONDUIT_DIANN_PATH=/opt/diann-2.5.0           # 2. environment
+# 3. diann_path: in config/snakemake.yaml or your profile
+```
+
+### What gets checked, and when
+
+| When | Check | On failure |
+|---|---|---|
+| At parse time | The path resolves, has one of the three shapes, and the binary is executable | Fails in seconds with download instructions. Downgraded to a warning on `--dry-run` |
+| Before any search | DIA-NN's version is ≥ 2.2, and it recognises every CLI flag the workflow passes | Fails with the offending flags named. Controlled by `diann_compat_check` |
+| After the main search | The report carries every column the downstream readers select by name | Fails naming the missing columns, instead of an opaque error inside an R script |
+
+The flag check exists because DIA-NN does **not** error on an unknown flag — it prints
+`WARNING: unrecognised option [--flag]` and carries on. An unchecked version mismatch
+therefore changes the science silently rather than crashing. The probe runs DIA-NN with
+every flag the workflow uses and no input files (a few seconds), and includes a deliberately
+invalid flag as a self-test: if DIA-NN does not report *that* one, the check refuses to
+claim a pass.
+
+Set `diann_compat_check: warn` to report and continue, or `off` to skip it entirely.
+
+The DIA-NN version, mode, resolved path, and flag findings are recorded in each run's
+`manifest.json` under `diann` — the version is no longer pinned by an image tag, so runs
+have to capture what actually executed.
+
+#### What these checks do not tell you
+
+They are **basic structural checks**, and it is worth being clear about their limits.
+
+They confirm that a given DIA-NN *runs*, that it understands every flag Conduit passes, and
+that its report carries the columns Conduit reads. They say nothing about whether it
+produces the **same numbers** as the version you used last. A release can change scoring,
+FDR estimation, RT modelling, or quantification and still pass every check here without a
+warning — the interface is identical, the science is not.
+
+DIA-NN releases often — twelve Linux builds since 2.0 — and we do not test every one.
+"Tested" means someone ran Conduit end to end on that version and was satisfied with the
+result; it is a short list, maintained by hand in `DIANN_TESTED_VERSIONS`
+(`modules/_shared/diann_env.py`). An untested version that passes the checks gets a
+**warning, not a blessing**: it means "nothing structural is wrong", not "this is known to
+be equivalent".
+
+Two practical consequences:
+
+- **Pin one version for the duration of a study.** Results from different DIA-NN versions
+  are not automatically comparable, and `manifest.json` records which version produced each
+  run so you can tell them apart after the fact.
+- **Upgrading is a change worth measuring.** Both versions can be installed side by side and
+  selected per run, so the comparison is cheap:
+
+  ```bash
+  snakemake --config diann_path=resources/diann/diann-2.5.0 run_name=v250 ...
+  snakemake --config diann_path=resources/diann/diann-2.6.1 run_name=v261 ...
+  ```
+
+  Then diff what you actually care about — precursor and protein-group counts, taxon calls,
+  quantities — before treating the new version as a drop-in replacement.
 
 ---
 
