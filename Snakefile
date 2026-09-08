@@ -6,6 +6,7 @@ import os
 import sys
 import glob
 import pandas as pd
+import shlex
 import shutil
 import logging
 from datetime import datetime
@@ -99,6 +100,68 @@ for _new_key, _old_key in _HAPIID_KEY_ALIASES.items():
         config[_old_key] = config[_new_key]
 if METHOD not in ALLOWED_METHODS:
     raise ValueError(f"Method '{METHOD}' not allowed. Must be one of: {', '.join(ALLOWED_METHODS)}")
+
+################################################################################
+# DIA-NN preflight
+################################################################################
+# DIA-NN is supplied by the user, not shipped with this workflow — its licence
+# permits one backup copy and forbids sublicensing, so it cannot live in a
+# public image (issue #63). One config key, `diann_path`, names their copy;
+# the helper below classifies its shape (extracted directory / bare executable
+# / container image) and derives everything the rules need:
+#
+#   config["diann_cmd"]            -> used in shell blocks as {config[diann_cmd]}
+#   config["containers"]["diann"]  -> the container (None = run on the host)
+#   config["diann"]                -> provenance, lands in manifest.json
+#
+# Doing this at parse time means a missing or mis-shaped install fails in
+# seconds with a message that says what to download and where to put it,
+# rather than 40 minutes into a run. Dry runs downgrade it to a warning so the
+# DAG still builds on a machine (or CI box) with no DIA-NN installed.
+sys.path.insert(0, os.path.join(workflow.basedir, "modules", "_shared"))
+import diann_env
+
+# Invocations that build the DAG but never run a job. A missing DIA-NN must not
+# break these: `tests/run_dry_runs.sh`, `--lint`, and the DAG-rendering step all
+# run in CI, which cannot hold the binary.
+_NON_EXECUTING_FLAGS = {
+    "-n", "--dry-run", "--dryrun",
+    "--dag", "--rulegraph", "--filegraph", "--d3dag",
+    "--lint", "--list", "-l", "--list-target-rules",
+    "--summary", "--detailed-summary", "--unlock",
+    "--containerize", "--export-cwl", "--generate-unit-tests",
+}
+_IS_DRY_RUN = bool(_NON_EXECUTING_FLAGS & set(sys.argv))
+
+try:
+    DIANN = diann_env.resolve_diann_environment(config, workflow, strict=not _IS_DRY_RUN)
+except diann_env.DiannEnvError as _e:
+    raise ValueError(str(_e)) from None
+
+# Publish the schema contract so module rules can pass it to the report-column
+# checker without importing diann_env themselves (single writer, many readers).
+config["diann_required_report_columns"] = diann_env.DIANN_REQUIRED_REPORT_COLUMNS
+
+# strict | warn | off — see config/snakemake.yaml. Anything but "off" gates the
+# cfg-snapshot rules (and therefore every DIA-NN rule) on the compatibility check.
+DIANN_COMPAT_CHECK = str(config.get("diann_compat_check", "strict")).lower()
+if DIANN_COMPAT_CHECK not in ("strict", "warn", "off"):
+    raise ValueError(
+        f"diann_compat_check must be one of strict, warn, off (got {DIANN_COMPAT_CHECK!r})"
+    )
+config["diann_compat_check"] = DIANN_COMPAT_CHECK
+# The probe has to execute DIA-NN, so it cannot run on a dry run; skip the gate
+# there rather than leaving an output that can never be produced in the DAG.
+config["diann_compat_gate"] = DIANN_COMPAT_CHECK != "off" and not _IS_DRY_RUN
+
+# Pre-render the probe invocation here rather than in the rule: building it
+# needs diann_env, and the scratch dir is fixed under RUN_DIR so the command
+# can be baked in (and read back in the log) instead of assembled at run time.
+DIANN_PROBE_TMPDIR = os.path.join(RUN_DIR, "logs/diann/compat_probe_tmp")
+config["diann_compat_probe_tmpdir"] = DIANN_PROBE_TMPDIR
+config["diann_compat_probe_cmd"] = shlex.join(
+    diann_env.build_compat_probe_argv(config["diann_cmd"], DIANN_PROBE_TMPDIR)
+)
 
 # Collect both .raw (Thermo native) and .mzML (open format) — DIA-NN accepts
 # both as inputs. Tests ship mzML because some filtered raw files are missing

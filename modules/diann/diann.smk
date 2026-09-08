@@ -36,7 +36,7 @@ rule generate_diann_spectral_library:
     threads: workflow.cores
     shell:
         """
-        diann --cfg {input.config_file} \
+        {config[diann_cmd]} --cfg {input.config_file} \
         --fasta {input.fasta} \
         --out-lib {params.out_lib} \
         --met-excision \
@@ -91,7 +91,7 @@ if config.get("diann_search_mode", "standard") == "standard":
             """
             mkdir -p $(dirname {log}) $(dirname {output.empirical_lib})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
-            diann --cfg {input.config_file} \
+            {config[diann_cmd]} --cfg {input.config_file} \
             --fasta {input.fasta} \
             --dir {input.raw_files_dir} \
             --temp {params.tmpdir} \
@@ -122,7 +122,7 @@ if config.get("diann_search_mode", "standard") == "standard":
             """
             mkdir -p $(dirname {log})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir} $(dirname {output.quant})
-            diann --cfg {input.config_file} \
+            {config[diann_cmd]} --cfg {input.config_file} \
             --f {input.raw} \
             --lib {input.empirical_lib} \
             --fasta {input.fasta} \
@@ -164,7 +164,7 @@ if config.get("diann_search_mode", "standard") == "standard":
             mkdir -p $(dirname {log})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
             {params.symlink_cmds}
-            diann --cfg {input.config_file} \
+            {config[diann_cmd]} --cfg {input.config_file} \
             --dir {input.raw_files_dir} \
             --lib {input.empirical_lib} \
             --fasta {input.fasta} \
@@ -203,7 +203,7 @@ else:  # infinidia — monolithic, see comment above
             """
             mkdir -p $(dirname {log}) $(dirname {output.diann_parquet})
             rm -rf {params.tmpdir} && mkdir -p {params.tmpdir}
-            diann --cfg {input.config_file} \
+            {config[diann_cmd]} --cfg {input.config_file} \
             --fasta {input.fasta} \
             --dir {input.raw_files_dir} \
             --temp {params.tmpdir} \
@@ -214,13 +214,38 @@ else:  # infinidia — monolithic, see comment above
             --threads {threads} --verbose 1 >> {log} 2>&1
             """
 ################################################################################
+# Report schema validation
+################################################################################
+# The parse-time preflight and the CLI probe cover the input side of the DIA-NN
+# contract (right shape, right version, every flag understood). This covers the
+# output side: DIA-NN has renamed and dropped report columns between releases,
+# and everything downstream — conduitR::diann_to_qfeatures(), the presence
+# scripts, the HAPiID spectrum mappers — selects columns by name. Without this
+# a schema drift surfaces as an opaque error deep inside an R script long after
+# the expensive search finished. Reads the parquet schema only, never the rows.
+rule validate_diann_report_schema:
+  input:
+    report = os.path.join(RUN_DIR,"diann_output/diann.parquet")
+  output:
+    report_schema_check = os.path.join(RUN_DIR,"logs/diann/report_schema_check.json")
+  params:
+    required_columns = config["diann_required_report_columns"]["main"],
+    profile = "main"
+  log: os.path.join(RUN_DIR,"logs/diann/validate_diann_report_schema.log")
+  retries: 0   # a schema mismatch is deterministic; retrying only repeats it
+  container: config["containers"]["conduitr"]
+  script:
+    "scripts/check_diann_report_columns.R"
+
+################################################################################
 # Extracting Detected Proteins
 ################################################################################
 rule extract_detected_proteins:
   input:
     protein_info_df=os.path.join(RUN_DIR,"database_resources/protein_info.txt"),
     protein_info_fasta =os.path.join(RUN_DIR,"database_resources/database.fasta"),
-    diann_parquet=os.path.join(RUN_DIR,"diann_output/diann.parquet")
+    diann_parquet=os.path.join(RUN_DIR,"diann_output/diann.parquet"),
+    report_schema_check=os.path.join(RUN_DIR,"logs/diann/report_schema_check.json")
   output:
     detected_protein_info_df = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/detected_protein_info.txt"),
     detected_protein_info_fasta = os.path.join(RUN_DIR,"database_resources/detected_protein_resources/detected_protein.fasta")

@@ -33,8 +33,8 @@ proteome_ids <- proteome_id_df |>
 if (length(proteome_ids) == 0L) {
   conduitR::log_with_timestamp("No proteome IDs — writing empty taxonomy table.")
   tax_cols <- c("organism_id", "domain", "kingdom", "phylum", "class", "order",
-                "family", "genus", "species", "proteome_id", "proteome_type",
-                "download_info")
+                "family", "genus", "species", "strain", "proteome_id",
+                "proteome_type", "download_info")
   empty_tax <- stats::setNames(lapply(tax_cols, function(x) character(0)), tax_cols) |>
     tibble::as_tibble()
   readr::write_delim(empty_tax, output_file)
