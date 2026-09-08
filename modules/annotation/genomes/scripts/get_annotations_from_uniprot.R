@@ -4,7 +4,18 @@
 # to annotate the data. This works conviently with the rest of the conduit 
 # infastructure. 
 ################################################################################
-## Opening Log File 
+## Cap conduitR's parallel worker pool to this rule's Snakemake allocation.
+# conduitR sizes its future/furrr pools from future::availableCores() - 1
+# (= parallelly::availableCores()), which otherwise reports every physical core
+# on the node and oversubscribes when Snakemake scheduled this rule with fewer
+# threads. Setting the `custom` availableCores() method makes it return this
+# rule's thread count, so the pool matches the allocation on both local and
+# SLURM runs (parallelly takes the min across methods, so it never exceeds the
+# node's real core count).
+n_threads <- as.integer(snakemake@threads[[1]])
+options(parallelly.availableCores.custom = function() n_threads)
+
+## Opening Log File
 # Open the log file to write both stdout and stderr
 logfile <- snakemake@log[[1]]
 zz <- file(logfile, open = "a")

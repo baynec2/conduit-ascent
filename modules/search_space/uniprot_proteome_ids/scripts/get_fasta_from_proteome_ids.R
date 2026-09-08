@@ -76,6 +76,21 @@ if (!isFALSE(append_additional_uniprot_proteome_id)) {
   }
 }
 
+# Empty detection (no proteomes to fetch, and none appended): emit an empty
+# database.fasta + empty proteome table so the run resolves to an empty
+# (no-detection) conduit via the database.fasta emptiness checkpoint downstream.
+if (length(proteome_ids) == 0L) {
+  conduitR::log_with_timestamp("No proteome IDs — writing empty database.fasta + proteome table.")
+  file.create(fasta_destination_fp)
+  readr::write_tsv(
+    tibble::tibble(proteome_id = character(), organism_id = character(),
+                   proteome_type = character(), download_info = character()),
+    proteome_id_destination_fp
+  )
+  sink(type = "message"); sink(); close(zz)
+  quit(save = "no", status = 0)
+}
+
 conduitR::log_with_timestamp("Starting download of fasta files from the proteome ids.")
 
 start_time <- Sys.time()

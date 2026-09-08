@@ -1,0 +1,6 @@
+# Integration test: hapid (marker-gene profiling) in InfiniDIA mode.
+# Skips marker-gene speclib-gen and runs DIA-NN with --pre-search --pre-filter.
+experiment: integration_test
+run_name: hapid_infinidia
+search_space_method: hapid
+hapid_search_mode: infinidia

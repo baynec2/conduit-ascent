@@ -6,10 +6,10 @@
 # Usage:
 #   snakemake --profile profiles/slurm --configfile experiments/<exp>/config/<method>.yaml
 #
-# Existing alternative: run_conduit_barnacle2.slurm submits a single SBATCH job
-# that runs Snakemake inline. This profile is for the inverse pattern — let
+# profiles/barnacle2/ is a worked example of this pattern tailored to the
+# UCSD/Knight Lab cluster. This generic profile is the same idea — let
 # Snakemake submit each rule as its own SLURM job, which parallelizes much
-# better on a cluster.
+# better on a cluster than a single inline job.
 #
 # Adapt slurm_account / slurm_partition / runtime / mem_mb to your site.
 executor: slurm

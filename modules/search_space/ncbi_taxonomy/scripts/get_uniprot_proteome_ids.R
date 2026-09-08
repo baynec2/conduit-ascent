@@ -8,12 +8,26 @@ zz <- file(logfile, open = "a")
 sink(zz,append = TRUE)       # redirect stdout
 sink(zz, type = "message")  # redirect stderr/messages
 
+## Cap conduitR's parallel worker pool to this rule's Snakemake allocation.
+# conduitR::get_proteome_ids_from_organism_ids() sizes its future/furrr pool
+# from future::availableCores() - 1 (= parallelly::availableCores()), which
+# otherwise reports every physical core on the node and oversubscribes when
+# Snakemake scheduled this rule with fewer threads. Setting the `custom`
+# availableCores() method makes it return this rule's thread count (parallelly
+# takes the min across methods, so it never exceeds the node's real cores).
+n_threads <- as.integer(snakemake@threads[[1]])
+options(parallelly.availableCores.custom = function() n_threads)
+
 start_time <- Sys.time()
 
 # Now everything from print(), message(), warning() will go into the log file
 conduitR::log_with_timestamp("Starting get_uniprot_proteome_ids.R script")
 conduitR::log_with_timestamp("Input file: %s", snakemake@input[[1]])
 conduitR::log_with_timestamp("Output file: %s", snakemake@output[[1]])
+
+# Pure-function helper (parse_organism_ids) lives in a sibling file so it's
+# reachable from testthat without snakemake@ globals.
+snakemake@source("get_uniprot_proteome_ids_lib.R")
 
 ## Defining inputs and outputs from snakemake workflow
 input_file <- snakemake@input[[1]]
@@ -25,34 +39,43 @@ append_additional_ncbi_taxa_id <- snakemake@config$append_additional_ncbi_taxa_i
 conduitR::log_with_timestamp("Making the database_resources_directory if it doesn't exist.")
 
 conduitR::log_with_timestamp("Reading organism IDs from the input file.")
-# Read organism IDs from the input file (single-column, skip header line)
-organism_ids <- readr::read_lines(input_file) |>
-  (\(x) x[nchar(trimws(x)) > 0])() |>   # drop blank lines
-  tail(-1L) |>                             # drop header
-  as.integer()
+raw_df <- readr::read_tsv(input_file, show_col_types = FALSE)
 
-# Append additional NCBI taxonomic IDs if specified by the user
+# Empty detection (e.g. a first pass that identified nothing): no organism IDs
+# to resolve. Emit an empty, schema-correct proteome table so the run resolves
+# to an empty (no-detection) conduit downstream instead of querying UniProt with
+# an empty set.
+if (nrow(raw_df) == 0L && isFALSE(snakemake@config$append_additional_ncbi_taxa_id)) {
+  conduitR::log_with_timestamp("No organism IDs — writing empty proteome_ids table.")
+  empty_cols <- c("initial_proteome_id", "organism_id", "organism", "protein_count",
+                  "proteome_type", "redundant_to", "genome_assembly_id",
+                  "genome_assembly_level", "annotation_score", "parent_id",
+                  "child_rank", "proteome_id")
+  empty_df <- stats::setNames(
+    lapply(empty_cols, function(x) character(0)), empty_cols
+  ) |> tibble::as_tibble()
+  readr::write_tsv(empty_df, proteome_ids_fp)
+  sink(type = "message"); sink(); close(zz)
+  quit(save = "no", status = 0)
+}
+
+# Compute the pre-append id set so we can log "already present" vs "appended"
+# accurately. The parse_organism_ids helper handles both cases internally and
+# returns the final deduplicated vector.
+pre_append_ids <- parse_organism_ids(raw_df, append_id = FALSE)
+organism_ids   <- parse_organism_ids(raw_df, append_additional_ncbi_taxa_id)
+
 if (!isFALSE(append_additional_ncbi_taxa_id)) {
-  # Check if the user-specified ID is already in the list of organism IDs
-  if (append_additional_ncbi_taxa_id %in% organism_ids) {
+  if (as.integer(append_additional_ncbi_taxa_id) %in% pre_append_ids) {
     conduitR::log_with_timestamp(
-      paste0(
-        "User-specified NCBI organism ID ", 
-        append_additional_ncbi_taxa_id, 
-        " is already present in the data."
-      )
+      "User-specified NCBI organism ID %s is already present in the data.",
+      append_additional_ncbi_taxa_id
     )
   } else {
-    # Log that we are appending the user-specified ID
     conduitR::log_with_timestamp(
-      paste0(
-        "Appending user-specified NCBI organism ID ", 
-        append_additional_ncbi_taxa_id, 
-        " to the NCBI taxonomy IDs to search."
-      )
+      "Appending user-specified NCBI organism ID %s to the NCBI taxonomy IDs to search.",
+      append_additional_ncbi_taxa_id
     )
-    # Actually append the ID to the list
-    organism_ids <- c(organism_ids, append_additional_ncbi_taxa_id)
   }
 }
 

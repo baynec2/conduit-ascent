@@ -27,6 +27,10 @@ rule get_uniprot_proteome_ids:
   output:
     proteome_ids = os.path.join(RUN_DIR,"proteome_ids.txt")
   log: os.path.join(RUN_DIR,"logs/search_space/ncbi_taxonomy/get_uniprot_proteome_ids.log")
+  # conduitR::get_proteome_ids_from_organism_ids() sizes its worker pool as
+  # future::availableCores() - 1; guarantee >=2 cores so it never resolves to 0
+  # workers (which would error) on a single-core allocation.
+  threads: min(8, workflow.cores)
   container: config["containers"]["conduitr"]
   script:
     "scripts/get_uniprot_proteome_ids.R"

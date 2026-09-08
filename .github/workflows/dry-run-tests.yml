@@ -38,15 +38,35 @@ jobs:
           r-version: "4.3"
 
       - name: Install R script test dependencies
-        run: Rscript -e "install.packages(c('readr','dplyr','stringr'), repos='https://cloud.r-project.org')"
+        # Use the default repo (set by r-lib/actions/setup-r to Posit's RSPM,
+        # which serves Linux binaries). Overriding with cloud.r-project.org
+        # forces source builds and trips over fs/pkgload/testthat needing
+        # system deps that aren't preinstalled on the Ubuntu runner.
+        run: Rscript -e "install.packages(c('readr','dplyr','stringr','tidyr','tibble','testthat','rprojroot'))"
 
-      - name: Run R script unit tests
+      - name: Run R script unit tests (eggnogmapper regression)
         run: Rscript tests/scripts/test_parse_eggnogmapper_annotations.R
+
+      - name: Run R testthat suite (refactored snakemake-script helpers)
+        run: |
+          Rscript -e '
+            res <- testthat::test_dir("tests/scripts/testthat", reporter = "summary")
+            df <- as.data.frame(res)
+            if (any(df$failed > 0)) quit(status = 1)
+          '
+
+      - name: Run Python unit tests (genomes + unipept_hapid script helpers)
+        run: |
+          pip install pytest pandas biopython
+          python -m pytest tests/scripts/python -v
+
+      - name: Run awk pipeline tests (peptidotyping FASTA header generation)
+        run: bash tests/scripts/test_awk_pipelines.sh
 
       - name: Generate DAGs
         run: |
           mkdir -p dag_output
-          for method in ncbi_taxonomy_id uniprot_proteome_id unipept_peptidotyping unipept_hapid MAGs metaphlan hapid; do
+          for method in ncbi_taxonomy_id uniprot_proteome_id unipept_peptidotyping unipept_hapid genomes metaphlan hapid; do
             snakemake \
               --snakefile Snakefile \
               --configfile "tests/configs/integration_test_${method}.yaml" \

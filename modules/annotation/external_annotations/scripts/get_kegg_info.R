@@ -28,6 +28,21 @@ kegg_orthology_info_fp = snakemake@output[["kegg_orthology_info"]]
 conduitR::log_with_timestamp("Reading in files")
 uniprot_annotated_protein_info = readr::read_delim(uniprot_annotated_protein_info_fp)
 
+# Empty input (UniParc / non-reference proteome -> no UniProtKB annotations):
+# emit empty, correctly-typed tables instead of querying KEGG with an empty set.
+.empty_annotation <- tibble::tibble(
+  protein_id = character(), annotation_type = character(),
+  term = character(), description = character()
+)
+if (nrow(uniprot_annotated_protein_info) == 0L) {
+  conduitR::log_with_timestamp("No UniProtKB annotations; writing empty KEGG tables")
+  readr::write_delim(.empty_annotation, kegg_pathway_info_fp)
+  readr::write_delim(.empty_annotation, kegg_map_pathway_info_fp)
+  readr::write_delim(.empty_annotation, kegg_orthology_info_fp)
+  sink(type = "message"); sink(); close(zz)
+  quit(save = "no", status = 0)
+}
+
 # Converting Annotations to long format 
 conduitR::log_with_timestamp("Converting uniprot annotated protein info to long format.")  
 

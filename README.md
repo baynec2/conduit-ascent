@@ -9,9 +9,10 @@ Conduit is a scalable and modular workflow management system for metaproteomics 
 - **Search Space Definition**: Multiple strategies to define the protein search space for your experiment:
     - **NCBI Taxonomy IDs**: Know what taxa are in your sample? Provide NCBI taxon IDs and Conduit handles the rest.
     - **UniProt Proteome IDs**: Know specific proteome IDs? Conduit can build a search space directly from them.
-    - **Peptidotyping**: A first-pass DIA-NN search using species-specific peptides to identify which taxa are present, then builds a refined search space.
+    - **Peptidotyping**: A first-pass DIA-NN search using species-specific peptides to identify which taxa are present, then builds a refined search space. Available against UniProt-derived peptides (`unipept_peptidotyping`), a HAPiID-style species-first variant (`unipept_hapiid`), or peptides digested from your own genomes with no UniProt lookup (`genome_peptidotyping`).
     - **MetaPhlAn**: Have shotgun metagenomic data? Conduit runs MetaPhlAn profiling and uses the results to define the search space.
-    - **MAGs**: Have metagenome-assembled genomes? Conduit uses Bakta to annotate them and builds the search space from the predicted proteins.
+    - **Genomes**: Have bacterial genome FASTAs (metagenome-assembled or reference)? Conduit uses Bakta to annotate them and builds the search space from the predicted proteins. Genomes can also be downloaded from an MGnify catalog instead of supplied by hand.
+    - **HAPiID**: Marker-gene profiling across your genomes, then greedy selection of the smallest genome set covering most of the annotated spectra.
 - **DIA-NN Integration**: Automated, spectral-library-free processing of DIA data.
 - **Taxonomic Annotation**: Multi-level taxonomic classification of detected proteins.
 - **Functional Annotation**: GO term, KEGG pathway, Pfam domain, CAZy, and eggNOG-mapper annotations.
@@ -62,9 +63,10 @@ cd conduit-ascent
 ```
 experiments/your_experiment/
 ├── input/
-│   ├── raw_files/            # Your Thermo .raw files
+│   ├── ms_files/             # Your .raw (Thermo) or .mzML files
 │   ├── ncbi_taxa_ids.txt     # NCBI taxon IDs (if using ncbi_taxonomy_id method)
-│   └── sample_annotation.txt # Sample metadata
+│   └── sample_annotation.txt # Sample metadata; needs a `file` column naming
+│                             # each MS file without its extension
 └── config/
     └── snakemake.yaml        # Experiment configuration
 ```
@@ -95,16 +97,23 @@ The main configuration file controls all aspects of the workflow. Below is a ful
 
 ```yaml
 containers:
-  conduitr:     "docker://baynec2/conduitr:alpha"
-  diann:        "docker://baynec2/diann2.1.0:alpha"
-  bakta:        "docker://baynec2/bakta:alpha"
-  metaphlan:    "docker://baynec2/metaphlan:alpha"
-  eggnogmapper: "docker://baynec2/eggnogmapper:2.1.12"
-  umgap:        "docker://baynec2/umgap:alpha"
-  taxonkit:     "quay.io/biocontainers/taxonkit:0.20.0--h9ee0642_1"
+  conduitr:           "docker://baynec2/conduitr:a5cfeae"
+  diann:              "docker://baynec2/diann:f5f961d"
+  bakta:              "docker://baynec2/bakta:f5f961d"
+  metaphlan:          "docker://baynec2/metaphlan:f5f961d"
+  eggnogmapper:       "docker://baynec2/eggnogmapper:f5f961d"
+  umgap:              "docker://baynec2/umgap:e46d512"
+  fraggenescan_hmmer: "docker://baynec2/fraggenescan_hmmer:f5f961d"
+  taxonkit:           "docker://quay.io/biocontainers/taxonkit:0.20.0--h9ee0642_1"
 ```
 
-These point to the Docker/Apptainer images used for each tool. You generally do not need to change these unless you are pinning to a specific version or using a private registry.
+These point to the Docker/Apptainer images used for each tool. You generally do not need to
+change them unless you are pinning to a specific version or using a private registry.
+
+Tags are short commit SHAs rather than moving tags like `:latest`. Apptainer caches images
+by URI, so a moving tag would not refresh once cached and you would silently keep running
+an old image; a SHA makes the change explicit. See the tag-bumping note in `CLAUDE.md`
+before starting a large run during active development.
 
 ---
 
@@ -114,10 +123,28 @@ These point to the Docker/Apptainer images used for each tool. You generally do 
 |-----------|-------------|
 | `experiment` | **Required.** Name of the experiment. Must match the name of the directory under `experiments/`. Conduit uses this to locate all input files and write all outputs. |
 | `run_name` | **Required.** Name for this specific analysis run. Outputs are written to `experiments/{experiment}/runs/{run_name}/`. Use this to run the same experiment with different methods or settings without overwriting prior results. |
-| `generate_diann_spectral_library_config` | Path (relative to the main Snakefile) to the DIA-NN `.cfg` file used for spectral library generation. Defaults to `config/generate_diann_spectral_library.cfg`. |
-| `run_diann_config` | Path (relative to the main Snakefile) to the DIA-NN `.cfg` file used for the main search. Defaults to `config/run_diann.cfg`. |
-| `sample_annotation` | Path (relative to the experiment directory) to the sample annotation file. Defaults to `input/sample_annotation.txt`. This file maps `.raw` file names to sample metadata. |
-| `output_dir` | Path (relative to the experiment directory) for the final output. Defaults to `output/`. |
+| `sample_annotation` | Path (relative to the experiment directory) to the sample annotation file. Defaults to `input/sample_annotation.txt`. Maps MS file names (without extension) to sample metadata via a required `file` column. **Effectively fixed:** `build_conduit.smk` hardcodes the default path and ignores this key, so overriding it passes the Snakefile's checks and then fails downstream. |
+| `diann_search_mode` | `standard` (default) or `infinidia`. `standard` runs a three-stage library / per-file / combine search; `infinidia` runs a single monolithic search with `--pre-search --pre-filter`. Also decides whether a predicted spectral library is built at all. |
+
+#### DIA-NN configuration files
+
+Each key points at a `.cfg` file of DIA-NN flags. All of them are snapshotted into
+`runs/{run_name}/config/` at run start, so the settings a run used are frozen with its
+outputs. Override a key in your experiment YAML to swap in a variant without editing the
+shared file.
+
+| Parameter | Default | Used by |
+|-----------|---------|---------|
+| `run_diann_config` | `config/run_diann.cfg` | the main search, every method (when `diann_search_mode: standard`) |
+| `diann_spectral_library_base_config` | `config/diann_spectral_library_base.cfg` | every spectral-library prediction step |
+| `diann_library_search_base_config` | `config/diann_library_search_base.cfg` | `hapiid`, `unipept_hapiid` in standard mode |
+| `hapiid_infinidia_config` | `config/hapid_infinidia.cfg` | `hapiid`, `unipept_hapiid` in InfiniDIA mode |
+| `peptidotyping_standard_config` | `config/peptidotyping_standard.cfg` | `unipept_peptidotyping`, `genome_peptidotyping` in standard mode |
+| `peptidotyping_infinidia_config` | `config/peptidotyping_infinidia.cfg` | `unipept_peptidotyping`, `genome_peptidotyping` in InfiniDIA mode |
+
+Note that inputs, outputs, scratch paths and thread counts (`--fasta`, `--dir`, `--lib`,
+`--out`, `--out-lib`, `--temp`, `--threads`) are supplied by the rules themselves, and
+several rules also pass digest flags inline. Setting those in a `.cfg` has no effect.
 
 ---
 
@@ -125,7 +152,11 @@ These point to the Docker/Apptainer images used for each tool. You generally do 
 
 | Parameter | Description |
 |-----------|-------------|
-| `search_space_method` | **Required.** Strategy used to define the protein search space. Options: `ncbi_taxonomy_id`, `uniprot_proteome_id`, `unipept_peptidotyping`, `MAGs`, `metaphlan`. See details below. |
+| `search_space_method` | **Required.** Strategy used to define the protein search space. Options: `ncbi_taxonomy_id`, `uniprot_proteome_id`, `unipept_peptidotyping`, `unipept_hapiid`, `genomes`, `metaphlan`, `hapiid`, `genome_peptidotyping`. See details below. |
+
+Every method requires `experiments/{experiment}/input/ms_files/` (`.raw` or `.mzML`) and
+`experiments/{experiment}/input/sample_annotation.txt`. The requirements listed per method
+below are in addition to those.
 
 #### `ncbi_taxonomy_id`
 Builds the database from UniProt proteomes matching the provided NCBI taxon IDs. Requires `experiments/{experiment}/input/ncbi_taxa_ids.txt`.
@@ -136,11 +167,37 @@ Builds the database from a user-supplied list of UniProt proteome IDs. Requires 
 #### `unipept_peptidotyping`
 Performs a first-pass DIA-NN search using species-specific peptides (derived from Unipept's UMGAP LCA index) to identify which taxa are present in the sample, then builds a refined database from the detected taxa. See peptidotyping-specific parameters below.
 
-#### `MAGs`
-Accepts user-provided genome FASTAs — either metagenome-assembled genomes (MAGs) or reference genomes. Bakta annotates each FASTA and the predicted proteins form the search space. Requires `experiments/{experiment}/input/MAG_files/`.
+#### `unipept_hapiid`
+HAPiID-inspired variant of the above: a GO-filtered first pass straight at species/strain level, rather than family-first with a species second pass. The old name `unipept_hapid` is still accepted as a deprecated alias.
+
+#### `genomes`
+Accepts user-provided genome FASTAs — either metagenome-assembled genomes (MAGs) or reference genomes. Bakta annotates each FASTA and the predicted proteins form the search space. The old method name `MAGs` is still accepted as a deprecated alias.
+
+Requires `experiments/{experiment}/input/genome_files/` containing:
+
+- one or more `.fa`, `.fna` or `.fasta` genome files, and
+- **`taxonomy.txt`** — a tab-separated table with a required `genome` column matching the
+  FASTA base names, plus optional `domain kingdom phylum class order family genus species`
+  columns (missing ranks default to `NA`).
+
+Omitting `taxonomy.txt` is the most common first-run failure. The legacy `MAG_files/`
+directory name is still accepted when `genome_files/` is absent.
+
+Both requirements are lifted when `genome_download_source: mgnify` — the catalog supplies
+the genomes and the taxonomy table instead.
+
+#### `hapiid`
+Marker-gene (ribosomal protein / elongation factor) profiling across your genomes, then greedy selection of the smallest genome set covering `hapiid_percent_spectra` of the annotated spectra. Takes the same `genome_files/` inputs as `genomes`, and additionally needs the HMM profiles at `hapiid_hmm_profiles`. The old name `hapid` is still accepted as a deprecated alias.
+
+#### `genome_peptidotyping`
+Two-pass peptide-based detection over your genomes with no UniProt lookup: tryptic peptides are digested from the genomes, assigned an LCA, and searched to decide which genomes are present. Takes the same `genome_files/` inputs as `genomes`. The rank columns in `taxonomy.txt` are functionally required here — the LCA computation and the species-to-genome match both read them.
 
 #### `metaphlan`
 Runs MetaPhlAn on shotgun metagenomic FASTQ files to profile the community, then builds a database from the detected taxa. Requires `experiments/{experiment}/input/fastq_files/`.
+
+**Reads must be gzipped.** The rule globs `*.fastq.gz` only; an uncompressed `.fastq` is
+not matched, so it contributes no sample and the run continues with an empty profile and
+no error.
 
 ---
 
@@ -148,9 +205,53 @@ Runs MetaPhlAn on shotgun metagenomic FASTQ files to profile the community, then
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `presence_min_peptides` | `3` | Minimum number of unique peptides that must be detected to call a species present. Higher values reduce false positives at the cost of sensitivity. |
-| `presence_min_coverage` | `0` | Minimum protein coverage required to call a species present. Set to `0` to disable coverage filtering. |
-| `min_taxon_db_peptides` | `10` | Minimum number of species-specific peptides a taxon must have in the reference database to be considered in the first-pass search. Taxa with fewer peptides are excluded as too poorly represented. |
+Applies to `unipept_peptidotyping` and `genome_peptidotyping`. Both methods run two
+detection passes, and every key below exists once per pass — the first-pass name is given
+here, and the second-pass twin is the same name with `second` in place of `first` (e.g.
+`peptidotyping_second_pass_method`).
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `min_taxon_db_peptides` | `10` | Minimum number of species-specific peptides a taxon must have in the reference database to enter the detection search at all. Taxa with fewer are excluded as too poorly represented. Not per-pass. |
+| `peptidotyping_first_pass_method` | `count` | The presence-call rule. `count` is recommended: a taxon is present if it has at least `..._min_confident_peptides` distinct peptides at DIA-NN `Q.Value <= 0.01`, resting on DIA-NN's own validated precursor FDR. `enrichment` and `qvalue` both depend on the reported decoy null, which InfiniDIA's `--pre-filter` censors, and are kept for provenance rather than use. |
+| `peptidotyping_first_pass_min_confident_peptides` | `10` | Under `method: count`, how many confident peptides a taxon needs. Raising it tightens the "congener halo" of close relatives at some cost to low-abundance members. |
+| `peptidotyping_first_pass_min_peptides` | `10` | Minimum distinct contributing peptides regardless of confidence. Raises the bar without regard to quality. |
+| `peptidotyping_first_pass_margin` | `2.0` | Under `method: enrichment` only, the multiple of the decoy noise rate a lineage's per-peptide score must clear. Lowering it enlarges the second-pass database, which is searched library-free and can exhaust memory. |
+| `peptidotyping_first_pass_qvalue_threshold` | `0.05` | Under `method: qvalue` only, the picked q-value cutoff. |
+| `peptidotyping_first_pass_score_fraction_threshold` | `null` | Optional score-coverage gate: keep the smallest top-by-score prefix of taxa reaching this fraction of total score. Disabled by default because it drops real low-abundance taxa. |
+| `peptidotyping_first_pass_max_taxa` | `null` | Optional cap: keep the top N taxa by score. **Set at most one** of this and `..._score_fraction_threshold` for the same pass — setting both is an error. |
+
+#### Per-method search modes
+
+Independent of `diann_search_mode`, which controls only the main search. Each is
+`standard` (build a predicted spectral library, then search with `--lib`) or `infinidia`
+(search the FASTA directly with `--pre-search --pre-filter`).
+
+| Parameter | Default |
+|-----------|---------|
+| `unipept_peptidotyping_search_mode` | `infinidia` |
+| `genome_peptidotyping_search_mode` | `infinidia` |
+| `unipept_hapiid_search_mode` | `standard` |
+| `hapiid_search_mode` | `standard` |
+
+#### HAPiID-Specific Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `hapiid_percent_spectra` | `80` | Take the smallest set of genomes covering this percentage of marker-gene-annotated spectra. Applies to `hapiid` and `unipept_hapiid`. |
+| `hapiid_hmm_profiles` | `resources/hapid/ribP_elonF_profiles_refined_manually.hmm` | HMM profiles for marker-gene identification. |
+
+#### Genome Source (optional MGnify download)
+
+Applies to `genomes`, `hapiid` and `genome_peptidotyping`.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `genome_download_source` | `FALSE` | `FALSE` uses the genomes you provide. `mgnify` downloads a catalog instead, replacing **both** your FASTAs and your `taxonomy.txt`. |
+| `mgnify_catalog` | `""` | Catalog and version, e.g. `human-gut/v2.0.2`. The string is the version pin. Required when the source is `mgnify`; it is not validated, and a typo surfaces late as a parse failure on the downloaded metadata. |
+| `mgnify_taxonomy_filter` | `FALSE` | Optional GTDB-lineage substring filter, e.g. `p__Firmicutes`. |
+| `mgnify_max_genomes` | `0` | Cap on species representatives to download. `0` means no limit. |
+| `mgnify_ftp_base` | EBI FTP | Base URL; should not need changing. |
 
 #### MetaPhlAn-Specific Parameters
 
@@ -167,9 +268,11 @@ These apply to all `search_space_method` choices.
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `append_additional_proteome_id` | `FALSE` | Optionally append a single extra UniProt proteome ID to the database (e.g., a host reference proteome). Common examples: Human = `UP000005640`, Mouse C57/BL6 = `UP000000589`. Set to `FALSE` to skip. |
-| `append_additional_ncbi_taxa_id` | `FALSE` | Optionally append a single extra NCBI taxon ID to the database (e.g., a host species). Common examples: Human = `9606`, Mouse = `10090`. Set to `FALSE` to skip. |
-| `exclude_proteome_id` | `FALSE` | Exclude a specific UniProt proteome ID from the database. Useful in peptidotyping if the first-pass incorrectly calls a contaminant. Set to `FALSE` to skip. |
-| `exclude_ncbi_taxa_id` | `FALSE` | Exclude a specific NCBI taxon ID from the database. Set to `FALSE` to skip. |
+| `append_additional_ncbi_taxa_id` | `FALSE` | Optionally append a single extra NCBI taxon ID to the database (e.g., a host species). Common examples: Human = `9606`, Mouse = `10090`. Set to `FALSE` to skip. Has no effect under `uniprot_proteome_id`, which never routes through the NCBI taxonomy module. |
+
+On the genome-sourced methods (`genomes`, `hapiid`, `genome_peptidotyping`) the two keys
+are **mutually exclusive** — setting both raises. On the UniProt-based methods they apply
+at different stages and stack.
 
 ---
 
@@ -179,18 +282,23 @@ These parameters point to large reference databases that Conduit needs for certa
 
 | Parameter | Default Path | Approx. Size | Description |
 |-----------|-------------|-------------|-------------|
-| `peptidotyping_resource_dir` | `resources/peptidotyping/` | — | Directory for peptidotyping-specific reference data. |
-| `eggnog_database` | `resources/annotation/eggnog/e5.og_annotations.tsv` | ~200 MB | eggNOG ortholog annotation table used for functional annotation. |
-| `pfam_db_url` | EBI FTP (current release) | — | URL for downloading the Pfam-A database. Update if a newer release is available. |
+| `peptidotyping_resource_dir` | `resources/peptidotyping/` | ~170 GB | UMGAP-derived `sequences.tsv.lz4` + `taxons.tsv.lz4`. Required for `unipept_peptidotyping` and `unipept_hapiid`. |
+| `taxonkit_db_dir` | `resources/peptidotyping/taxonkit` | — | NCBI taxonomy database for taxonkit. Conventionally lives under `peptidotyping_resource_dir`. |
+| `metaphlan_database_dir` | `resources/metaphlan/` | ~54 GB | MetaPhlAn reference database. Required for the `metaphlan` method. |
+| `bakta_db_dir` | `resources/bakta/db/` | ~84 GB (full) / ~2 GB (light) | Bakta annotation database. Required for the genome-sourced methods. Controlled by `bakta_db_type`. |
+| `bakta_db_type` | `"light"` | — | Which Bakta database to use: `"full"` (~84 GB) or `"light"` (~2 GB). Light is sufficient for most bacterial work; use full only when you need the plasmid/viral databases. |
+| `eggnogmapper_db_dir` | `resources/eggnogmapper/db/` | ~50 GB (full) / ~8 GB (bacteria) | eggNOG-mapper database directory for sequence-based functional annotation. |
+| `genome_resource_dir` | `resources/genome_databases/derived` | — | Cache of per-genome artifacts (Prodigal/FGS, HMMER, bakta). Shared across experiments only when the source is MGnify, whose accessions are globally unique. |
+| `genome_set_resource_dir` | `resources/genome_databases/derived_sets` | — | Cache of per-genome-set aggregates (LCA peptide databases, HAPiID libraries). |
+| `mgnify_cache_dir` | `resources/genome_databases/mgnify` | — | Downloaded MGnify catalogs, one subdirectory per catalog. |
+| `pfam_db_url` | EBI FTP (current release) | — | URL for downloading the Pfam-A database. |
 | `cazy_db_url` | dbCAN2 | — | URL for downloading the CAZy activity annotation file. |
 | `eggnog_db_url` | eggNOG 5.0 | — | URL for downloading the eggNOG annotations table. |
-| `metaphlan_database_dir` | `resources/metaphlan/` | ~54 GB | Directory for the MetaPhlAn reference database. Required for the `metaphlan` search space method. |
-| `unipept_sequences` | `resources/databases/sequences.tsv.lz4` | ~1.46 GB | Compressed Unipept sequence table. Required for peptidotyping. |
-| `unipept_taxons` | `resources/databases/taxons.tsv.lz4` | — | Compressed Unipept taxon table. Required for peptidotyping. |
-| `bakta_db_dir` | `resources/bakta/db/` | ~84 GB (full) / ~2 GB (light) | Bakta annotation database. Required for the `MAGs` method. Controlled by `bakta_db_type`. |
-| `bakta_db_type` | `"light"` | — | Which Bakta database to use: `"full"` (~84 GB) or `"light"` (~2 GB). The light database is faster to download but less comprehensive. |
-| `eggnogmapper_db_dir` | `resources/eggnogmapper/db/` | ~50 GB (full) / ~8 GB (bacteria) | eggNOG-mapper database directory for sequence-based functional annotation. |
-| `gbtk_database` | `resources/gbtk/` | ~140 GB | GTDB-Tk database. Reserved for future MAG taxonomy use. |
+| `go_obo_url`, `kegg_rest_url`, `enzyme_dat_url`, `pfam_clans_url` | pinned releases | — | Term-name dictionaries used to fill annotation descriptions. |
+
+These paths are machine-specific, so they belong in your Snakemake **profile** rather than
+in an experiment config — the profile's `config:` block overrides both the base config and
+the experiment config. See `profiles/nanopore-catalyst/config.yaml` for a worked example.
 
 ---
 
@@ -213,12 +321,12 @@ conduit-ascent/
 │   │   ├── uniprot_proteome_ids/     # From UniProt proteome IDs
 │   │   ├── peptidotyping/            # First-pass species detection
 │   │   ├── metaphlan/                # From MetaPhlAn metagenomic profiling
-│   │   ├── MAGs/                     # From metagenome-assembled genomes
+│   │   ├── genomes/                  # From user-provided genome FASTAs
 │   │   └── database_processing/      # Shared post-processing
 │   ├── diann/                        # DIA-NN identification and quantification
 │   ├── annotation/                   # Protein and taxonomic annotation
 │   │   ├── uniprot/                  # UniProt-based annotation
-│   │   ├── MAGs/                     # Bakta + UniProt annotation for MAG proteins
+│   │   ├── genomes/                  # Bakta + UniProt annotation for genome proteins
 │   │   ├── eggnogmapper/             # eggNOG-mapper functional annotation
 │   │   └── external_annotations/     # KEGG, Pfam, CAZy annotations
 │   └── build_conduit/                # Builds final Conduit RDS object
@@ -233,12 +341,12 @@ conduit-ascent/
 │   └── {experiment_name}/
 │       ├── config/                   # Per-experiment config
 │       ├── input/
-│       │   ├── raw_files/            # Thermo .raw MS files
+│       │   ├── ms_files/             # .raw or .mzML MS files
 │       │   ├── sample_annotation.txt # Sample metadata
 │       │   ├── ncbi_taxa_ids.txt     # Taxon IDs (ncbi_taxonomy_id method)
 │       │   ├── proteome_ids.txt      # Proteome IDs (uniprot_proteome_id method)
 │       │   ├── fastq_files/          # FASTQ files (metaphlan method)
-│       │   └── MAG_files/            # MAG FASTA files (MAGs method)
+│       │   └── genome_files/         # Genome FASTA files (genomes method)
 │       └── runs/
 │           └── {run_name}/           # All outputs for a given run
 │               ├── config/
@@ -268,7 +376,7 @@ All outputs for a run are written to `experiments/{experiment}/runs/{run_name}/`
 
 These instructions are for Knight Lab members running Conduit on Barnacle2 via SLURM. They can be adapted to other SLURM-based HPC systems.
 
-> For tutorial purposes you will also need files in `experiments/example/input/database_resources` and `experiments/example/input/raw_files`. Contact baynec2 directly for these files.
+> For tutorial purposes you will also need files in `experiments/example/input/database_resources` and `experiments/example/input/ms_files`. Contact baynec2 directly for these files.
 
 ### 1. Login
 
@@ -276,46 +384,89 @@ These instructions are for Knight Lab members running Conduit on Barnacle2 via S
 ssh <username>@barnacle2.ucsd.edu
 ```
 
-### 2. Clone the repository
+### 2. Clone the repository onto scratch
+
+Clone into your `/ddn_scratch` space — it's large and not purged, so the repo,
+your MS files, all outputs (`runs/`), and the (re)built peptidotyping resources
+live there and stay visible inside the rule containers (the profile binds
+`/ddn_scratch`). Avoid `$HOME`, which is quota-limited.
 
 ```bash
+cd /ddn_scratch/$USER
 git clone https://github.com/baynec2/conduit-ascent.git
 cd conduit-ascent
-mkdir slurm_out
 ```
 
-### 3. Install Snakemake in your base environment
+### 3. Install Miniforge and create the Snakemake environment
 
-Barnacle2 has Singularity available system-wide. Install Snakemake (and dependencies) into the base environment — **do not** create a separate conda environment, as that will shadow the system Singularity.
+Barnacle2 has **no conda/Miniforge module** (`module avail` lists only tools like
+`singularity_3.6.4`), so install Miniforge yourself, into `$HOME` — a Miniforge
+install plus this env is small (a few hundred MB), and `$HOME` is backed up and
+mounted on the compute nodes. Miniforge defaults to the conda-forge channel and
+ships `mamba` as a fast solver (`mamba` and `conda` are interchangeable below).
 
 ```bash
-singularity --version   # verify Singularity is available
-
-pip install snakemake
-pip install wheel
-pip install datrie
+cd ~
+wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
+bash Miniforge3-Linux-x86_64.sh -b            # installs to $HOME/miniforge3
+source $HOME/miniforge3/etc/profile.d/conda.sh   # activate in this shell
+$HOME/miniforge3/bin/conda init bash             # load on future logins
+mamba --version                                  # sanity check
 ```
 
-### 4. Add SLURM core detection to the UniProt annotation script
-
-Edit `modules/annotation/uniprot/scripts/get_annotations_from_uniprot.R` and add these two lines after the opening comment block:
-
-```r
-slurm_cores <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", 1))
-options(parallelly.maxWorkers.localhost = slurm_cores)
-```
-
-### 5. Submit the job
-
-Use the `run_conduit_barnacle2.slurm` script included in the repository root. Update `--mail-user` in the SBATCH header with your email before submitting.
+Then create a dedicated environment with Snakemake and the SLURM executor plugin.
+Don't install singularity/apptainer into it — Barnacle2 has Singularity installed
+system-wide (`/usr/bin/singularity`, SingularityCE 4.x), so keeping it out of the
+env leaves that system Singularity on `PATH` (on every node, no module needed).
 
 ```bash
-sbatch run_conduit_barnacle2.slurm
-squeue --me           # check job status
-cat slurm_out/*.err   # check Snakemake logs
+mamba create -n conduit -c conda-forge -c bioconda \
+    snakemake snakemake-executor-plugin-slurm
+conda activate conduit
+snakemake --version                      # sanity check
 ```
 
-With `--cpus-per-task=16` and `--mem=64G`, test inputs take approximately 50 minutes on Barnacle2.
+The `snakemake-executor-plugin-slurm` package is what lets Snakemake submit each
+pipeline rule as its own SLURM job (see `profiles/barnacle2/`), rather than
+running everything inside one large allocation.
+
+### 4. Run the workflow
+
+The `profiles/barnacle2/` profile uses the SLURM **executor**: Snakemake itself
+submits each rule as its own SLURM job. The Snakemake process is lightweight (it
+just submits and polls jobs), so run it directly from a login node inside a
+`tmux`/`screen` session so it survives your SSH disconnecting.
+
+```bash
+tmux new -s conduit          # so the run survives disconnects
+
+# --- one-time-per-session setup ---
+conda activate conduit
+singularity --version       # system install at /usr/bin/singularity (SingularityCE 4.x)
+
+# Point Snakemake's caches/temp at scratch so they don't fill your quota-limited
+# $HOME. SLURM exports this environment to the per-rule jobs.
+export XDG_CACHE_HOME="/ddn_scratch/${USER}/.cache"
+export TMPDIR="/ddn_scratch/${USER}/tmp"
+mkdir -p "$XDG_CACHE_HOME" "$TMPDIR"
+
+# --- launch the workflow ---
+snakemake \
+  --profile profiles/barnacle2 \
+  --configfile experiments/<exp>/config/<method>.yaml
+```
+
+Detach from `tmux` with `Ctrl-b d`; reattach later with `tmux attach -t conduit`.
+Check the per-rule SLURM jobs Snakemake has submitted with `squeue --me`, and
+per-rule logs under `runs/{run_name}/logs/` (workflow) and
+`.snakemake/slurm_logs/` (raw SLURM stdout/stderr, written by the executor).
+
+The profile caps concurrent SLURM jobs at 50, lets each job use up to a full
+node (64 cores), and scales memory at ~8 GB/core (capped ~24 GB below the node's
+514 GB). Walltime is left to barnacle2's partition default — `short` allows 14
+days, which covers even the multi-day peptidotyping resource rebuild. After a
+run, the `benchmarks/*.tsv` files record each rule's real peak memory and
+runtime; use them to tighten the `set-resources` values in the profile.
 
 ## Troubleshooting
 

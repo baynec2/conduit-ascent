@@ -26,34 +26,50 @@ run_name:
 #   ncbi_taxonomy_id     user-provided NCBI taxon IDs → UniProt proteomes
 #   uniprot_proteome_id  user-provided UniProt proteome IDs
 #   unipept_peptidotyping  UMGAP-LCA peptide-based species detection
-#   unipept_hapid          HAPiID-style GO-filtered first-pass
+#   unipept_hapiid         HAPiID-style GO-filtered first-pass
 #   genome_peptidotyping   peptidotyping on user-provided genomes (no UniProt)
 #   metaphlan            MetaPhlAn profiling → NCBI taxon IDs
-#   MAGs                 all user-provided MAGs, no selection
-#   hapid                HAPiID marker-gene profiling → greedy genome selection
+#   genomes              all user-provided genome FASTAs (MAGs or reference), no selection
+#                        (the old name "MAGs" is still accepted as a deprecated alias)
+#   hapiid               HAPiID marker-gene profiling → greedy genome selection
+#                        (the old names "hapid"/"unipept_hapid" are still accepted as
+#                         deprecated aliases; on-disk cache/resource paths keep "hapid")
 search_space_method: ncbi_taxonomy_id
 # Sample annotation file (relative to experiment dir).
+# NOTE: build_conduit.smk hardcodes input/sample_annotation.txt and ignores this
+# key, so pointing it elsewhere passes the Snakefile's checks and then fails in
+# generate_qfeatures_from_diann_parquet. Treat it as fixed until that is fixed.
 sample_annotation: input/sample_annotation.txt
-# Output dir (relative to experiment dir).
-output_dir: output/
 
 # --- Container images ---
 # Moving tags like :alpha / :develop are OK for active dev; pin to @sha256:... for reproducibility.
 containers:
-  conduitr:     "docker://baynec2/conduitr:0ae9adc"
+  conduitr:     "docker://baynec2/conduitr:a5cfeae"
   diann:        "docker://baynec2/diann:f5f961d"
   bakta:        "docker://baynec2/bakta:f5f961d"
   metaphlan:    "docker://baynec2/metaphlan:f5f961d"
   eggnogmapper: "docker://baynec2/eggnogmapper:f5f961d"
-  umgap:        "docker://baynec2/umgap:f5f961d"
+  umgap:        "docker://baynec2/umgap:e46d512"
   fraggenescan_hmmer: "docker://baynec2/fraggenescan_hmmer:f5f961d"
   taxonkit:     "docker://quay.io/biocontainers/taxonkit:0.20.0--h9ee0642_1"
 
 # --- DIA-NN cfg-file pointers (rarely changed per-experiment) ---
+# Every cfg below is snapshotted into RUN_DIR/config/ at run start (see
+# modules/setup/setup.smk); consuming rules read the snapshot, so the cfg
+# used by a run is reproducibly frozen with the run. Override any of these
+# keys in an experiment YAML to swap in a variant cfg (e.g. proteoform-mode
+# peptidotyping) without editing the rule.
 # Shared flags for spectral-library generation. Per-rule digest flags are inline in module rules.
 diann_spectral_library_base_config: config/diann_spectral_library_base.cfg
 # Shared flags for library-based DIA-NN searches (HAPiID-style).
 diann_library_search_base_config: config/diann_library_search_base.cfg
+# Shared flags for the peptidotyping InfiniDIA DIA-NN search (both passes).
+peptidotyping_infinidia_config: config/peptidotyping_infinidia.cfg
+# Shared flags for the peptidotyping standard-mode DIA-NN search (both passes).
+# Used when *_peptidotyping_search_mode == "standard".
+peptidotyping_standard_config: config/peptidotyping_standard.cfg
+# Shared flags for the HAPiID InfiniDIA DIA-NN search.
+hapiid_infinidia_config: config/hapid_infinidia.cfg
 # Main DIA-NN search mode. Options:
 #   standard   use run_diann_config below
 #   infinidia  use config/run_diann_infinidia.cfg (--pre-search --pre-filter)
@@ -61,31 +77,50 @@ diann_search_mode: "standard"
 # Main DIA-NN search config. Used when diann_search_mode == "standard".
 run_diann_config: config/run_diann.cfg
 
+# Per-method search mode for multi-pass search-space DIA-NN searches.
+# Independent of diann_search_mode (which controls only the main search).
+# Options for each:  standard | infinidia
+#   standard   build a predicted spectral library first, then search with --lib
+#   infinidia  search FASTA directly with --pre-search --pre-filter
+# Defaults preserve historical behavior of each method.
+unipept_peptidotyping_search_mode: "infinidia"
+genome_peptidotyping_search_mode:  "infinidia"
+unipept_hapiid_search_mode:        "standard"
+hapiid_search_mode:                "standard"
+
 # --- Host / target filtering (optional; applies to every method) ---
 # Append an extra UniProt proteome to the database (e.g., a host reference).
 # FALSE = none.  Examples: Human = UP000005640, Mouse C57/BL6 = UP000000589.
 append_additional_proteome_id: FALSE
 # Append an extra NCBI taxon ID to the database (same idea, different key).
 # FALSE = none.  Examples: Human = 9606, Mouse = 10090.
+# NOTE: on the genome-sourced methods (genomes/hapiid/genome_peptidotyping) this
+# and append_additional_proteome_id are mutually exclusive — setting both raises
+# in append_additional_organisms_or_proteomes.R. On the UniProt-based methods
+# they apply at different stages and stack.
 append_additional_ncbi_taxa_id: FALSE
-# Exclude a UniProt proteome ID from the database. Useful in peptidotyping when a
-# host is detected by the first pass but you don't want its proteome in the final DB.
-# FALSE = none.
-exclude_proteome_id: FALSE
-# Exclude an NCBI taxon ID from the database. FALSE = none.
-exclude_ncbi_taxa_id: FALSE
 
 # --- Annotation resources (eggnog-mapper runs for every method) ---
 eggnogmapper_db_dir: "resources/eggnogmapper/db"       # ~50 GB (full) or ~8 GB (bacteria only)
-eggnog_database:     "resources/annotation/eggnog/e5.og_annotations.tsv"  # ~200 MB
 pfam_db_url:         "https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/pfamA.txt.gz"
 cazy_db_url:         "https://pro.unl.edu/dbCAN2/download/Databases/CAZyDB.07302020.fam-activities.txt"
 eggnog_db_url:       "http://eggnog6.embl.de/download/eggnog_5.0/e5.og_annotations.tsv"
 
+# Authoritative term-name dictionaries used to fill `description` for the
+# eggNOG-mapper-derived annotation types (go/kegg_*/pfam/ec_number/brite).
+# Pinned to specific releases for reproducibility (recorded in the conduit
+# object via resources/annotation/dictionaries/dictionary_versions.tsv).
+# KEGG REST is live (no dated archive); the downloaded snapshot is cached in
+# resources/ and its release is captured at download time.
+go_obo_url:          "http://release.geneontology.org/2026-05-19/ontology/go-basic.obo"  # GO release 2026-05-19
+kegg_rest_url:       "https://rest.kegg.jp"
+enzyme_dat_url:      "https://ftp.expasy.org/databases/enzyme/enzyme.dat"
+pfam_clans_url:      "https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/Pfam37.0/Pfam-A.clans.tsv.gz"  # Pfam 37.0
+
 
 # =============================================================================
 #  PEPTIDOTYPING FAMILY
-#  Used by: unipept_peptidotyping · unipept_hapid · genome_peptidotyping
+#  Used by: unipept_peptidotyping · unipept_hapiid · genome_peptidotyping
 # =============================================================================
 # Location of UMGAP-derived sequences.tsv.lz4 + taxons.tsv.lz4 (~170 GB combined).
 # For per-machine off-repo storage, set PEPTIDOTYPING_RESOURCE_DIR env var when
@@ -95,35 +130,135 @@ peptidotyping_resource_dir: "resources/peptidotyping/"
 # peptidotyping_resource_dir (CLAUDE.md); the test runner derives it from
 # PEPTIDOTYPING_RESOURCE_DIR if TAXONKIT_DB_DIR isn't set.
 taxonkit_db_dir: "resources/peptidotyping/taxonkit"
-# Minimum unique peptides to call a species present.
-presence_min_peptides: 3
-# Minimum coverage to call a species present (0 = no coverage filter).
-presence_min_coverage: 0
 # Minimum diagnostic peptides per taxon required for it to enter the search database.
 min_taxon_db_peptides: 10
+
+# Filter chain applied to each peptidotyping pass, in order:
+#   1. picked target-decoy FDR (Savitski et al. 2015) at the taxon level —
+#      each lineage keeps only the higher-scoring of its {target, decoy} pair,
+#      then all representatives compete in one ranked list. A lineage is called
+#      present iff it is a target representative AND qvalue <= qvalue_threshold
+#      AND n_unique_peptides_all >= min_peptides. See conduitR::pick_taxon_fdr.
+#   2. score-coverage — *_score_fraction_threshold OR *_max_taxa (disabled by
+#      default; an abundance-based top-N gate that drops low-abundance lineages
+#      independent of FDR, so it is off for this recall-oriented first pass).
+#
+# Each gate is recorded in the per-pass *_fdr_results.tsv via the
+# filter_reason column, so it's trivial to see which gate rejected which taxon.
+#
+# method — the presence-call rule:
+#   "count" (default, recommended): a taxon is present iff it has at least
+#       `min_confident_peptides` distinct CONFIDENT peptides (DIA-NN Q.Value
+#       <= 0.01). This rests on DIA-NN's own precursor FDR (a real, validated
+#       FDR) and does NOT use the reported decoy null at all — which is the
+#       point: InfiniDIA's --pre-filter censors the reported decoys (~135 of
+#       ~972k survive in the s76 2nd pass), so any decoy-magnitude statistic
+#       (enrichment) is unreliable and any decoy-count FDR (qvalue) is thin /
+#       quantized. Confident-peptide COUNT survives the censoring and cleanly
+#       separates real taxa (10s-1000s of peptides) from noise (decoy taxa top
+#       out ~16). Recall-oriented: the presence call is a candidate-selection
+#       screen; close relatives sharing peptides ("congener halo") may ride
+#       along and are resolved by the final full-proteome search.
+#   "enrichment": per-peptide score >= margin x pooled decoy noise rate. BROKEN
+#       under InfiniDIA — the censored decoy null inflates the noise rate and
+#       drops true high-peptide-count organisms (e.g. E. coli in s76 -> empty
+#       DB). Kept for provenance / non-InfiniDIA use only.
+#   "qvalue": global ranked-list picked q-value gate (uses qvalue_threshold).
+#       Recovers signal but its taxon-level q-value is NOT a trustworthy FDR
+#       under the censored null (see docs); use "count".
+peptidotyping_first_pass_method:  count
+peptidotyping_second_pass_method: count
+# margin — under method: enrichment, the multiple of the decoy noise rate a
+# lineage's per-peptide score must exceed. It trades three things at once:
+# lower margin -> higher recall, more false positives, and MORE families pass
+# gate 1, which enlarges the gate-2 species/strain database. That database is
+# searched library-free by DIA-NN, whose memory scales with the candidate
+# peptide count, so an over-permissive margin can OOM the search.
+# Calibrated on the equimolar defined-community pool (see supplementary
+# margin-sweep figure): full 10/10 recovery spans M = 1.75-2.25 (the recall
+# cliff, where E. coli/Phocaeicola drop at the species/strain gate, is at 2.5);
+# the tractability floor is ~M = 1.75 (25 families / 11.9 GB; M = 1.5 -> 38
+# families / 24.9 GB OOM'd at 126 GB on a 125 GB host). 2.0 sits centred in the
+# full-recall plateau (max headroom from both the OOM floor and the recall
+# cliff); 2.25 is the false-positive-minimal full-recall point.
+peptidotyping_first_pass_margin:  2.0
+peptidotyping_second_pass_margin: 2.0
+# qvalue_threshold — picked q-value cutoff for a presence call under
+# method: qvalue (ignored under method: enrichment). 0.05 is deliberately
+# permissive: a lineage dropped here is unrecoverable in the later species /
+# full-proteome stages, so the first pass favours recall.
+peptidotyping_first_pass_qvalue_threshold:  0.05
+peptidotyping_second_pass_qvalue_threshold: 0.05
+# min_peptides — minimum distinct peptides (n_unique_peptides_all) required to
+# call a lineage present. Raised from 2 to 10 to curb over-calling: at 2 the
+# species/strain pass detected ~1100 taxa (many spurious). 10 distinct peptides
+# is a much harder bar for a noise lineage to clear. NOTE: this gate counts
+# n_unique_peptides_all (every contributing peptide regardless of PEP), not the
+# confident (Q<=0.01) count — so it raises the bar but stays confidence-blind;
+# gating on confident peptides is the deeper fix if 10 proves insufficient.
+peptidotyping_first_pass_min_peptides:  10
+peptidotyping_second_pass_min_peptides: 10
+# min_confident_peptides — under method: count, the minimum number of distinct
+# CONFIDENT peptides (DIA-NN Q.Value <= 0.01) a taxon must have to be called
+# present. This is the count that "N peptides per taxon" usually means, and the
+# gate rests on DIA-NN's validated precursor FDR. 10 favours recall: across the
+# s75-s86 single-species controls every true organism had >=37 confident
+# peptides while decoy taxa topped out at 16, so 10 recovers 9/9 with margin;
+# raising toward 20 tightens the congener halo at a small recall cost on
+# low-abundance members (validate on a complex sample before raising). Ignored
+# unless method: count.
+peptidotyping_first_pass_min_confident_peptides:  10
+peptidotyping_second_pass_min_confident_peptides: 10
+# Optional score-coverage filter applied to whatever survives the picked FDR.
+# For each pass, set AT MOST ONE of *_score_fraction_threshold / *_max_taxa —
+# setting both for the same pass is an error. Both null (the default) disables
+# it — recommended, as it independently drops real low-abundance taxa.
+#   *_score_fraction_threshold: keep the smallest top-by-score prefix of
+#       FDR-passing taxa whose cumulative score reaches the given fraction
+#       of the total score (HAPiID-style coverage filter).
+#   *_max_taxa: keep the top-N FDR-passing taxa by score.
+peptidotyping_first_pass_score_fraction_threshold: null
+peptidotyping_first_pass_max_taxa: null
+peptidotyping_second_pass_score_fraction_threshold: null
+peptidotyping_second_pass_max_taxa: null
 
 
 # =============================================================================
 #  HAPiID
-#  Used by: hapid · mgnify_hapid
+#  Used by: hapiid (incl. the mgnify-sourced variant)
 # =============================================================================
 # HMM profiles for marker-gene identification (ribosomal proteins, elongation factors).
-hapid_hmm_profiles: "resources/hapid/ribP_elonF_profiles_refined_manually.hmm"
+hapiid_hmm_profiles: "resources/hapid/ribP_elonF_profiles_refined_manually.hmm"
 # Greedy genome-selection cutoff — take the smallest set of genomes that covers this
 # fraction of marker-gene-annotated spectra.
-hapid_percent_spectra: 80
+hapiid_percent_spectra: 80
 
 
 # =============================================================================
-#  MAGs / bakta annotation
-#  Used by: MAGs · hapid · genome_peptidotyping
-#           (any method that produces MAGs to annotate, incl. mgnify_* variants)
+#  Genome / bakta annotation
+#  Used by: genomes · hapid · genome_peptidotyping
+#           (any method that produces genomes to annotate, incl. mgnify_* variants)
 # =============================================================================
 # Bakta database location and variant.
 # Bakta DB size: light ~2 GB, full ~84 GB. The light DB is sufficient for most
 # bacterial-MAG workflows; use full only when you need plasmid/viral DBs.
 bakta_db_dir:  "resources/bakta/db"
 bakta_db_type: "light"
+
+# =============================================================================
+#  Shared genome-derived resource caches
+#  Used by: genomes · hapid · genome_peptidotyping (when source == "mgnify")
+# =============================================================================
+# Sharing only kicks in when genome_download_source == "mgnify" — MGnify accessions
+# are globally unique. For local genomes we keep per-run paths; local names aren't
+# guaranteed unique across experiments.
+#
+# Per-genome artifacts (Prodigal/FGS FAA, HMMER tblout, bakta annotations).
+# Layout: {genome_resource_dir}/{catalog_slug}/{tool}/{genome_id}/
+genome_resource_dir: "resources/genome_databases/derived"
+# Per-genome-set aggregates (LCA peptide DBs, hapid speclib + dedup marker DB).
+# Layout: {genome_set_resource_dir}/{catalog_slug}__filter-{filter}__max{n}/{module}/
+genome_set_resource_dir: "resources/genome_databases/derived_sets"
 
 
 # =============================================================================
@@ -138,9 +273,9 @@ relative_abundance_threshold: 0.01
 # =============================================================================
 #  MGnify genome download  (optional pre-step)
 #  Activated when: genome_download_source == "mgnify"
-#  Consumed by:    MAGs · hapid · genome_peptidotyping (when the flag is set)
+#  Consumed by:    genomes · hapid · genome_peptidotyping (when the flag is set)
 # =============================================================================
-# Where to fetch genomes from. FALSE = user-provided MAGs only. "mgnify" = download.
+# Where to fetch genomes from. FALSE = user-provided genomes only. "mgnify" = download.
 genome_download_source: FALSE
 # MGnify catalog string. The string IS the version pin (no extra version key needed).
 # e.g. "human-gut/v2.0.2", "chicken-gut/v1.0.1"

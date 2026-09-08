@@ -1,0 +1,31 @@
+# ── Pool species (10) ──────────────────────────────────────────────────
+820       # Bacteroides uniformis           (genus 816, family 815)
+562       # Escherichia coli                (genus 561, family 543)
+1579      # Lactobacillus acidophilus       (genus 1578, family 33958)
+1624      # Ligilactobacillus salivarius    (genus 2767887, family 33958)
+33035     # Blautia producta                (genus 572511, family 186803)
+823       # Parabacteroides distasonis      (genus 375288, family 2005525)
+1679      # Bifidobacterium longum          (genus 1678, family 31953)
+239935    # Akkermansia muciniphila         (genus 239934, family 1647988)
+821       # Phocaeicola vulgatus            (genus 909656, family 815)
+817       # Bacteroides fragilis            (genus 816, family 815)
+
+# ── Pool genera (9 unique) ─────────────────────────────────────────────
+816       # Bacteroides
+561       # Escherichia
+1578      # Lactobacillus
+2767887   # Ligilactobacillus
+572511    # Blautia
+375288    # Parabacteroides
+1678      # Bifidobacterium
+239934    # Akkermansia
+909656    # Phocaeicola
+
+# ── Pool families (7 unique) ───────────────────────────────────────────
+815       # Bacteroidaceae        (covers B. uniformis, P. vulgatus, B. fragilis)
+543       # Enterobacteriaceae    (covers E. coli)
+33958     # Lactobacillaceae      (covers L. acidophilus, L. salivarius)
+186803    # Lachnospiraceae       (covers Blautia producta)
+2005525   # Tannerellaceae        (covers Parabacteroides distasonis)
+31953     # Bifidobacteriaceae    (covers Bifidobacterium longum)
+1647988   # Akkermansiaceae       (covers Akkermansia muciniphila)

@@ -22,6 +22,15 @@ eggnog_info_fp = snakemake@input[["eggnog_info"]]
 eggnog_code_info_fp = snakemake@input[["eggnog_code_info"]]
 emapper_annotations_fp = snakemake@input[["emapper_annotations"]]
 
+# Authoritative term-name dictionaries (for description backfill)
+go_obo_fp       = snakemake@input[["go_obo"]]
+kegg_ko_fp      = snakemake@input[["kegg_ko"]]
+kegg_pathway_fp = snakemake@input[["kegg_pathway"]]
+kegg_module_fp  = snakemake@input[["kegg_module"]]
+kegg_brite_fp   = snakemake@input[["kegg_brite"]]
+enzyme_dat_fp   = snakemake@input[["enzyme_dat"]]
+pfam_clans_fp   = snakemake@input[["pfam_clans"]]
+
 # qf
 qf_fp = snakemake@input[["qf"]]
 
@@ -61,6 +70,34 @@ conduit_annotations = protein_groups |>
   # If the proteinids in a protein group have the same content, they will only be counted once.
   dplyr::distinct()|>
   dplyr::filter(!is.na(term))
+
+# Fill missing descriptions for the eggNOG-mapper-derived accession types from
+# authoritative external dictionaries. Each vocabulary is tagged with the exact
+# annotation_type it describes; add_term_descriptions() only fills blanks and
+# never borrows a description from another source, so provenance stays explicit.
+conduitR::log_with_timestamp("Filling descriptions from authoritative dictionaries")
+
+term_dictionary <- dplyr::bind_rows(
+  conduitR::parse_go_obo(go_obo_fp)        |> dplyr::mutate(annotation_type = "go"),
+  conduitR::read_kegg_list(kegg_ko_fp)     |> dplyr::mutate(annotation_type = "kegg_orthology"),
+  conduitR::read_kegg_list(kegg_pathway_fp)|> dplyr::mutate(annotation_type = "kegg_map_pathway"),
+  conduitR::read_kegg_list(kegg_module_fp) |> dplyr::mutate(annotation_type = "kegg_module"),
+  conduitR::read_kegg_list(kegg_brite_fp)  |> dplyr::mutate(annotation_type = "brite"),
+  conduitR::parse_enzyme_dat(enzyme_dat_fp)|> dplyr::mutate(annotation_type = "ec_number"),
+  conduitR::parse_pfam_clans(pfam_clans_fp)|> dplyr::mutate(annotation_type = "pfam")
+) |>
+  dplyr::select(annotation_type, term, description)
+
+n_blank_before <- sum(is.na(conduit_annotations$description) |
+                        conduit_annotations$description == "", na.rm = TRUE)
+
+conduit_annotations <- conduitR::add_term_descriptions(conduit_annotations, term_dictionary)
+
+n_blank_after <- sum(is.na(conduit_annotations$description) |
+                       conduit_annotations$description == "", na.rm = TRUE)
+conduitR::log_with_timestamp(sprintf(
+  "Descriptions filled: blank rows %d -> %d of %d total",
+  n_blank_before, n_blank_after, nrow(conduit_annotations)))
 
 conduitR::log_with_timestamp("Writing conduit annotations to file")
 

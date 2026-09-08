@@ -1,6 +1,6 @@
-# Integration test: MAGs (user-provided, no selection)
+# Integration test: genomes method (user-provided genome FASTAs, no selection)
 # All other config is inherited from config/snakemake.yaml (auto-loaded by
 # the Snakefile) and the active profile (profiles/<hostname>/).
 experiment: integration_test
-run_name: MAGs
-search_space_method: MAGs
+run_name: genomes
+search_space_method: genomes

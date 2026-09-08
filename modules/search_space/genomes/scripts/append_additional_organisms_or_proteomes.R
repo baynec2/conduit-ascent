@@ -1,5 +1,5 @@
 ################################################################################
-# Append Additional Organisms or Proteomes to MAG FASTA & Taxonomy
+# Append Additional Organisms or Proteomes to Genome FASTA & Taxonomy
 ################################################################################
 
 ## Snakemake logging setup -----------------------------------------------------
@@ -7,6 +7,16 @@ logfile <- snakemake@log[[1]]
 zz <- file(logfile, open = "a")
 sink(zz, append = TRUE)       # stdout
 sink(zz, type = "message")  # stderr/messages
+
+## Cap conduitR's parallel worker pool to this rule's Snakemake allocation.
+# conduitR::get_proteome_ids_from_organism_ids() sizes its future/furrr pool
+# from future::availableCores() - 1 (= parallelly::availableCores()), which
+# otherwise reports every physical core on the node and oversubscribes when
+# Snakemake scheduled this rule with fewer threads. Setting the `custom`
+# availableCores() method makes it return this rule's thread count (parallelly
+# takes the min across methods, so it never exceeds the node's real cores).
+n_threads <- as.integer(snakemake@threads[[1]])
+options(parallelly.availableCores.custom = function() n_threads)
 
 start_time <- Sys.time()
 
@@ -37,13 +47,15 @@ append_proteomes <- function(fasta_set, taxonomy, proteome_ids, fasta_dir) {
 }
 
 ## Inputs ---------------------------------------------------------------------
-mag_fasta_fp <- snakemake@input[["mag_fasta"]]
-mag_taxonomy_fp <- snakemake@input[["mag_taxonomy"]]
+genome_fasta_fp <- snakemake@input[["genome_fasta"]]
+genome_taxonomy_fp <- snakemake@input[["genome_taxonomy"]]
 
 ## Outputs --------------------------------------------------------------------
-uniprot_fasta_dir <- snakemake@output[["uniprot_fasta_dir"]]
 fasta_fp <- snakemake@output[["fasta"]]
 taxonomy_fp <- snakemake@output[["taxonomy"]]
+# Scratch dir for downloaded UniProt FASTAs — only used on append branches.
+# Sibling of fasta_fp so it lives next to the database it augments.
+uniprot_fasta_dir <- file.path(dirname(fasta_fp), "uniprot_database")
 
 ## Config ---------------------------------------------------------------------
 additional_proteome_id <- snakemake@config[["append_additional_proteome_id"]]
@@ -51,7 +63,7 @@ additional_ncbi_taxa_id <- snakemake@config[["append_additional_ncbi_taxa_id"]]
 
 conduitR::log_with_timestamp("Running append_additional_organisms_or_proteomes.R")
 conduitR::log_with_timestamp(
-  paste0("Input files: ", mag_fasta_fp, " ", mag_taxonomy_fp)
+  paste0("Input files: ", genome_fasta_fp, " ", genome_taxonomy_fp)
 )
 conduitR::log_with_timestamp(
   paste0("Output files: ", fasta_fp, " ", taxonomy_fp)
@@ -59,22 +71,22 @@ conduitR::log_with_timestamp(
 
 ## Read inputs ----------------------------------------------------------------
 # FASTA via Biostrings
-fasta <- Biostrings::readAAStringSet(mag_fasta_fp)
+fasta <- Biostrings::readAAStringSet(genome_fasta_fp)
 
 # Taxonomy table
-taxonomy <- readr::read_delim(mag_taxonomy_fp, col_types = readr::cols())
-conduitR::log_with_timestamp("Creating directory for uniprot fasta file")
-dir.create(uniprot_fasta_dir)
+taxonomy <- readr::read_delim(genome_taxonomy_fp, col_types = readr::cols())
+
 ## Control flow ---------------------------------------------------------------
 if (is_missing(additional_proteome_id) && is_missing(additional_ncbi_taxa_id)) {
   conduitR::log_with_timestamp(
-    "No additional proteomes or taxa specified; passing MAGs through unchanged"
+    "No additional proteomes or taxa specified; passing genomes through unchanged"
   )
 
 } else if (!is_missing(additional_proteome_id) && is_missing(additional_ncbi_taxa_id)) {
   conduitR::log_with_timestamp(
     paste0("Appending UniProt proteome ID(s): ", additional_proteome_id)
   )
+  dir.create(uniprot_fasta_dir, recursive = TRUE, showWarnings = FALSE)
   res <- append_proteomes(
     fasta_set = fasta,
     taxonomy = taxonomy,
@@ -92,9 +104,10 @@ if (is_missing(additional_proteome_id) && is_missing(additional_ncbi_taxa_id)) {
 
   proteome_ids <- conduitR::get_proteome_ids_from_organism_ids(
     additional_ncbi_taxa_id
-  ) |> 
+  ) |>
   dplyr::pull(proteome_id)
 
+  dir.create(uniprot_fasta_dir, recursive = TRUE, showWarnings = FALSE)
   res <- append_proteomes(
     fasta_set = fasta,
     taxonomy = taxonomy,

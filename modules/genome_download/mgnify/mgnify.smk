@@ -5,7 +5,6 @@ import os
 # ==============================================================================
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR        = config["run_dir"]
-MAG_DIR        = os.path.join(EXPERIMENT_DIR, "input/MAG_files")
 MGNIFY_OUT     = os.path.join(RUN_DIR, "genome_download/mgnify")
 
 MGNIFY_FTP_BASE = config.get("mgnify_ftp_base",
@@ -111,13 +110,28 @@ checkpoint parse_mgnify_metadata:
 # Snakemake-dedupe to a single download.
 rule download_mgnify_genome:
     input:
-        representatives = os.path.join(MGNIFY_OUT, "species_representatives.txt")
+        # ancient(): species_representatives.txt is a PER-RUN checkpoint output
+        # (regenerated with a fresh mtime every run) but the genome it gates
+        # lands in the SHARED, persistent cache. Without ancient() Snakemake's
+        # mtime rerun-trigger sees the freshly-stamped representatives file as
+        # "newer" than the cached .fna and re-downloads all ~4,744 genomes on
+        # every run that isn't the one which first populated the cache — which
+        # in turn invalidates the shared FGS/HMMER/LCA artifacts downstream.
+        # ancient() keeps the DAG edge (so the checkpoint still fires and the
+        # accession wildcards resolve) while ignoring the timestamp. The genome
+        # content depends only on the accession wildcard, so this is safe.
+        representatives = ancient(os.path.join(MGNIFY_OUT, "species_representatives.txt"))
     output:
         genome = os.path.join(MGNIFY_CACHE_GENOMES, "{accession}.fna")
     params:
         url = mgnify_genome_url
     log:
         os.path.join(MGNIFY_OUT, "logs/download_{accession}.log")
+    # Run in the bakta container (same image the sibling genome-processing rules
+    # use) so curl is a modern, reproducible version — the host curl is 7.68,
+    # which lacks --retry-all-errors and made this rule host-version-dependent.
+    container:
+        config["containers"]["bakta"]
     shell:
         r"""
         set -euo pipefail
@@ -126,7 +140,11 @@ rule download_mgnify_genome:
         # -f makes curl exit non-zero on 4xx/5xx (default behaviour writes the
         # HTML error body to {output.genome} and FragGeneScan downstream
         # segfaults on it). -S ensures errors are reported even with -s.
-        curl -fSL --retry 5 --retry-delay 10 \
+        # --retry-all-errors also retries connection-level failures (resets,
+        # partial transfers) that plain --retry skips; --connect-timeout bounds
+        # hangs against a flaky EBI FTP endpoint. (Requires the container's
+        # modern curl; the host's 7.68 lacks --retry-all-errors.)
+        curl -fSL --retry 8 --retry-delay 10 --retry-all-errors --connect-timeout 30 \
             -o {output.genome} '{params.url}' 2> >(tee -a {log} >&2)
         # Validate the downloaded file is actually a FASTA — defence-in-depth
         # in case the URL ever serves a 200 with junk content.

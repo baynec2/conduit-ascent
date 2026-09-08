@@ -21,6 +21,7 @@ conduitR::log_with_timestamp("Running add_annotations_to_qfeatures.R script")
 
 conduitR::log_with_timestamp(paste0("Input file: ", snakemake@input[["qf"]]))
 conduitR::log_with_timestamp(paste0("Input file: ", snakemake@input[["uniprot_annotated_protein_info"]]))
+conduitR::log_with_timestamp(paste0("Input file: ", snakemake@input[["protein_info"]]))
 conduitR::log_with_timestamp(paste0("Output file: ", snakemake@output[["annotated_qf"]]))
 
 #Defining files
@@ -28,6 +29,7 @@ conduitR::log_with_timestamp(paste0("Output file: ", snakemake@output[["annotate
 qf_fp = snakemake@input[["qf"]]
 uniprot_annotated_protein_info_fp = snakemake@input[["uniprot_annotated_protein_info"]]
 conduit_annotations_fp = snakemake@input[["conduit_annotations"]]
+protein_info_fp = snakemake@input[["protein_info"]]
 
 # Outputs
 annotated_qf_fp = snakemake@output[["annotated_qf"]]
@@ -35,12 +37,14 @@ annotated_qf_fp = snakemake@output[["annotated_qf"]]
 # Reading in files
 conduitR::log_with_timestamp("Reading in files")
 uniprot_annotated_protein_info = readr::read_delim(uniprot_annotated_protein_info_fp)
+# Full-FASTA mapping: add_taxonomy_to_qf does per-peptide LCA over every protein in Protein.Ids.
+protein_info = readr::read_delim(protein_info_fp)
 qf = readRDS(qf_fp)
 conduitR::log_with_timestamp("Working with annotations contained in the Uniprot_annotated_protein_info_file")
 
 # Adding taxonomy annotations
 conduitR::log_with_timestamp("Adding taxonomy information to QFeatures, handling assay links, and summarizing")
-qf = conduitR::add_taxonomy_to_qf(qf,uniprot_annotated_protein_info)
+qf = conduitR::add_taxonomy_to_qf(qf, protein_info)
 
 # Adding all of the annotations that we have extracted. 
 # First, we need to pivot these to wide format. 
@@ -171,6 +175,30 @@ qf = maybe_add_annotation(qf,
                                     id_column = Protein.Group,
                                     conduit_annotations = conduit_annotations_wide,
                                     column_name = cazy_family)
+
+conduitR::log_with_timestamp("Adding gene_symbol annotations to QFeatures")
+qf = maybe_add_annotation(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = gene_symbol)
+
+conduitR::log_with_timestamp("Adding ec_number annotations to QFeatures")
+qf = maybe_add_annotation(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = ec_number)
+
+conduitR::log_with_timestamp("Adding kegg_module annotations to QFeatures")
+qf = maybe_add_annotation(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = kegg_module)
+
+conduitR::log_with_timestamp("Adding brite annotations to QFeatures")
+qf = maybe_add_annotation(qf,
+                                    id_column = Protein.Group,
+                                    conduit_annotations = conduit_annotations_wide,
+                                    column_name = brite)
 
 conduitR::log_with_timestamp(paste0("Annotations sucessfully added. Writing Qfeatures object to ", annotated_qf_fp))
 

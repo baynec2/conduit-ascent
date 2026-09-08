@@ -7,6 +7,10 @@ start_time <- Sys.time()
 
 conduitR::log_with_timestamp("Running call_ncbi_taxa_ids.R script")
 
+# Pure-function helper (parse_metaphlan_profiles) lives in a sibling file so
+# it's reachable from testthat without snakemake@ globals.
+snakemake@source("call_ncbi_taxa_ids_lib.R")
+
 # Defining Inputs
 merged_profiles_fp  = snakemake@input[["merged_profiles"]]
 # Defining Output
@@ -24,46 +28,7 @@ conduitR::log_with_timestamp(
     relative_abundance_threshold)
     )
 
-# Extracting sample names, these are from the third column to the last.             
-sample_names = names(merged_profiles)[3:ncol(merged_profiles)]
-# Splitting taxa and ncbi ids into seperate columns
-taxa_split <- merged_profiles |>
-  # Split clade_name by pipe
-  tidyr::separate(
-    clade_name,
-    into = c("kingdom","phylum","class","order","family","genus","species","strain"),
-    sep = "\\|",
-    fill = "right"
-  )|>
-    # Optional: remove the prefixes (k__, p__, etc.)
-  dplyr::mutate(
-    kingdom = stringr::str_remove(kingdom, "^k__"),
-    phylum  = stringr::str_remove(phylum, "^p__"),
-    class   = stringr::str_remove(class, "^c__"),
-    order   = stringr::str_remove(order, "^o__"),
-    family  = stringr::str_remove(family, "^f__"),
-    genus   = stringr::str_remove(genus, "^g__"),
-    species = stringr::str_remove(species, "^s__"),
-    strain = stringr::str_remove(strain, "^t__")
-  )|>
-    tidyr::separate(
-    NCBI_tax_id,
-    into = c("kingdom_ncbi","phylum_ncbi","class_ncbi","order_ncbi","family_ncbi","genus_ncbi","species_ncbi","strain_ncbi"),
-    sep = "\\|",
-    fill = "right"
-  )|> 
-  dplyr::select(species,species_ncbi,dplyr::all_of(sample_names))|>
-  dplyr::filter(species_ncbi != "",
-                !is.na(species_ncbi))|>
-  tidyr::pivot_longer(cols = dplyr::all_of(sample_names),
-                      names_to = "sample_name",
-                      values_to = "relative_abundance") |>
-                      dplyr::filter(relative_abundance > relative_abundance_threshold)
-
-# Dereplicating organism ids that are beyond theshold in multiple samples.
-ncbi_taxonomy_ids = tibble::tibble(
-  ncbi_taxonomy_id = unique(dplyr::pull(taxa_split, species_ncbi))
-)
+ncbi_taxonomy_ids <- parse_metaphlan_profiles(merged_profiles, relative_abundance_threshold)
   
 conduitR::log_with_timestamp(
     paste0(
