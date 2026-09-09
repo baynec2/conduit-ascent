@@ -32,7 +32,8 @@ grep '^ACC' resources/hapid/ribP_elonF_profiles_refined_manually.hmm
 
 Pfam asks to be cited. See <https://www.ebi.ac.uk/interpro/about/citing/>.
 
-The marker-gene approach is HAPiID's; credit it as well. The project publishes no
-citation of its own in its README, so cite the repository
-(<https://github.com/mgtools/HAPiID>, Ye lab, Indiana University) or whichever HAPiID
-publication you are following.
+The marker-gene approach is HAPiID's; credit it as well:
+
+> Stamboulian M, Li S, Ye Y. *Using high-abundance proteins as guides for fast and
+> effective peptide/protein identification from human gut metaproteomic data.*
+> Microbiome 9, 80 (2021). doi:[10.1186/s40168-021-01035-8](https://doi.org/10.1186/s40168-021-01035-8)

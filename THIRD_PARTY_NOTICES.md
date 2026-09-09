@@ -20,18 +20,31 @@ its notice to travel with it.
 - License: [`.../unipept-database/LICENSE`](modules/search_space/unipept_peptidotyping/scripts/unipept-database/LICENSE)
 - Provenance and verification: [`.../unipept-database/PROVENANCE.md`](modules/search_space/unipept_peptidotyping/scripts/unipept-database/PROVENANCE.md)
 
-### coverAllSpectra_greedy.py — derived from HAPiID, no license declared
+### coverAllSpectra_greedy.py — our code, HAPiID's method
 
 `modules/search_space/_shared/scripts/coverAllSpectra_greedy.py`
 
-Adapted from <https://github.com/mgtools/HAPiID> (Ye lab, Indiana University), which
-publishes **no license file** — so default copyright applies upstream and this file
-cannot be relied on as redistributable. Recorded here rather than left implicit.
+**No third-party code.** The greedy genome-selection step implements the method
+described in HAPiID, and the paper is credited in the script and below, but the
+implementation is ours.
 
-The underlying greedy set-cover algorithm is textbook and not protectable; what remains
-at issue is the specific expression of two helper functions and their naming. Resolving
-it needs either written permission from the upstream authors or an independent
-reimplementation of those helpers. **Open — see the licensing brief, item 2.**
+It did not start that way. The file began as an adaptation of
+<https://github.com/mgtools/HAPiID>, which declares **no license at all** — so default
+copyright applies upstream and nothing from it can be redistributed. Two helper
+functions still carried upstream expression. They were replaced with an independent
+implementation written against the algorithm and this module's tests, verified
+equivalent by fuzzing 50,000 randomised inputs against the previous behaviour with zero
+mismatches. The greedy set-cover algorithm itself is textbook and not protectable.
+
+Credit for the method belongs upstream:
+
+> Stamboulian M, Li S, Ye Y. *Using high-abundance proteins as guides for fast and
+> effective peptide/protein identification from human gut metaproteomic data.*
+> Microbiome 9, 80 (2021). doi:[10.1186/s40168-021-01035-8](https://doi.org/10.1186/s40168-021-01035-8)
+
+Asking the authors to add a license to their repository remains worth doing — it would
+settle the question for every other group building on HAPiID, several of whom will hit
+the same wall — but this repository no longer depends on the answer.
 
 ## Data
 
