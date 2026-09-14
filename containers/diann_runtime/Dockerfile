@@ -21,7 +21,10 @@
 # Base is ubuntu:22.04 rather than the vendor Dockerfile's debian:12 — this is
 # the base the previous (DIA-NN-bundling) conduit image used and is known to
 # satisfy the binary's glibc/libstdc++ requirements for DIA-NN 2.x.
-FROM ubuntu:22.04
+# Pinned by digest: ubuntu:22.04 is a moving tag, and this image installs
+# dotnet-sdk-8.0 from apt, so two builds of an identical Dockerfile are not
+# the same image (see #68).
+FROM ubuntu@sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc
 
 LABEL base_image="ubuntu:22.04" \
       version="1" \
@@ -53,7 +56,10 @@ RUN set -ex && \
     dpkg -i packages-microsoft-prod.deb && \
     rm packages-microsoft-prod.deb && \
     apt-get update && \
-    apt-get install -y dotnet-sdk-8.0 && \
+    # Pinned to what the in-use image contains, verified by inspecting it.
+    # Which .NET a DIA-NN search ran against should not depend on which day
+    # the image happened to be rebuilt.
+    apt-get install -y dotnet-sdk-8.0=8.0.424-1 && \
     apt-get remove -y wget && \
     apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*

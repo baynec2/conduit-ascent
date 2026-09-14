@@ -65,3 +65,55 @@ def test_greedy_cover_genome_with_no_spectra_is_not_selected():
     }
     out = cag.greedy_cover(g2s)
     assert [g for g, _ in out] == ["G1"]
+
+
+def test_greedy_cover_counts_duplicate_spectra_once():
+    # A genome listing the same spectrum repeatedly must not appear to cover
+    # more than it does. G1 has 4 entries but only 2 distinct spectra, so G2's
+    # 3 distinct spectra should win the first pick.
+    g2s = {
+        "G1": ["s1", "s1", "s2", "s2"],
+        "G2": ["s3", "s4", "s5"],
+    }
+    out = cag.greedy_cover(g2s)
+    assert out[0][0] == "G2"
+    # Total coverage is 5 distinct spectra, not the 7 raw list entries.
+    assert out[-1][1] == 5
+
+
+def test_greedy_cover_ties_resolve_by_iteration_order():
+    # Equal coverage must resolve deterministically to the first genome seen,
+    # so a given input file always yields the same selection.
+    tie = {"G1": ["s1", "s2"], "G2": ["s3", "s4"]}
+    assert cag.greedy_cover(tie)[0][0] == "G1"
+    assert cag.greedy_cover({"G2": ["s3", "s4"], "G1": ["s1", "s2"]})[0][0] == "G2"
+
+
+def test_greedy_cover_cumulative_counts_are_monotonic_and_complete():
+    g2s = {
+        "G1": ["s1", "s2", "s3"],
+        "G2": ["s3", "s4"],
+        "G3": ["s5"],
+        "G4": ["s1"],
+    }
+    out = cag.greedy_cover(g2s)
+    cums = [n for _, n in out]
+    assert cums == sorted(cums)
+    # Every reachable spectrum is accounted for, and no genome is picked twice.
+    assert out[-1][1] == len({s for spectra in g2s.values() for s in spectra})
+    assert len({g for g, _ in out}) == len(out)
+
+
+def test_write_selection_empty_emits_header_only(tmp_path):
+    out_f = tmp_path / "sel.tsv"
+    cag.write_selection([], str(out_f))
+    assert out_f.read_text() == "genome\tnSpectraCovered\tcumulative_pct\n"
+
+
+def test_write_selection_cumulative_pct_reaches_100(tmp_path):
+    out_f = tmp_path / "sel.tsv"
+    cag.write_selection([("G1", 3), ("G2", 5)], str(out_f))
+    rows = [ln.split("\t") for ln in out_f.read_text().strip().split("\n")[1:]]
+    assert [r[0] for r in rows] == ["G1", "G2"]
+    assert float(rows[0][2]) == 60.0
+    assert float(rows[-1][2]) == 100.0

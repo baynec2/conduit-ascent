@@ -42,20 +42,57 @@ search_space_method: ncbi_taxonomy_id
 sample_annotation: input/sample_annotation.txt
 
 # --- Container images ---
-# Moving tags like :alpha / :develop are OK for active dev; pin to @sha256:... for reproducibility.
+# Pinned by DIGEST, not by tag. Both halves of that matter:
+#
+#   1. A tag cannot name this commit. CI tags each image with the sha of the
+#      commit that built it, and the image for a commit does not exist until
+#      after that commit is pushed — so a tag here always names some EARLIER
+#      commit and looks perpetually out of date. Bumping it just makes a new
+#      commit and recreates the gap. A digest has no commit in it to lag.
+#
+#   2. These builds are not reproducible, so a tag is not a version. Almost
+#      every Dockerfile below resolves its packages at build time — `bakta`,
+#      `metaphlan` and `fraggenescan_hmmer` install their tools with no
+#      version at all, `umgap` curls whatever rustup ships today, and
+#      `diann_runtime` takes dotnet-sdk-8.0 as a major version. Two builds
+#      of the SAME Dockerfile are therefore different images: compare
+#      fraggenescan_hmmer at 660f4cb and f5f961d — byte-identical source,
+#      two digests. Without a digest, which metaphlan profiled your samples
+#      depends on which build happened to be tagged last.
+#
+# The tag each digest came from is in the comment beside it, because that is
+# the part a human can read and grep the CI logs for. To move one, take the
+# digest of the tag you want — the multi-arch index digest, not a
+# per-platform one:
+#
+#   docker buildx imagetools inspect baynec2/<image>:<sha>
+#
+# Digests fix WHICH BUILD you get. They do not make a rebuild reproducible —
+# that needs versions pinned inside the Dockerfiles, which is tracked
+# separately. eggnog-mapper=2.1.12 is currently the only one that does it.
 containers:
-  conduitr:     "docker://baynec2/conduitr:a5cfeae"
+  # a5cfeae
+  conduitr:           "docker://baynec2/conduitr@sha256:919a3014f3177d1a70054b7cb0083a1ab726637831b3eae0ae01717a1fd45a59"
   # Runtime deps (.NET 8, libgomp, locales) for a user-supplied DIA-NN — no
   # DIA-NN inside. There is deliberately no `diann` key here: the DIA-NN
   # container is resolved from `diann_path` at parse time (see below) and
   # written into containers.diann by modules/_shared/diann_env.py.
-  diann_runtime: "docker://baynec2/diann_runtime:7ce6ed8"
-  bakta:        "docker://baynec2/bakta:f5f961d"
-  metaphlan:    "docker://baynec2/metaphlan:f5f961d"
-  eggnogmapper: "docker://baynec2/eggnogmapper:f5f961d"
-  umgap:        "docker://baynec2/umgap:e46d512"
-  fraggenescan_hmmer: "docker://baynec2/fraggenescan_hmmer:f5f961d"
-  taxonkit:     "docker://quay.io/biocontainers/taxonkit:0.20.0--h9ee0642_1"
+  # 14165ea
+  diann_runtime:      "docker://baynec2/diann_runtime@sha256:6f9bb07a6b00180edabac2a730ef51274e9e4b96c7e954666be9a1e5d7ff3bbb"
+  # 14165ea
+  bakta:              "docker://baynec2/bakta@sha256:39e81cde128d89f2f6675566d99388ae83f8804d59695fedcbd2a60f89d165d6"
+  # 14165ea
+  metaphlan:          "docker://baynec2/metaphlan@sha256:079f46bb3f82f8491e04af6be1110b74b5aed3b675ddca98c4ff7d1660b9fcc5"
+  # 14165ea
+  eggnogmapper:       "docker://baynec2/eggnogmapper@sha256:340601fdf5a43d6712e060ca71d84b758b657ca2a686bfed6c80a54626ccd3f3"
+  # 14165ea
+  umgap:              "docker://baynec2/umgap@sha256:e858b171ead56c51bb0c0257fbb6d78a960cf5b823084eaf58c3883faba7ce30"
+  # 14165ea
+  fraggenescan_hmmer: "docker://baynec2/fraggenescan_hmmer@sha256:63b9c5b8bc3c72ed242d4e2feb13540f8750a0bc33933d44acd082388ca3e222"
+  # 0.20.0--h9ee0642_1 — biocontainers tags already carry a build hash, so
+  # this one was effectively immutable already; pinned by digest anyway so
+  # there is one rule here rather than one rule and an exception.
+  taxonkit:           "docker://quay.io/biocontainers/taxonkit@sha256:c27f1ecebde5e98ba09693dd3046814464a9d3ad2c944fba5a0be560ee643c7d"
 
 # --- DIA-NN installation (user-supplied) ---
 # conduit-ascent does not distribute DIA-NN. Its licence permits one backup
@@ -138,7 +175,14 @@ append_additional_ncbi_taxa_id: FALSE
 eggnogmapper_db_dir: "resources/eggnogmapper/db"       # ~50 GB (full) or ~8 GB (bacteria only)
 pfam_db_url:         "https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/pfamA.txt.gz"
 cazy_db_url:         "https://pro.unl.edu/dbCAN2/download/Databases/CAZyDB.07302020.fam-activities.txt"
-eggnog_db_url:       "http://eggnog6.embl.de/download/eggnog_5.0/e5.og_annotations.tsv"
+# eggnog6.embl.de now 301s to eggnogdb.org, which 404s for this file (and for
+# the emapperdb-5.0.2 files); eggnog5.embl.de still serves both.
+eggnog_db_url:       "http://eggnog5.embl.de/download/eggnog_5.0/e5.og_annotations.tsv"
+# Base URL for the two emapper database files (eggnog.db, eggnog_proteins.dmnd),
+# fetched by download_eggnogmapper_db. Declared here, not just read via
+# config.get() in the rule, so the next host move is a visible one-line edit
+# rather than an undocumented override nobody knows exists.
+eggnogmapper_db_url: "http://eggnog5.embl.de/download/emapperdb-5.0.2"
 
 # Authoritative term-name dictionaries used to fill `description` for the
 # eggNOG-mapper-derived annotation types (go/kegg_*/pfam/ec_number/brite).
