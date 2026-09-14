@@ -20,6 +20,10 @@
 # worked for the old inline-job setup with neither specified, so they are
 # left unset here and the cluster default is used. If your cluster requires
 # them, uncomment slurm_partition / slurm_account under default-resources.
+#
+# Other clusters: there is deliberately no generic SLURM profile, because
+# scratch paths, binds, partitions and per-rule memory are all site-specific.
+# Copy this directory to profiles/<your-cluster>/ and adapt it to your site.
 
 executor: slurm
 use-singularity: true
