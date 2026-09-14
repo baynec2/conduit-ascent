@@ -79,8 +79,8 @@ containers:
   # written into containers.diann by modules/_shared/diann_env.py.
   # 14165ea
   diann_runtime:      "docker://baynec2/diann_runtime@sha256:6f9bb07a6b00180edabac2a730ef51274e9e4b96c7e954666be9a1e5d7ff3bbb"
-  # 14165ea
-  bakta:              "docker://baynec2/bakta@sha256:39e81cde128d89f2f6675566d99388ae83f8804d59695fedcbd2a60f89d165d6"
+  # f65548d
+  bakta:              "docker://baynec2/bakta@sha256:cb9692a812b897b1001fa54b3b4f24484df330cdab1d583d69175e3595aafb81"
   # 14165ea
   metaphlan:          "docker://baynec2/metaphlan@sha256:079f46bb3f82f8491e04af6be1110b74b5aed3b675ddca98c4ff7d1660b9fcc5"
   # 14165ea
