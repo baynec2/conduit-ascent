@@ -52,3 +52,12 @@ def per_genome_set_cache_root(module):
         return os.path.join(config["genome_set_resource_dir"],
                             _genome_set_slug(), module)
     return os.path.join(config["run_dir"], "database_resources", module)
+
+def mgnify_set_path(name):
+    """A file parse_mgnify_metadata writes for this run's MGnify genome set
+    (catalog + filter + max_genomes). Runs with the same set share it, so the
+    rules that build shared-cache artifacts from it see the same input path in
+    every run. A per-run path here gets recorded in each cached artifact's
+    provenance, and Snakemake's input rerun-trigger then rebuilds the whole cache
+    for every new run (#61)."""
+    return os.path.join(per_genome_set_cache_root("mgnify"), name)

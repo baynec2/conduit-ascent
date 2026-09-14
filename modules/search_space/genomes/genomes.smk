@@ -34,10 +34,10 @@ def _mgnify_genome_path(genome):
     return os.path.join(_MGNIFY_CATALOG_ROOT, "genomes", f"{genome}.fna")
 
 def _mgnify_taxonomy_path():
-    # Per-run, NOT shared — the file is a filtered projection by per-run
-    # mgnify_taxonomy_filter / mgnify_max_genomes, so two runs with different
-    # filters would clobber each other in a shared location.
-    return os.path.join(RUN_DIR, "genome_download/mgnify/taxonomy.txt")
+    # Keyed by genome set (catalog + filter + max_genomes): runs with different
+    # filters get different files, runs with the same set share one. See
+    # mgnify_set_path() in _shared/genome_cache.smk.
+    return mgnify_set_path("taxonomy.txt")
 
 # Files that should be included in Bakta database.
 # The protein-sequence-cluster diamond DB differs by DB type: the `full` DB
@@ -68,7 +68,7 @@ def _selected_genomes_source():
     if method == "hapiid":
         return os.path.join(RUN_DIR, "database_resources/hapid/selected_genomes.txt")
     if config.get("genome_download_source") == "mgnify":
-        return os.path.join(RUN_DIR, "genome_download/mgnify/species_representatives.txt")
+        return mgnify_set_path("species_representatives.txt")
     return None
 
 # Local checkpoint so get_genome_list() stays inside this module's checkpoints
@@ -169,11 +169,15 @@ rule download_bakta_resources:
 
 rule annotate_genomes_with_bakta:
     input:
-        # ancient(): .fastas_checked is a per-run sentinel but bakta annotations
-        # land in the SHARED per-genome cache when source == mgnify (BAKTA_OUT_ROOT).
-        # Ignore its timestamp so a fresh run doesn't re-annotate cached genomes;
-        # it's an ordering guard only (annotation content depends on genome_fa).
-        genomes_ok = ancient(os.path.join(GENOME_DIR, ".fastas_checked")),
+        # Ordering guard for user-supplied genomes only: wait for
+        # check_genome_fastas. ancient() because the sentinel is re-touched when
+        # the check re-runs, and annotation content depends only on genome_fa.
+        # MGnify genomes skip it: their annotations land in the SHARED per-genome
+        # cache, where this per-experiment path would be recorded as an input
+        # and make every new experiment re-annotate every genome (#61).
+        # download_mgnify_genome already validates each FASTA.
+        **({} if config.get("genome_download_source") == "mgnify"
+           else {"genomes_ok": ancient(os.path.join(GENOME_DIR, ".fastas_checked"))}),
         genome_fa = genome_fasta_path,
         # Depend on the bakta DB so Snakemake schedules download_bakta_resources
         # when it's missing (and skips it when the DB is already staged at
