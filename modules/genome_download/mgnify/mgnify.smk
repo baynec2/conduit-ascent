@@ -1,5 +1,7 @@
 import os
 
+include: "../../search_space/_shared/genome_cache.smk"
+
 # ==============================================================================
 # Paths
 # ==============================================================================
@@ -17,12 +19,10 @@ MGNIFY_CATALOG  = config.get("mgnify_catalog", "")
 # experiments / runs using the same catalog share one copy instead of
 # re-downloading per-experiment. The catalog string is the version pin.
 #
-# NOTE: taxonomy.txt is NOT shared. It's a FILTERED projection of the
-# metadata, with per-run filters (mgnify_taxonomy_filter, mgnify_max_genomes)
-# already applied — different runs would produce different files. It lives
-# in MGNIFY_OUT (per-run) alongside the per-run species_representatives.txt.
-# Mixing per-run and shared outputs in the same checkpoint also confuses
-# Snakemake's "is this checkpoint done?" check, which is why this matters.
+# taxonomy.txt and species_representatives.txt are a FILTERED projection of the
+# metadata (mgnify_taxonomy_filter, mgnify_max_genomes), so they are keyed by the
+# genome set rather than the catalog — see mgnify_set_path() in
+# _shared/genome_cache.smk.
 MGNIFY_CACHE_DIR       = config.get("mgnify_cache_dir",
                                     "resources/genome_databases/mgnify")
 MGNIFY_CATALOG_SLUG    = MGNIFY_CATALOG.replace("/", "_")
@@ -87,16 +87,16 @@ rule download_mgnify_metadata:
         """
 
 
-# Both outputs are per-run: taxonomy.txt is a filtered projection (depends on
-# mgnify_taxonomy_filter + mgnify_max_genomes); representatives is the same
-# filtered set as accessions only. Keeping both per-run keeps Snakemake's
-# checkpoint "done?" check honest and avoids cross-run output collisions.
+# Both outputs are keyed by the genome set (catalog + filter + max_genomes), not
+# the run. parse_mgnify_metadata.py is deterministic for a given set, so runs
+# that share a set share these files, and the shared-cache rules downstream see
+# one stable input path rather than a new per-run one each time (#61).
 checkpoint parse_mgnify_metadata:
     input:
         metadata = MGNIFY_CACHE_METADATA
     output:
-        taxonomy        = os.path.join(MGNIFY_OUT, "taxonomy.txt"),
-        representatives = os.path.join(MGNIFY_OUT, "species_representatives.txt")
+        taxonomy        = mgnify_set_path("taxonomy.txt"),
+        representatives = mgnify_set_path("species_representatives.txt")
     params:
         taxonomy_filter = config.get("mgnify_taxonomy_filter", False),
         max_genomes     = config.get("mgnify_max_genomes", 0)
@@ -108,19 +108,12 @@ checkpoint parse_mgnify_metadata:
 
 # Genomes land in the shared cache — two runs requesting the same accession
 # Snakemake-dedupe to a single download.
+# No input: a genome depends only on its accession. Accessions are only ever
+# requested through checkpoint-gated lists (get_mgnify_genome_list and the
+# genome-list functions downstream), so nothing downloads before the checkpoint
+# fires. A per-run input here would be recorded in every cached genome's
+# provenance and make each new run re-download the whole catalog (#61).
 rule download_mgnify_genome:
-    input:
-        # ancient(): species_representatives.txt is a PER-RUN checkpoint output
-        # (regenerated with a fresh mtime every run) but the genome it gates
-        # lands in the SHARED, persistent cache. Without ancient() Snakemake's
-        # mtime rerun-trigger sees the freshly-stamped representatives file as
-        # "newer" than the cached .fna and re-downloads all ~4,744 genomes on
-        # every run that isn't the one which first populated the cache — which
-        # in turn invalidates the shared FGS/HMMER/LCA artifacts downstream.
-        # ancient() keeps the DAG edge (so the checkpoint still fires and the
-        # accession wildcards resolve) while ignoring the timestamp. The genome
-        # content depends only on the accession wildcard, so this is safe.
-        representatives = ancient(os.path.join(MGNIFY_OUT, "species_representatives.txt"))
     output:
         genome = os.path.join(MGNIFY_CACHE_GENOMES, "{accession}.fna")
     params:
@@ -166,6 +159,6 @@ rule mgnify_download_complete:
             os.path.join(MGNIFY_CACHE_GENOMES, "{acc}.fna"),
             acc=get_mgnify_genome_list()
         ),
-        taxonomy = os.path.join(MGNIFY_OUT, "taxonomy.txt")
+        taxonomy = mgnify_set_path("taxonomy.txt")
     output:
         touch(os.path.join(MGNIFY_OUT, ".mgnify_download_complete"))

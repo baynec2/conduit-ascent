@@ -57,7 +57,7 @@ def _mgnify_genome_path(genome):
 if config.get("genome_download_source") == "mgnify":
     checkpoint hapid_import_mgnify_genomes:
         input:
-            os.path.join(RUN_DIR, "genome_download/mgnify/species_representatives.txt")
+            mgnify_set_path("species_representatives.txt")
         output:
             os.path.join(HAPID_OUT_ROOT, "all_hapid_genomes.txt")
         log:
@@ -132,13 +132,13 @@ rule press_hapid_hmm_profiles:
 rule predict_orfs_with_fraggenescan:
     input:
         genome_fa = hapid_fasta_path,
-        # ancient(): .fastas_checked is a per-run sentinel (re-touched every run,
-        # transitively via .mgnify_download_complete) but this FAA lands in the
-        # SHARED per-genome cache. Without ancient() its fresh mtime re-runs
-        # FragGeneScan for all genomes every run. It's purely an ordering guard
-        # (ensures the genome FASTAs exist); the FAA content depends only on
-        # genome_fa, so ignoring its timestamp is safe.
-        fastas_ok = ancient(os.path.join(HAPID_DIR, ".fastas_checked"))
+        # Ordering guard for user-supplied genomes only (the FASTAs were
+        # checked); ancient() because the FAA content depends only on genome_fa.
+        # MGnify genomes skip it: their FAA lands in the SHARED per-genome cache,
+        # where this per-experiment path would be recorded as an input and make
+        # every new experiment re-run FragGeneScan for every genome (#61).
+        **({} if config.get("genome_download_source") == "mgnify"
+           else {"fastas_ok": ancient(os.path.join(HAPID_DIR, ".fastas_checked"))})
     output:
         os.path.join(HAPID_FGS_DIR, "{genome}.faa")
     params:
@@ -510,13 +510,13 @@ checkpoint run_greedy_genome_selection:
 
 
 # Enrich the greedy TSV with a `taxon_name` column. For MGnify-sourced
-# genomes the per-run taxonomy.txt already maps each accession to its GTDB
+# genomes the genome set's taxonomy.txt already maps each accession to its GTDB
 # species; for user-supplied genomes no taxonomy source exists so taxon_name
 # is left blank.
 def _hapid_annotate_inputs(wildcards=None):
     inputs = {"raw": os.path.join(HAPID_OUT_ROOT, "hapid_greedy_selection_raw.tsv")}
     if config.get("genome_download_source") == "mgnify":
-        inputs["taxonomy"] = os.path.join(RUN_DIR, "genome_download/mgnify/taxonomy.txt")
+        inputs["taxonomy"] = mgnify_set_path("taxonomy.txt")
     return inputs
 
 
