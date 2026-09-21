@@ -1,3 +1,10 @@
+# Everything here is consumed by Linux tooling (Snakemake + Apptainer), so keep LF
+# in the working tree on every platform, regardless of the local core.autocrlf.
+# Without this a Windows checkout writes CRLF and scripts invoked by path fail with
+#   /usr/bin/env: 'bash\r': No such file or directory   (exit 127)
+* text=auto eol=lf
+
+# Git LFS binaries: opted out of text conversion via -text.
 tests/data/sample1.raw filter=lfs diff=lfs merge=lfs -text
 tests/data/sample1.mzML filter=lfs diff=lfs merge=lfs -text
 tests/fixtures/peptidotyping_subset/*.tsv filter=lfs diff=lfs merge=lfs -text
