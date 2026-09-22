@@ -208,6 +208,14 @@ peptidotyping_resource_dir: "resources/peptidotyping/"
 # peptidotyping_resource_dir (CLAUDE.md); the test runner derives it from
 # PEPTIDOTYPING_RESOURCE_DIR if TAXONKIT_DB_DIR isn't set.
 taxonkit_db_dir: "resources/peptidotyping/taxonkit"
+# Scratch space for the UMGAP index build. Separate from the resource dir so
+# the index can live on bulk storage while scratch lives on fast storage.
+# GNU sort writes ~530 GB of spill files here in 4 KB units. On a native
+# filesystem that runs at ~4 GB/s. On a 9p/CIFS/NFS mount -- notably /mnt/c
+# under WSL, where each 4 KB write pays a 64 KB round trip -- it drops to
+# ~11 MB/s, turning hours into days. Set this to a LOCAL disk on such hosts,
+# e.g. --config peptidotyping_temp_dir=/var/tmp/conduit_peptidotyping_scratch
+peptidotyping_temp_dir: "resources/peptidotyping/temp"
 # Minimum diagnostic peptides per taxon required for it to enter the search database.
 min_taxon_db_peptides: 10
 
