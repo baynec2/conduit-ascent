@@ -155,6 +155,17 @@ download_and_parse_uniprot_tryptic() {
 
   have "$output_dir/taxons.tsv.lz4" || return
 
+  # conduit-ascent: skip when the peptide table is already present. The have()
+  # above is a PRECONDITION check ("do my inputs exist"), not a skip-if-done
+  # check, so without this any re-entry re-downloads all of SwissProt+TrEMBL
+  # (~9.5 h). That is not hypothetical: Snakemake deletes a failed job's
+  # declared outputs, so losing a sibling output such as taxons.tsv.lz4 forces
+  # this stage to re-run even when peptides-out.tsv.lz4 survived intact.
+  if [ -e "$temp_dir/peptides-out.tsv.lz4" ]; then
+    log "peptides-out.tsv.lz4 already present -- skipping download and parse."
+    return
+  fi
+
   log "Started generating the uniprot_entries file."
 
   download_uniprot "$db_types" \
