@@ -37,9 +37,16 @@ KMER_LENGTH=9
 UNIPEPT_TEMP_CONSTANT="unipept_temp"
 
 # conduit-ascent: which stage(s) to run. "all" (the default) preserves the
-# original end-to-end behaviour; "download" stops after the UniProt download
-# and parse; "index" starts at the sort. Set via the ONLY environment
-# variable so the two Snakemake rules can drive the halves independently.
+# original end-to-end behaviour. "taxa" builds only the taxon and lineage
+# tables; "download" only the UniProt download and parse; "index" starts at
+# the sort. Set via the ONLY environment variable so each Snakemake rule can
+# drive its own stage.
+#
+# taxa is separate from download for a DAG reason, not a tidiness one.
+# Snakemake removes a job's declared outputs before running it, so any rule
+# that owns BOTH taxons.tsv.lz4 and peptides-out.tsv.lz4 destroys the peptide
+# table whenever the taxon tables alone go missing -- and the peptide table
+# costs ~9.5 h to rebuild while the taxon tables cost minutes.
 ONLY="${ONLY:-all}"
 run_stage() { [ "$ONLY" = "all" ] || [ "$ONLY" = "$1" ]; }
 
@@ -154,17 +161,6 @@ download_and_parse_uniprot_tryptic() {
   local peptide_max_length="$6"
 
   have "$output_dir/taxons.tsv.lz4" || return
-
-  # conduit-ascent: skip when the peptide table is already present. The have()
-  # above is a PRECONDITION check ("do my inputs exist"), not a skip-if-done
-  # check, so without this any re-entry re-downloads all of SwissProt+TrEMBL
-  # (~9.5 h). That is not hypothetical: Snakemake deletes a failed job's
-  # declared outputs, so losing a sibling output such as taxons.tsv.lz4 forces
-  # this stage to re-run even when peptides-out.tsv.lz4 survived intact.
-  if [ -e "$temp_dir/peptides-out.tsv.lz4" ]; then
-    log "peptides-out.tsv.lz4 already present -- skipping download and parse."
-    return
-  fi
 
   log "Started generating the uniprot_entries file."
 
@@ -849,8 +845,10 @@ elif [[ "$MODE" == "tryptic" ]]; then
   parse_tryptic_arguments "$@"
   checkDirectoryAndCreate "$TEMP_DIR/$UNIPEPT_TEMP_CONSTANT"
   build_binaries "taxdmp-parser" "uniprot-parser-tryptic" "function-calculator" "lca-calculator"
-  if run_stage download; then
+  if run_stage taxa; then
     create_taxon_tables "$TEMP_DIR" "$UNIPEPT_TEMP_CONSTANT" "$OUTPUT_DIR"
+  fi
+  if run_stage download; then
     download_and_parse_uniprot_tryptic "$DB_TYPES" "$TEMP_DIR" "$UNIPEPT_TEMP_CONSTANT" "$OUTPUT_DIR" "$PEPTIDE_MIN_LENGTH" "$PEPTIDE_MAX_LENGTH"
   fi
   if run_stage index; then

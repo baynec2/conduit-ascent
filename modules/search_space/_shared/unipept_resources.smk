@@ -52,15 +52,60 @@ _PROLOGUE = r"""
 
 # This is needed to generate the file containing all peptides in TREMBL and
 # SWISSPROT and their LCAs. See https://github.com/unipept/unipept-database/issues/75
+rule build_taxon_tables:
+    """Minutes, from NCBI. Its own rule for a DAG reason, not tidiness.
+
+    Snakemake removes a job's declared outputs before running it. While these
+    lived alongside peptides-out.tsv.lz4 on one rule, losing the taxon tables
+    -- which happens whenever a downstream job fails, since Snakemake clears a
+    failed job's outputs -- destroyed the peptide table too, and with it ~9.5 h
+    of UniProt transfer, to rebuild something that costs minutes.
+    """
+    output:
+        taxons   = os.path.join(PT_RES, "taxons.tsv.lz4"),
+        lineages = os.path.join(PT_RES, "lineages.tsv.lz4")
+    params:
+        outdir      = PT_RES,
+        temp_outdir = PT_TMP,
+        script      = UMGAP_SH
+    benchmark:
+        os.path.join(PT_RES, "benchmarks/build_taxon_tables.tsv")
+    log:
+        os.path.join(PT_RES, "logs/build_taxon_tables.log")
+    container:
+        config["containers"]["umgap"]
+    shell:
+        _PROLOGUE + r"""
+        ONLY=taxa {params.script} tryptic \
+          --output-dir {params.outdir} \
+          --temp-dir {params.temp_outdir} \
+          >> {log} 2>&1
+        """
+
+
 rule download_uniprot_peptides:
+    input:
+        # ancient(): depend on the taxon tables EXISTING, not on their
+        # mtime. They are cheap to rebuild (~40 s) and Snakemake clears them
+        # whenever build_taxon_tables re-runs, which would otherwise count as
+        # "Updated input files" here and re-trigger ~9.5 h of UniProt
+        # transfer to reproduce a peptide table that is already on disk.
+        #
+        # The cost is real and worth stating: the parser assigns taxa from
+        # these tables, so a peptide table built against an older NCBI dump is
+        # not re-derived when the dump moves. Delete peptides-out.tsv.lz4 to
+        # force a fresh parse against current taxonomy.
+        taxons = ancient(rules.build_taxon_tables.output.taxons)
     output:
         # temp(): removed once build_sequence_index succeeds, but KEPT if it
         # fails -- so a failed index build resumes from here instead of
         # re-downloading SwissProt+TrEMBL. Lives directly in the temp dir, not
         # in its unipept_temp/ subdirectory, which the script's EXIT trap wipes.
+        #
+        # The taxon tables are deliberately NOT outputs here. Sharing a rule
+        # with them meant Snakemake cleared this file whenever they went
+        # missing, which is exactly when you most want to keep it.
         peptides = temp(os.path.join(PT_TMP, "peptides-out.tsv.lz4")),
-        taxons   = os.path.join(PT_RES, "taxons.tsv.lz4"),
-        lineages = os.path.join(PT_RES, "lineages.tsv.lz4"),
         entries  = os.path.join(PT_RES, "uniprot_entries.tsv.lz4"),
         relnotes = os.path.join(PT_RES, "relnotes.txt")
     params:
@@ -92,7 +137,7 @@ rule download_uniprot_peptides:
 rule build_sequence_index:
     input:
         peptides = rules.download_uniprot_peptides.output.peptides,
-        taxons   = rules.download_uniprot_peptides.output.taxons
+        taxons   = rules.build_taxon_tables.output.taxons
     output:
         sequences = os.path.join(PT_RES, "sequences.tsv.lz4")
     params:
