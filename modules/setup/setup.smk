@@ -11,6 +11,7 @@ RUN_DIR = config["run_dir"]
 # included module, so the path is built from the repo root, not from here.
 sys.path.insert(0, os.path.join(workflow.basedir, "modules", "_shared"))
 import diann_env
+from workflow_version import workflow_version
 
 DIANN_COMPAT_JSON = os.path.join(RUN_DIR, "logs/diann/diann_compatibility.json")
 DIANN_PROBE_RAW = os.path.join(RUN_DIR, "logs/diann/diann_compat_probe_raw.txt")
@@ -190,7 +191,7 @@ rule setup_diann_library_search_base_config:
         shutil.copy(params.selected_config, output.output_config_file)
 
 # Point-in-time reproducibility snapshot: resolved merged config + git SHA +
-# sample_annotation hash + cfg-file hashes + container tags.
+# workflow version + sample_annotation hash + cfg-file hashes + container tags.
 #
 # Runs inline on the host (no container) — Snakemake's `run:` directive
 # executes Python in the Snakemake process itself, which already has all
@@ -276,6 +277,7 @@ rule write_run_manifest:
 
         _manifest = {
             "workflow": {
+                "version": workflow_version(params.repo_root),
                 "git_sha": _git_sha,
                 "git_dirty": _git_dirty,
                 "timestamp_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
