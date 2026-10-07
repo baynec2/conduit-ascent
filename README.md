@@ -710,6 +710,13 @@ All outputs must be placed in `database_resources/`. If a file cannot be generat
 | `subcellular_locations.txt` | Subcellular location predictions |
 | `kegg_annotations.txt` | KEGG pathway annotations |
 
+## Versions
+
+Releases are tagged on `main` (`v0.1.0`, ...) and listed in [`CHANGELOG.md`](CHANGELOG.md).
+For a study, run a tagged release and keep the same one throughout. Each run records the
+version that produced it in `manifest.json` and in the `conduit` object's provenance; a
+run from an untagged commit records `0.1.0+<commit>` instead of the bare number.
+
 ## License
 
 conduit-ascent is released under the [MIT License](LICENSE), copyright © 2025-2026

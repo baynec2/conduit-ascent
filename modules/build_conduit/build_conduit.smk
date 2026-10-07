@@ -1,5 +1,12 @@
+import os
+import sys
+
 EXPERIMENT_DIR = config["experiment_dir"]
 RUN_DIR = config["run_dir"]
+
+# workflow.basedir is the repo root even inside an included module.
+sys.path.insert(0, os.path.join(workflow.basedir, "modules", "_shared"))
+from workflow_version import workflow_version
 
 
 def search_space_detection_inputs(wildcards):
@@ -106,7 +113,7 @@ rule build_conduit:
   input:
     unpack(build_conduit_inputs)
   params:
-    workflow_version  = open("VERSION").read().strip(),
+    workflow_version  = workflow_version(workflow.basedir),
     snakemake_version = __import__('snakemake').__version__
   output:
     conduit = os.path.join(
