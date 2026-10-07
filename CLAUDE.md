@@ -141,6 +141,30 @@ Bump any tag in `config/snakemake.yaml` whose SHA differs from the latest CI-pub
 
 If a Dockerfile commit predates the CI workflow being added (`184ad867`, 2026-04-06) and has no SHA-tagged image on Docker Hub — bakta, eggnogmapper, metaphlan, fraggenescan_hmmer at time of writing — either leave the existing manual tag (`:alpha`, `:2.1.12`) or trigger a CI rebuild by making a no-op change to the Dockerfile.
 
+## Versioning and Releases
+
+conduit-ascent uses [Semantic Versioning](https://semver.org/). Before 1.0.0, a minor bump may change config keys or output formats. 1.0.0 is reserved for the manuscript release, when config and outputs become a stability promise.
+
+- `VERSION` holds the release number (no `v` prefix). `CHANGELOG.md` has one entry per release.
+- Releases are cut from `main`, and only released code lands there. Day-to-day work merges into `develop` via PRs.
+- `modules/_shared/workflow_version.py` produces the version a run records, in `manifest.json` (`workflow.version`) and the `conduit` object's provenance. The bare number appears only when HEAD is the clean commit tagged `v<VERSION>`. Otherwise it is `<VERSION>+<sha7>`, with `.dirty` appended when there are uncommitted changes. **Don't bypass this by reading `VERSION` directly**, or development runs will pass for a release.
+
+### Cutting a release
+
+1. On a branch off `develop`: bump `VERSION`, add a `## [X.Y.Z] - YYYY-MM-DD` entry plus its link line at the bottom of `CHANGELOG.md`, and pin any container tags that changed (see the pre-flight above). PR it into `develop`.
+2. Open a PR `develop` → `main` titled `Release vX.Y.Z`, wait for the `dry-runs` CI, then merge it with a merge commit.
+3. Tag the merge commit on `main` and publish the release, using the changelog entry as the notes:
+
+```bash
+git fetch origin
+git tag -a vX.Y.Z -m "conduit-ascent X.Y.Z" origin/main
+git push origin vX.Y.Z
+awk '/^## \[X.Y.Z\]/{f=1;next} /^(## |\[X.Y.Z\]:)/{f=0} f' CHANGELOG.md > /tmp/notes.md
+gh release create vX.Y.Z --title "conduit-ascent X.Y.Z" --notes-file /tmp/notes.md --verify-tag
+```
+
+The tag must be on the exact merge commit. Runs from any other commit, including later `develop` commits, record `X.Y.Z+<sha>` until the next release.
+
 ## conduitR Package
 
 Located at `/home/nanopore-catalyst/conduitR`. An R package providing:
