@@ -21,7 +21,7 @@ Conduit is a scalable and modular workflow management system for metaproteomics 
 - **Container Support**: Full containerization via Apptainer. Run on any reasonable Linux machine.
 - **Named Runs**: Multiple analysis runs (e.g., different search space methods) can coexist within the same experiment directory via the `run_name` config parameter.
 - **Scalable**: Runs on a single machine or scales to HPC clusters via SLURM.
-- **Readable and modular**: every stage is a Snakemake rule you can read and adapt. See [License](#license) for the current licensing status.
+- **Readable and modular**: every stage is a Snakemake rule you can read and adapt. Released under the [MIT License](LICENSE).
 
 ## Dependencies
 
@@ -704,9 +704,8 @@ All outputs must be placed in `database_resources/`. If a file cannot be generat
 
 ## License
 
-> **Pending.** This repository does not yet carry a license file, so default copyright
-> applies until one is added. The license and copyright holder are being settled with
-> UC San Diego; this section will name them once they are.
+conduit-ascent is released under the [MIT License](LICENSE), copyright © 2025-2026
+Charlie Bayne.
 
 Third-party material copied into this repository — and the terms of the reference data
 the pipeline downloads — is inventoried in
