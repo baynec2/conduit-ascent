@@ -165,6 +165,17 @@ gh release create vX.Y.Z --title "conduit-ascent X.Y.Z" --notes-file /tmp/notes.
 
 The tag must be on the exact merge commit. Runs from any other commit, including later `develop` commits, record `X.Y.Z+<sha>` until the next release.
 
+4. Merge `main` back into `develop` through a PR, so the release merge commit is on both branches:
+
+```bash
+git checkout -b chore/sync-main-into-develop origin/develop
+git merge --no-ff origin/main -m "Merge main into develop after vX.Y.Z"
+git push -u origin chore/sync-main-into-develop
+gh pr create --base develop --title "Merge main into develop after vX.Y.Z" --body "Back-merge after the release."
+```
+
+After the back-merge, `git rev-list --count develop..origin/main` is 0, so a nonzero count means `main` really has something `develop` lacks. If in doubt, compare files with `git diff develop origin/main`.
+
 ## conduitR Package
 
 Located at `/home/nanopore-catalyst/conduitR`. An R package providing:
