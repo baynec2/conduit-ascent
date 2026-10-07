@@ -79,8 +79,8 @@ containers:
   # written into containers.diann by modules/_shared/diann_env.py.
   # 14165ea
   diann_runtime:      "docker://baynec2/diann_runtime@sha256:6f9bb07a6b00180edabac2a730ef51274e9e4b96c7e954666be9a1e5d7ff3bbb"
-  # 14165ea
-  bakta:              "docker://baynec2/bakta@sha256:39e81cde128d89f2f6675566d99388ae83f8804d59695fedcbd2a60f89d165d6"
+  # f65548d
+  bakta:              "docker://baynec2/bakta@sha256:cb9692a812b897b1001fa54b3b4f24484df330cdab1d583d69175e3595aafb81"
   # 14165ea
   metaphlan:          "docker://baynec2/metaphlan@sha256:079f46bb3f82f8491e04af6be1110b74b5aed3b675ddca98c4ff7d1660b9fcc5"
   # 14165ea
@@ -208,6 +208,14 @@ peptidotyping_resource_dir: "resources/peptidotyping/"
 # peptidotyping_resource_dir (CLAUDE.md); the test runner derives it from
 # PEPTIDOTYPING_RESOURCE_DIR if TAXONKIT_DB_DIR isn't set.
 taxonkit_db_dir: "resources/peptidotyping/taxonkit"
+# Scratch space for the UMGAP index build. Separate from the resource dir so
+# the index can live on bulk storage while scratch lives on fast storage.
+# GNU sort writes ~530 GB of spill files here in 4 KB units. On a native
+# filesystem that runs at ~4 GB/s. On a 9p/CIFS/NFS mount -- notably /mnt/c
+# under WSL, where each 4 KB write pays a 64 KB round trip -- it drops to
+# ~11 MB/s, turning hours into days. Set this to a LOCAL disk on such hosts,
+# e.g. --config peptidotyping_temp_dir=/var/tmp/conduit_peptidotyping_scratch
+peptidotyping_temp_dir: "resources/peptidotyping/temp"
 # Minimum diagnostic peptides per taxon required for it to enter the search database.
 min_taxon_db_peptides: 10
 

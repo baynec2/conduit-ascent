@@ -18,17 +18,16 @@ RUN mkdir -p /opt/bakta_db /work \
 # Switch back to the non-root micromamba user
 USER $MAMBA_USER
 
-# Install Bakta from bioconda/conda-forge only
-# Versions pinned to what the in-use image actually contains, verified by
-# inspecting /opt/conda/conda-meta in it — not chosen. An unpinned
-# `micromamba install` resolves afresh on every build, so two builds of an
-# identical Dockerfile produce different tools (see #68); for these packages a
-# version change moves results, not just the environment.
-RUN micromamba install -y -n base -c conda-forge -c bioconda \
-      bakta=1.12.0 \
-      diamond=2.1.24 \
-      blast=2.17.0 \
-      hmmer=3.4 \
+# Install Bakta 1.12.0 from an explicit lock: every package, build and sha256
+# of the environment that last ran correctly (baynec2/bakta:f5f961d). Pinning
+# only the top-level tools was not enough. The rebuild that 758609a pinned kept
+# bakta/diamond/blast/hmmer but re-resolved everything else: 121 of ~150
+# packages changed, and perl 5.32.1 build 8 came with a relative @INC, so
+# tRNAscan-SE, and with it every bakta run, died with "Can't locate strict.pm".
+# Change the lock only on purpose, from an image that has been validated:
+# `micromamba env export -n base --explicit`.
+COPY --chown=$MAMBA_USER:$MAMBA_USER conda-linux-64.lock /tmp/conda-linux-64.lock
+RUN micromamba install -y -n base --file /tmp/conda-linux-64.lock \
     && micromamba clean --all --yes
 
 # Set work directory

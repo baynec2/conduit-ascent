@@ -4,7 +4,9 @@ on:
   push:
     branches: [main, develop]
     paths:
-      - 'containers/*/Dockerfile'
+      # Anything in a container's directory: the Dockerfile or a file it COPYs
+      # (e.g. bakta's conda-linux-64.lock).
+      - 'containers/**'
   workflow_dispatch:
     inputs:
       containers:
@@ -51,10 +53,14 @@ jobs:
               done
             fi
           else
-            # push event: only rebuild Dockerfiles changed in this commit.
-            # --diff-filter=d drops deletions: a removed container (e.g. the
-            # DIA-NN image retired in #63) has no Dockerfile left to build.
-            files=$(git diff --name-only --diff-filter=d HEAD~1 HEAD -- 'containers/*/Dockerfile')
+            # push event: rebuild every image whose directory changed in this
+            # commit, whether the Dockerfile or a file it COPYs (e.g. bakta's
+            # conda-linux-64.lock). A removed container (e.g. the DIA-NN image
+            # retired in #63) has no Dockerfile left, so it is skipped.
+            files=$(git diff --name-only HEAD~1 HEAD -- 'containers/' \
+              | awk -F/ 'NF >= 3 { print "containers/" $2 "/Dockerfile" }' \
+              | sort -u \
+              | while IFS= read -r f; do if [ -f "$f" ]; then echo "$f"; fi; done)
           fi
           {
             echo 'files<<EOF'

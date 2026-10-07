@@ -44,8 +44,8 @@ def _mgnify_genome_path(genome):
     return os.path.join(_MGNIFY_CATALOG_ROOT, "genomes", f"{genome}.fna")
 
 def _mgnify_taxonomy_path():
-    # Per-run, NOT shared — see genomes.smk _mgnify_taxonomy_path docstring.
-    return os.path.join(RUN_DIR, "genome_download/mgnify/taxonomy.txt")
+    # Keyed by genome set and shared across runs — see mgnify_set_path().
+    return mgnify_set_path("taxonomy.txt")
 
 def _taxonomy_input():
     """Taxonomy source: shared cache when mgnify, experiment-local otherwise."""
@@ -55,11 +55,12 @@ def _taxonomy_input():
 
 def _cache_taxonomy_input():
     """Taxonomy input for rules whose OUTPUT lands in the SHARED per-genome-set
-    cache (GP_SET_DIR). For the mgnify case the taxonomy.txt is a per-run file
-    (regenerated every run with a fresh mtime), so wrap it in ancient() to stop
-    its timestamp from invalidating the shared LCA-peptide DBs. Content is safe:
-    the genome-set slug (catalog+filter+max) fixes which genomes — and thus
-    which taxonomy rows — the shared artifacts derive from."""
+    cache (GP_SET_DIR). For mgnify the path is shared too (mgnify_set_path), so
+    it is the same in every run. It is still wrapped in ancient(): the file is
+    rewritten with identical content whenever parse_mgnify_metadata re-runs
+    (e.g. after the metadata is re-downloaded), and that fresh mtime must not
+    rebuild the multi-GB LCA-peptide DBs. Content is safe: the genome-set slug
+    (catalog+filter+max) fixes which taxonomy rows the shared artifacts use."""
     t = _taxonomy_input()
     return ancient(t) if config.get("genome_download_source") == "mgnify" else t
 
@@ -69,7 +70,7 @@ def _cache_taxonomy_input():
 # module must own the checkpoints it consumes — we re-import the upstream
 # file by static path. (Same pattern as genomes.smk canonicalize_selected_genomes,
 # commit e2960561.)
-_MGNIFY_REPS_SRC = os.path.join(RUN_DIR, "genome_download/mgnify/species_representatives.txt")
+_MGNIFY_REPS_SRC = mgnify_set_path("species_representatives.txt")
 
 if config.get("genome_download_source") == "mgnify":
     checkpoint canonicalize_mgnify_representatives:
@@ -337,11 +338,13 @@ rule build_genome_peptidotyping_effective_detection_rank_db:
 rule generate_genome_peptidotyping_first_pass_speclib:
     input:
         fasta = os.path.join(GP_SET_DIR, "effective_first_pass_database.fasta"),
-        # ancient() when mgnify: the config snapshot is per-run but this speclib
-        # lands in the shared GP_SET_DIR cache — don't let the snapshot's fresh
-        # mtime rebuild the (expensive) predicted speclib every run. The fasta
-        # (also GP_SET_DIR) remains a real content dependency.
-        config_file = (ancient(os.path.join(RUN_DIR, "config/diann_spectral_library_base.cfg"))
+        # mgnify: the repo cfg, not the per-run snapshot. This speclib lands in
+        # the shared GP_SET_DIR cache, where a per-run input path would make
+        # every new run rebuild it (#61); hapid's
+        # create_hapid_profiling_spectral_library does the same. Local runs keep
+        # the snapshot, which also orders this rule after the DIA-NN
+        # compatibility check.
+        config_file = (config["diann_spectral_library_base_config"]
                        if config.get("genome_download_source") == "mgnify"
                        else os.path.join(RUN_DIR, "config/diann_spectral_library_base.cfg"))
     output:
