@@ -125,18 +125,15 @@ The main configuration file controls all aspects of the workflow. Below is a ful
 
 ```yaml
 containers:
-  conduitr:           "docker://baynec2/conduitr:a5cfeae"
-  diann_runtime:      "docker://baynec2/diann_runtime:<sha>"
-  bakta:              "docker://baynec2/bakta:f5f961d"
-  metaphlan:          "docker://baynec2/metaphlan:f5f961d"
-  eggnogmapper:       "docker://baynec2/eggnogmapper:f5f961d"
-  umgap:              "docker://baynec2/umgap:e46d512"
-  fraggenescan_hmmer: "docker://baynec2/fraggenescan_hmmer:f5f961d"
-  taxonkit:           "docker://quay.io/biocontainers/taxonkit:0.20.0--h9ee0642_1"
+  # <commit the image was built from>
+  conduitr: "docker://baynec2/conduitr@sha256:<digest>"
+  ...
 ```
 
-These point to the Docker/Apptainer images used for each tool. You generally do not need to
-change them unless you are pinning to a specific version or using a private registry.
+Each image is pinned by digest, so every run of a given conduit-ascent release uses
+exactly the same build; the comment above each entry names the commit it was built
+from. See `config/snakemake.yaml` for the current pins. You generally do not need to
+change them unless you are testing a new image or using a private registry.
 
 There is deliberately no `diann` key. DIA-NN is supplied by you (see
 [Obtaining DIA-NN](#obtaining-dia-nn)) and the workflow derives its container from
