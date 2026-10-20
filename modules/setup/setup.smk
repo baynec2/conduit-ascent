@@ -20,7 +20,48 @@ DIANN_PROBE_RAW = os.path.join(RUN_DIR, "logs/diann/diann_compat_probe_raw.txt")
 # guarantee it runs before any search — no need to touch 35 DIA-NN rules.
 DIANN_COMPAT_GATE = [DIANN_COMPAT_JSON] if config.get("diann_compat_gate") else []
 
-localrules: setup_diann_spectral_library_config, setup_diann_run_config, setup_peptidotyping_infinidia_config, setup_peptidotyping_standard_config, setup_hapid_infinidia_config, setup_diann_library_search_base_config, check_diann_compatibility, write_run_manifest
+localrules: setup_diann_spectral_library_config, setup_diann_run_config, setup_peptidotyping_infinidia_config, setup_peptidotyping_standard_config, setup_hapid_infinidia_config, setup_diann_library_search_base_config, check_diann_compatibility, write_run_manifest, stage_ms_run_subset
+
+################################################################################
+# MS run subsets
+################################################################################
+# When diann_empirical_lib_subset / search_space_run_subset is set, the DIA-NN
+# steps it covers read --dir from a directory of symlinks to just the selected
+# runs instead of input/ms_files. The selection itself is made at parse time
+# (modules/_shared/run_subset.py) and stored in config["_run_subsets"]; this rule
+# only materialises it. The symlinks keep each file's basename, and the staged
+# combine step finds .quant files by basename (--quant-ori-names), so it still
+# reuses the per-run .quant files produced from the original paths.
+#
+# The selected paths are a param, so changing the selection reruns this rule and
+# everything downstream of the subset directory.
+rule stage_ms_run_subset:
+    input:
+        raws = lambda w: config["_run_subsets"][w.subset]["raws"]
+    output:
+        ms_dir = directory(os.path.join(RUN_DIR, "ms_subsets/{subset}")),
+        selection = os.path.join(RUN_DIR, "ms_subsets/{subset}.selection.tsv")
+    wildcard_constraints:
+        subset = "diann_empirical_lib|search_space"
+    params:
+        samples = lambda w: config["_run_subsets"][w.subset]["samples"],
+        strata = lambda w: config["_run_subsets"][w.subset]["strata"],
+        spec = lambda w: config["_run_subsets"][w.subset]["spec"]
+    log: os.path.join(RUN_DIR, "logs/setup/stage_ms_run_subset.{subset}.log")
+    run:
+        import json
+        import shutil
+        shutil.rmtree(output.ms_dir, ignore_errors=True)
+        os.makedirs(output.ms_dir)
+        for raw in input.raws:
+            os.symlink(os.path.abspath(raw), os.path.join(output.ms_dir, os.path.basename(raw)))
+        with open(output.selection, "w") as f:
+            f.write(f"# spec: {json.dumps(dict(params.spec), sort_keys=True)}\n")
+            f.write("sample\tstratum\traw_path\n")
+            for sample, stratum, raw in zip(params.samples, params.strata, input.raws):
+                f.write(f"{sample}\t{stratum}\t{os.path.abspath(raw)}\n")
+        with open(log[0], "w") as f:
+            f.write(f"staged {len(input.raws)} runs into {output.ms_dir}\n")
 
 ################################################################################
 # DIA-NN compatibility check

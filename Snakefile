@@ -211,6 +211,29 @@ if missing_in_annotation:
 if missing_in_raw:
     raise ValueError(f"Files in sample annotation but no matching raw files: {', '.join(missing_in_raw)}")
 
+# Optional run subsets for DIA-NN steps that learn from the runs rather than
+# quantify them (empirical library build; organism-selection passes). Resolved
+# once here so every module sees the same selection; modules read it through
+# run_subset.run_subset_inputs. See modules/_shared/run_subset.py.
+import run_subset
+config["_run_subsets"] = run_subset.resolve_run_subsets(config, sample_df, SAMPLES, RAW_FILEPATHS)
+if config["_run_subsets"]["diann_empirical_lib"] and config.get("diann_search_mode", "standard") != "standard":
+    raise ValueError(
+        "diann_empirical_lib_subset needs diann_search_mode: standard — the InfiniDIA "
+        "main search is a single job that also quantifies every run, so it has no "
+        "separate library step to subset"
+    )
+_SELECTION_METHODS = {"unipept_peptidotyping", "unipept_hapiid", "hapiid", "genome_peptidotyping"}
+if config["_run_subsets"]["search_space"] and METHOD not in _SELECTION_METHODS:
+    raise ValueError(
+        f"search_space_run_subset has no effect for search_space_method '{METHOD}'; "
+        f"it applies to: {', '.join(sorted(_SELECTION_METHODS))}"
+    )
+for _name, _subset in config["_run_subsets"].items():
+    if _subset:
+        print(f"{run_subset.SUBSET_KEYS[_name]}: using {len(_subset['samples'])} of "
+              f"{len(SAMPLES)} runs: {', '.join(_subset['samples'])}", file=sys.stderr)
+
 ###############################################################################
 # Module Setup and Configuration
 ################################################################################

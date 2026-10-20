@@ -159,6 +159,25 @@ genome_peptidotyping_search_mode:  "infinidia"
 unipept_hapiid_search_mode:        "standard"
 hapiid_search_mode:                "standard"
 
+# --- Optional MS run subsets (null = use every run) ---
+# Bound DIA-NN memory on large cohorts by running steps that only *learn* from
+# the runs on a subset of them. See modules/_shared/run_subset.py.
+#   diann_empirical_lib_subset  stage 1 of the standard main search (empirical
+#                               library). Stages 2-3 still quantify every run.
+#                               Requires diann_search_mode: standard.
+#   search_space_run_subset     the organism-selection DIA-NN passes of
+#                               unipept_peptidotyping, unipept_hapiid, hapiid and
+#                               genome_peptidotyping (all passes, either mode).
+#                               An organism seen only in left-out runs never
+#                               enters the database — prefer a larger fraction.
+# Each takes either
+#   {fraction: 0.25, stratify_by: [col, ...], seed: 1}
+# (~fraction of all runs, spread over the strata of the sample_annotation columns
+# in proportion to size, >=1 per stratum; stratify_by and seed are optional) or
+# {samples: [name, ...]}.
+diann_empirical_lib_subset: null
+search_space_run_subset:    null
+
 # --- Host / target filtering (optional; applies to every method) ---
 # Append an extra UniProt proteome to the database (e.g., a host reference).
 # FALSE = none.  Examples: Human = UP000005640, Mouse C57/BL6 = UP000000589.
