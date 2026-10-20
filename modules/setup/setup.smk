@@ -11,6 +11,7 @@ RUN_DIR = config["run_dir"]
 # included module, so the path is built from the repo root, not from here.
 sys.path.insert(0, os.path.join(workflow.basedir, "modules", "_shared"))
 import diann_env
+import run_subset
 
 DIANN_COMPAT_JSON = os.path.join(RUN_DIR, "logs/diann/diann_compatibility.json")
 DIANN_PROBE_RAW = os.path.join(RUN_DIR, "logs/diann/diann_compat_probe_raw.txt")
@@ -26,12 +27,14 @@ localrules: setup_diann_spectral_library_config, setup_diann_run_config, setup_p
 # MS run subsets
 ################################################################################
 # When diann_empirical_lib_subset / search_space_run_subset is set, the DIA-NN
-# steps it covers read --dir from a directory of symlinks to just the selected
+# steps it covers read --dir from a directory of links to just the selected
 # runs instead of input/ms_files. The selection itself is made at parse time
 # (modules/_shared/run_subset.py) and stored in config["_run_subsets"]; this rule
-# only materialises it. The symlinks keep each file's basename, and the staged
-# combine step finds .quant files by basename (--quant-ori-names), so it still
-# reuses the per-run .quant files produced from the original paths.
+# only materialises it, as hard links (DIA-NN cannot read Thermo .raw through
+# a symlink; see run_subset.stage_runs). The links keep each file's basename,
+# and the staged combine step finds .quant files by basename
+# (--quant-ori-names), so it still reuses the per-run .quant files produced
+# from the original paths.
 #
 # The selected paths are a param, so changing the selection reruns this rule and
 # everything downstream of the subset directory.
@@ -52,9 +55,7 @@ rule stage_ms_run_subset:
         import json
         import shutil
         shutil.rmtree(output.ms_dir, ignore_errors=True)
-        os.makedirs(output.ms_dir)
-        for raw in input.raws:
-            os.symlink(os.path.abspath(raw), os.path.join(output.ms_dir, os.path.basename(raw)))
+        run_subset.stage_runs(input.raws, output.ms_dir)
         with open(output.selection, "w") as f:
             f.write(f"# spec: {json.dumps(dict(params.spec), sort_keys=True)}\n")
             f.write("sample\tstratum\traw_path\n")

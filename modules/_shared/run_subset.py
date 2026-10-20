@@ -32,6 +32,7 @@ proportion to their size with at least one per group, so no condition drops out
 same runs — Snakemake re-parses on every invocation,
 and an unseeded draw would invalidate the library each time.
 """
+import errno
 import math
 import os
 import random
@@ -180,8 +181,38 @@ def resolve_run_subsets(config, sample_df, samples, raw_filepaths):
     return resolved
 
 
+def stage_runs(raws, ms_dir):
+    """Populate ``ms_dir`` with links to ``raws``, keeping each basename.
+
+    Hard links, not symlinks: DIA-NN's Thermo .raw reader cannot open a .raw
+    through a symlink ("ThermoRaw exception: Instrument index not available ...
+    cannot load the file, skipping") and silently skips it, which empties the
+    whole search. Verified against DIA-NN 2.5.0 on 2026-10-19 — the same file
+    loads directly and via a hard link. A hard link needs both paths on one
+    filesystem; across filesystems, .mzML falls back to a symlink (verified
+    fine) and .raw raises rather than produce an empty search.
+    """
+    os.makedirs(ms_dir)
+    for raw in raws:
+        src = os.path.realpath(raw)
+        dst = os.path.join(ms_dir, os.path.basename(raw))
+        try:
+            os.link(src, dst)
+        except OSError as e:
+            if e.errno != errno.EXDEV:
+                raise
+            if src.lower().endswith(".raw"):
+                raise OSError(
+                    f"cannot hard-link {src} into {ms_dir}: different filesystems. "
+                    "DIA-NN cannot read Thermo .raw files through a symlink, so a "
+                    "run subset of .raw files needs the run directory on the same "
+                    "filesystem as input/ms_files."
+                ) from e
+            os.symlink(src, dst)
+
+
 def subset_ms_dir(run_dir, name):
-    """Directory of symlinks to the selected MS files, staged by the setup module."""
+    """Directory of links to the selected MS files, staged by the setup module."""
     return os.path.join(run_dir, "ms_subsets", name)
 
 

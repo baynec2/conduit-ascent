@@ -180,3 +180,42 @@ def test_subset_points_rules_at_staged_dir(tmp_path):
     assert ms_dir == "runs/r1/ms_subsets/search_space"
     assert out_raws == [f"{ms_dir}/s02.mzML", f"{ms_dir}/s05.mzML"]
     assert out_samples == ["s02", "s05"]
+
+
+# ---------------------------------------------------------------------------
+# Staging
+# ---------------------------------------------------------------------------
+def test_stage_runs_hard_links_and_resolves_symlinked_inputs(tmp_path):
+    real = tmp_path / "data" / "a.raw"
+    real.parent.mkdir()
+    real.write_bytes(b"raw")
+    ms_files = tmp_path / "ms_files"
+    ms_files.mkdir()
+    (ms_files / "a.raw").symlink_to(real)  # e.g. integration test ms_files
+    out = tmp_path / "subset"
+    run_subset.stage_runs([str(ms_files / "a.raw")], str(out))
+    staged = out / "a.raw"
+    # A hard link to the real file, not a symlink: DIA-NN cannot read .raw via symlinks.
+    assert not staged.is_symlink()
+    assert os.path.samefile(staged, real)
+
+
+def _cross_device(*_args, **_kwargs):
+    import errno
+    raise OSError(errno.EXDEV, "Invalid cross-device link")
+
+
+def test_stage_runs_raw_across_filesystems_raises(tmp_path, monkeypatch):
+    raw = tmp_path / "a.raw"
+    raw.write_bytes(b"raw")
+    monkeypatch.setattr(run_subset.os, "link", _cross_device)
+    with pytest.raises(OSError, match="different filesystems"):
+        run_subset.stage_runs([str(raw)], str(tmp_path / "subset"))
+
+
+def test_stage_runs_mzml_across_filesystems_falls_back_to_symlink(tmp_path, monkeypatch):
+    mzml = tmp_path / "a.mzML"
+    mzml.write_bytes(b"mzml")
+    monkeypatch.setattr(run_subset.os, "link", _cross_device)
+    run_subset.stage_runs([str(mzml)], str(tmp_path / "subset"))
+    assert (tmp_path / "subset" / "a.mzML").is_symlink()

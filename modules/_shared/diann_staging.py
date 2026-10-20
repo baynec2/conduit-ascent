@@ -14,7 +14,7 @@ a mismatch is not an error, DIA-NN just silently re-searches the run.
 
 Verified against DIA-NN 2.5.0 on 2026-10-19: a .quant written without the flag
 is byte-identical to one written with it, and combine reuses it (no "Main
-search") whether --dir is input/ms_files or a directory of symlinks to it.
+search") whether --dir is input/ms_files or a directory of links to it.
 """
 import glob
 import os
