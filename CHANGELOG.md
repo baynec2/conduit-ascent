@@ -4,9 +4,29 @@ All notable changes to conduit-ascent are recorded here. Versions follow
 [Semantic Versioning](https://semver.org/). Before 1.0.0, a minor version may change
 config keys or output formats; check this file before upgrading mid-study.
 
-## [0.1.1] - 2026-10-07
+## [0.1.1] - 2026-11-17
+
+### Added
+
+- Optional MS run subsets for the DIA-NN steps that learn from the runs rather than
+  quantify them, to bound memory on large cohorts. Two new config keys, both `null`
+  (every run) by default, so existing configs behave as before:
+  `diann_empirical_lib_subset` builds the empirical library from a subset (stages 2–3
+  still search and quantify every run), and `search_space_run_subset` runs the
+  organism-selection passes of `unipept_peptidotyping`, `unipept_hapiid`, `hapiid` and
+  `genome_peptidotyping` on a subset. Each takes `{fraction, stratify_by, seed}` or
+  `{samples: [...]}`; the selection is recorded in `ms_subsets/<name>.selection.tsv`
+  and `manifest.json`. An organism present only in left-out runs never enters the
+  database, so prefer a generous fraction. Subsets are staged as hard links, because
+  DIA-NN 2.5.0 cannot read a Thermo `.raw` through a symlink.
 
 ### Fixed
+
+- The staged DIA-NN combine step no longer re-searches every run. The workflow
+  mispredicted DIA-NN's `.quant` file names, and a mismatch is not an error: DIA-NN
+  silently searched each run again instead of reusing the per-run results. Combine
+  now passes `--quant-ori-names`. Results are unchanged; the per-run stage simply
+  stops being wasted work. Completed combine steps rerun once after upgrading.
 
 - The `conduitr` container is re-pinned to conduitR 0.1.0. v0.1.0 ran a conduitR
   build from July, which predates the `get_ncbi_taxonomy()` fix: for a proteome
