@@ -108,7 +108,7 @@ Signature: `calc_taxon_fdr(pep, taxon, decoy, peptide = NULL, qvalue_threshold =
 
 ### Container Strategy
 
-All container images are pinned to short-SHA tags in `config/snakemake.yaml` under the `containers:` block. Two CI workflows publish them:
+All container images are pinned **by digest** in `config/snakemake.yaml` under the `containers:` block, with the commit each image was built from in a comment above it. CI publishes short-SHA tags; you pin the digest of the tag you want. Two CI workflows publish them:
 
 - **conduitR** (`baynec2/conduitr`): published by `conduitR/.github/workflows/docker-publish.yml` on every push to `main`/`develop`. Tags emitted: `:latest` (main), `:develop` (develop), and `:<short-sha>` (immutable).
 - **In-repo containers** (diann, bakta, metaphlan, eggnogmapper, umgap, fraggenescan_hmmer): published by `.github/workflows/build-container-images.yml` on push to `main`/`develop` when a `containers/*/Dockerfile` changes. Only the immutable `:<short-sha>` tag is emitted (no rolling tag).
@@ -135,6 +135,9 @@ git -C /home/nanopore-catalyst/conduitR log --oneline --abbrev=7 develop -1
 
 # Verify a tag actually exists on Docker Hub before pinning (replace tool/sha):
 curl -s "https://hub.docker.com/v2/repositories/baynec2/umgap/tags?page_size=25" | python3 -c "import sys,json;print('\n'.join(t['name'] for t in json.load(sys.stdin)['results']))"
+
+# The digest to pin for a tag (the multi-arch index digest), e.g. conduitr at a commit:
+curl -s "https://hub.docker.com/v2/repositories/baynec2/conduitr/tags/<sha>" | python3 -c "import sys,json;print(json.load(sys.stdin)['digest'])"
 ```
 
 Bump any tag in `config/snakemake.yaml` whose SHA differs from the latest CI-published one. (Once things stabilize and Dockerfiles aren't changing, this becomes a rare check.)
@@ -151,7 +154,7 @@ conduit-ascent uses [Semantic Versioning](https://semver.org/). Before 1.0.0, a 
 
 ### Cutting a release
 
-1. On a branch off `develop`: bump `VERSION`, add a `## [X.Y.Z] - YYYY-MM-DD` entry plus its link line at the bottom of `CHANGELOG.md`, and pin any container tags that changed (see the pre-flight above). PR it into `develop`.
+1. On a branch off `develop`: bump `VERSION`, add a `## [X.Y.Z] - YYYY-MM-DD` entry plus its link line at the bottom of `CHANGELOG.md`, and pin any container images that changed (see the pre-flight above). **Re-pin `conduitr` to the image built from the latest conduitR release tag** (`git -C <conduitR> rev-parse --short=7 vA.B.C^{commit}` gives the image tag) — nothing else keeps that pin in step with conduitR, and ascent v0.1.0 shipped two months behind it. PR it into `develop`.
 2. Open a PR `develop` → `main` titled `Release vX.Y.Z`, wait for the `dry-runs` CI, then merge it with a merge commit.
 3. Tag the merge commit on `main` and publish the release, using the changelog entry as the notes:
 

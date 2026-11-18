@@ -71,8 +71,8 @@ sample_annotation: input/sample_annotation.txt
 # that needs versions pinned inside the Dockerfiles, which is tracked
 # separately. eggnog-mapper=2.1.12 is currently the only one that does it.
 containers:
-  # a5cfeae
-  conduitr:           "docker://baynec2/conduitr@sha256:919a3014f3177d1a70054b7cb0083a1ab726637831b3eae0ae01717a1fd45a59"
+  # f4df97b (conduitR v0.1.0)
+  conduitr:           "docker://baynec2/conduitr@sha256:dbc02c9f9c566d45ac8adc05c86eeb6b4b5b97f3e938aa728a51ae14b4a163dc"
   # Runtime deps (.NET 8, libgomp, locales) for a user-supplied DIA-NN — no
   # DIA-NN inside. There is deliberately no `diann` key here: the DIA-NN
   # container is resolved from `diann_path` at parse time (see below) and
