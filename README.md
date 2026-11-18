@@ -1,27 +1,37 @@
-# Conduit: A Modular Metaproteomics Analysis Platform
+# conduit-ascent: The Conduit Metaproteomics Workflow
 
-Conduit is a scalable and modular workflow management system for metaproteomics data analysis, designed to seamlessly integrate with metagenomic data if available. Built using Snakemake, it provides a robust pipeline for processing Data Independent Acquisition (DIA) mass spectrometry data with particular emphasis on metaproteomics applications.
+conduit-ascent is the Snakemake workflow at the core of the Conduit metaproteomics ecosystem. It turns raw Data Independent Acquisition (DIA) mass spectrometry files into quantified, taxonomically and functionally annotated protein and peptide matrices, and integrates metagenomic data when it is available.
 
-**Current version:** 0.1.0 (active development — not all features are finalized)
+### The Conduit ecosystem
+
+| Component | Role |
+|-----------|------|
+| **conduit-ascent** (this repository) | The Snakemake workflow: search-space selection, DIA-NN searches, annotation, and construction of the final `conduit` object |
+| [conduit-basecamp](https://github.com/baynec2/conduit-basecamp) | Desktop app for configuring and launching conduit-ascent without the command line, on Windows, macOS or Linux |
+| [conduit-summit](https://github.com/baynec2/conduit-summit) | Graphical interface for exploring and analysing conduit-ascent results |
+| [conduitR](https://github.com/baynec2/conduitR) | R package used by conduit-ascent and conduit-summit, for analysis in R |
+
+In this README, "conduit-ascent" means the workflow in this repository, and "Conduit" means the ecosystem as a whole.
 
 ## Features
 
 - **Search Space Definition**: Multiple strategies to define the protein search space for your experiment:
-    - **NCBI Taxonomy IDs**: Know what taxa are in your sample? Provide NCBI taxon IDs and Conduit handles the rest.
-    - **UniProt Proteome IDs**: Know specific proteome IDs? Conduit can build a search space directly from them.
+    - **NCBI Taxonomy IDs**: Know what taxa are in your sample? Provide NCBI taxon IDs and conduit-ascent handles the rest.
+    - **UniProt Proteome IDs**: Know specific proteome IDs? conduit-ascent can build a search space directly from them.
     - **Peptidotyping**: A first-pass DIA-NN search using species-specific peptides to identify which taxa are present, then builds a refined search space. Available against UniProt-derived peptides (`unipept_peptidotyping`), a HAPiID-style species-first variant (`unipept_hapiid`), or peptides digested from your own genomes with no UniProt lookup (`genome_peptidotyping`).
-    - **MetaPhlAn**: Have shotgun metagenomic data? Conduit runs MetaPhlAn profiling and uses the results to define the search space.
-    - **Genomes**: Have bacterial genome FASTAs (metagenome-assembled or reference)? Conduit uses Bakta to annotate them and builds the search space from the predicted proteins. Genomes can also be downloaded from an MGnify catalog instead of supplied by hand.
+    - **MetaPhlAn**: Have shotgun metagenomic data? conduit-ascent runs MetaPhlAn profiling and uses the results to define the search space.
+    - **Genomes**: Have bacterial genome FASTAs (metagenome-assembled or reference)? conduit-ascent uses Bakta to annotate them and builds the search space from the predicted proteins. Genomes can also be downloaded from an MGnify catalog instead of supplied by hand.
     - **HAPiID**: Marker-gene profiling across your genomes, then greedy selection of the smallest genome set covering most of the annotated spectra.
 - **DIA-NN Integration**: Automated, spectral-library-free processing of DIA data.
 - **Taxonomic Annotation**: Multi-level taxonomic classification of detected proteins.
 - **Functional Annotation**: GO term, KEGG pathway, Pfam domain, CAZy, and eggNOG-mapper annotations.
 - **R Integration**: Direct integration with R for statistical analysis and visualization via [conduitR](https://github.com/baynec2/conduitR).
-- **Conduit GUI**: Explore results without writing code using [Conduit-GUI](https://github.com/baynec2/conduit-GUI).
-- **Container Support**: Full containerization via Apptainer. Run on any reasonable Linux machine.
+- **Launch from conduit-basecamp**: Configure and run the workflow from a desktop app, [conduit-basecamp](https://github.com/baynec2/conduit-basecamp), on Windows, macOS or Linux.
+- **Explore results in conduit-summit**: Explore results without writing code using [conduit-summit](https://github.com/baynec2/conduit-summit).
+- **Container Support**: Full containerization via Apptainer.
 - **Named Runs**: Multiple analysis runs (e.g., different search space methods) can coexist within the same experiment directory via the `run_name` config parameter.
 - **Scalable**: Runs on a single machine or scales to HPC clusters via SLURM.
-- **Readable and modular**: every stage is a Snakemake rule you can read and adapt. See [License](#license) for the current licensing status.
+- **Readable and modular**: every stage is a Snakemake rule you can read and adapt. Released under the [MIT License](LICENSE).
 
 ## Dependencies
 
@@ -31,9 +41,9 @@ Conduit is a scalable and modular workflow management system for metaproteomics 
 - Apptainer/Singularity (≥1.1.0)
 - **DIA-NN** — you download this yourself; see [Obtaining DIA-NN](#obtaining-dia-nn)
 
-All other dependencies (R, Python, MetaPhlAn, Bakta, eggNOG-mapper, etc.) are handled automatically via Apptainer containers. You only need Snakemake, Apptainer, and your own copy of DIA-NN on your **Linux** system.
+All other dependencies (R, Python, MetaPhlAn, Bakta, eggNOG-mapper, etc.) are handled automatically via Apptainer containers. To run the workflow directly from the command line, you need Snakemake, Apptainer, and your own copy of DIA-NN on a **Linux** system.
 
-> **Note:** Conduit does not run on macOS. Windows is not recommended but may work without containers.
+> **Note:** On Windows or macOS, use [conduit-basecamp](https://github.com/baynec2/conduit-basecamp), which runs conduit-ascent for you.
 
 ### Hardware Requirements
 
@@ -61,7 +71,7 @@ cd conduit-ascent
 
 ### 2b. Obtain DIA-NN
 
-Conduit does not ship DIA-NN. Download it, unzip it into `resources/diann/`, and you
+conduit-ascent does not ship DIA-NN. Download it, unzip it into `resources/diann/`, and you
 are done — see [Obtaining DIA-NN](#obtaining-dia-nn) for the details, including why the
 download URL says `2.0` no matter which version you are fetching.
 
@@ -101,7 +111,7 @@ Outputs are written to `experiments/your_experiment/runs/{run_name}/`.
 
 ### 5. Explore your results
 
-Use `experiments/your_experiment/runs/{run_name}/output_files/{experiment}_{run_name}_conduit.rds` as input to [Conduit-GUI](https://github.com/baynec2/conduit-GUI) or [conduitR](https://github.com/baynec2/conduitR).
+Use `experiments/your_experiment/runs/{run_name}/output_files/{experiment}_{run_name}_conduit.rds` as input to [conduit-summit](https://github.com/baynec2/conduit-summit) or [conduitR](https://github.com/baynec2/conduitR).
 
 ### 6. Repeat for additional experiments or runs
 
@@ -145,7 +155,7 @@ before starting a large run during active development.
 
 | Parameter | Description |
 |-----------|-------------|
-| `experiment` | **Required.** Name of the experiment. Must match the name of the directory under `experiments/`. Conduit uses this to locate all input files and write all outputs. |
+| `experiment` | **Required.** Name of the experiment. Must match the name of the directory under `experiments/`. conduit-ascent uses this to locate all input files and write all outputs. |
 | `run_name` | **Required.** Name for this specific analysis run. Outputs are written to `experiments/{experiment}/runs/{run_name}/`. Use this to run the same experiment with different methods or settings without overwriting prior results. |
 | `sample_annotation` | Path (relative to the experiment directory) to the sample annotation file. Defaults to `input/sample_annotation.txt`. Maps MS file names (without extension) to sample metadata via a required `file` column. **Effectively fixed:** `build_conduit.smk` hardcodes the default path and ignores this key, so overriding it passes the Snakefile's checks and then fails downstream. |
 | `diann_search_mode` | `standard` (default) or `infinidia`. `standard` runs a three-stage library / per-file / combine search; `infinidia` runs a single monolithic search with `--pre-search --pre-filter`. Also decides whether a predicted spectral library is built at all. |
@@ -227,8 +237,6 @@ no error.
 
 #### Peptidotyping-Specific Parameters
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
 Applies to `unipept_peptidotyping` and `genome_peptidotyping`. Both methods run two
 detection passes, and every key below exists once per pass — the first-pass name is given
 here, and the second-pass twin is the same name with `second` in place of `first` (e.g.
@@ -302,7 +310,7 @@ at different stages and stack.
 
 ### Resource Configuration
 
-These parameters point to large reference databases that Conduit needs for certain methods. If the files already exist at the specified paths on your system, Conduit will use them directly. Otherwise, Conduit will download them automatically when required.
+These parameters point to large reference databases that conduit-ascent needs for certain methods. If the files already exist at the specified paths on your system, conduit-ascent will use them directly. Otherwise, conduit-ascent will download them automatically when required.
 
 | Parameter | Default Path | Approx. Size | Description |
 |-----------|-------------|-------------|-------------|
@@ -328,7 +336,7 @@ the experiment config. See `profiles/nanopore-catalyst/config.yaml` for a worked
 
 ## Obtaining DIA-NN
 
-Conduit does not distribute DIA-NN, and no Conduit container contains it.
+conduit-ascent does not distribute DIA-NN, and none of its containers contains it.
 
 DIA-NN's licence permits **one copy for backup purposes** and forbids renting, leasing,
 lending, or sublicensing the software. Publishing a public registry image with the binary
@@ -358,7 +366,7 @@ free for academic use; commercial use requires a licence from its authors.
 >   --jq '.assets[].name | select(test("Academia-Linux"))'
 > ```
 >
-> Taking the release title at face value lands you on 2.0, which Conduit rejects as below
+> Taking the release title at face value lands you on 2.0, which conduit-ascent rejects as below
 > the 2.2 minimum.
 
 Tested versions: **2.3.0** and **2.5.0**. Anything below **2.2** is rejected — earlier
@@ -389,7 +397,7 @@ which gives the default layout, so nothing else needs configuring:
 
 ```
 resources/diann/diann-2.5.0/
-├── diann-linux                      # the CLI Conduit invokes
+├── diann-linux                      # the CLI conduit-ascent invokes
 ├── libtorch_cpu.so, libc10.so, ...  # bundled, found via RUNPATH=$ORIGIN
 └── models/
 ```
@@ -440,14 +448,14 @@ have to capture what actually executed.
 
 They are **basic structural checks**, and it is worth being clear about their limits.
 
-They confirm that a given DIA-NN *runs*, that it understands every flag Conduit passes, and
-that its report carries the columns Conduit reads. They say nothing about whether it
+They confirm that a given DIA-NN *runs*, that it understands every flag conduit-ascent passes, and
+that its report carries the columns conduit-ascent reads. They say nothing about whether it
 produces the **same numbers** as the version you used last. A release can change scoring,
 FDR estimation, RT modelling, or quantification and still pass every check here without a
 warning — the interface is identical, the science is not.
 
 DIA-NN releases often — twelve Linux builds since 2.0 — and we do not test every one.
-"Tested" means someone ran Conduit end to end on that version and was satisfied with the
+"Tested" means someone ran conduit-ascent end to end on that version and was satisfied with the
 result; it is a short list, maintained by hand in `DIANN_TESTED_VERSIONS`
 (`modules/_shared/diann_env.py`). An untested version that passes the checks gets a
 **warning, not a blessing**: it means "nothing structural is wrong", not "this is known to
@@ -476,7 +484,7 @@ Two practical consequences:
 ```
 conduit-ascent/
 ├── Snakefile                         # Main workflow orchestration
-├── VERSION                           # Current version
+├── VERSION                           # Version number
 ├── config/                           # Default configuration files (templates)
 │   ├── snakemake.yaml                # Main config template
 │   ├── generate_diann_spectral_library.cfg
@@ -498,7 +506,7 @@ conduit-ascent/
 │   │   ├── genomes/                  # Bakta + UniProt annotation for genome proteins
 │   │   ├── eggnogmapper/             # eggNOG-mapper functional annotation
 │   │   └── external_annotations/     # KEGG, Pfam, CAZy annotations
-│   └── build_conduit/                # Builds final Conduit RDS object
+│   └── build_conduit/                # Builds the final `conduit` RDS object
 ├── containers/                       # Apptainer/Docker container definitions
 │   ├── bakta/
 │   ├── conduitR/
@@ -539,18 +547,18 @@ All outputs for a run are written to `experiments/{experiment}/runs/{run_name}/`
 | `database_resources/proteome_ids.txt` | UniProt proteome IDs included in the database |
 | `database_resources/database.predicted.speclib` | DIA-NN predicted spectral library |
 | `database_resources/detected_protein_resources/` | Proteins detected by DIA-NN and their annotations |
-| `output_files/{experiment}_{run_name}_conduit.rds` | Final Conduit R object for use with conduitR or Conduit-GUI |
+| `output_files/{experiment}_{run_name}_conduit.rds` | Final `conduit` R object for use with conduitR or conduit-summit |
 
-## Running Conduit on Barnacle2 (Knight Lab HPC)
+## Running conduit-ascent on Barnacle (Knight Lab HPC)
 
-These instructions are for Knight Lab members running Conduit on Barnacle2 via SLURM. They can be adapted to other SLURM-based HPC systems.
+These instructions are for Knight Lab members running conduit-ascent on Barnacle via SLURM. They can be adapted to other SLURM-based HPC systems.
 
 > For tutorial purposes you will also need files in `experiments/example/input/database_resources` and `experiments/example/input/ms_files`. Contact baynec2 directly for these files.
 
 ### 1. Login
 
 ```bash
-ssh <username>@barnacle2.ucsd.edu
+ssh <username>@barnacle.ucsd.edu
 ```
 
 ### 2. Clone the repository onto scratch
@@ -568,7 +576,7 @@ cd conduit-ascent
 
 ### 3. Install Miniforge and create the Snakemake environment
 
-Barnacle2 has **no conda/Miniforge module** (`module avail` lists only tools like
+Barnacle has **no conda/Miniforge module** (`module avail` lists only tools like
 `singularity_3.6.4`), so install Miniforge yourself, into `$HOME` — a Miniforge
 install plus this env is small (a few hundred MB), and `$HOME` is backed up and
 mounted on the compute nodes. Miniforge defaults to the conda-forge channel and
@@ -584,7 +592,7 @@ mamba --version                                  # sanity check
 ```
 
 Then create a dedicated environment with Snakemake and the SLURM executor plugin.
-Don't install singularity/apptainer into it — Barnacle2 has Singularity installed
+Don't install singularity/apptainer into it — Barnacle has Singularity installed
 system-wide (`/usr/bin/singularity`, SingularityCE 4.x), so keeping it out of the
 env leaves that system Singularity on `PATH` (on every node, no module needed).
 
@@ -596,12 +604,12 @@ snakemake --version                      # sanity check
 ```
 
 The `snakemake-executor-plugin-slurm` package is what lets Snakemake submit each
-pipeline rule as its own SLURM job (see `profiles/barnacle2/`), rather than
+pipeline rule as its own SLURM job (see `profiles/barnacle/`), rather than
 running everything inside one large allocation.
 
 ### 4. Run the workflow
 
-The `profiles/barnacle2/` profile uses the SLURM **executor**: Snakemake itself
+The `profiles/barnacle/` profile uses the SLURM **executor**: Snakemake itself
 submits each rule as its own SLURM job. The Snakemake process is lightweight (it
 just submits and polls jobs), so run it directly from a login node inside a
 `tmux`/`screen` session so it survives your SSH disconnecting.
@@ -621,7 +629,7 @@ mkdir -p "$XDG_CACHE_HOME" "$TMPDIR"
 
 # --- launch the workflow ---
 snakemake \
-  --profile profiles/barnacle2 \
+  --profile profiles/barnacle \
   --configfile experiments/<exp>/config/<method>.yaml
 ```
 
@@ -632,7 +640,7 @@ per-rule logs under `runs/{run_name}/logs/` (workflow) and
 
 The profile caps concurrent SLURM jobs at 50, lets each job use up to a full
 node (64 cores), and scales memory at ~8 GB/core (capped ~24 GB below the node's
-514 GB). Walltime is left to barnacle2's partition default — `short` allows 14
+514 GB). Walltime is left to barnacle's partition default — `short` allows 14
 days, which covers even the multi-day peptidotyping resource rebuild. After a
 run, the `benchmarks/*.tsv` files record each rule's real peak memory and
 runtime; use them to tighten the `set-resources` values in the profile.
@@ -702,11 +710,17 @@ All outputs must be placed in `database_resources/`. If a file cannot be generat
 | `subcellular_locations.txt` | Subcellular location predictions |
 | `kegg_annotations.txt` | KEGG pathway annotations |
 
+## Versions
+
+Releases are tagged on `main` (`v0.1.0`, ...) and listed in [`CHANGELOG.md`](CHANGELOG.md).
+For a study, run a tagged release and keep the same one throughout. Each run records the
+version that produced it in `manifest.json` and in the `conduit` object's provenance; a
+run from an untagged commit records `0.1.0+<commit>` instead of the bare number.
+
 ## License
 
-> **Pending.** This repository does not yet carry a license file, so default copyright
-> applies until one is added. The license and copyright holder are being settled with
-> UC San Diego; this section will name them once they are.
+conduit-ascent is released under the [MIT License](LICENSE), copyright © 2025-2026
+Charlie Bayne.
 
 Third-party material copied into this repository — and the terms of the reference data
 the pipeline downloads — is inventoried in
@@ -714,7 +728,7 @@ the pipeline downloads — is inventoried in
 
 ## Acknowledgments
 
-Conduit would not be possible without the great work of many people.
+conduit-ascent would not be possible without the great work of many people.
 
 - Snakemake developers
 - DIA-NN developers
