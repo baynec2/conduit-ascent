@@ -25,6 +25,14 @@ from diann_staging import (
 
 RAW_FILEPATHS = list_raw_files(EXPERIMENT_DIR)
 SAMPLES = list_samples(EXPERIMENT_DIR)
+
+# DIA-NN passes here only select organisms, so they may run on a subset of the
+# MS runs (search_space_run_subset); with none configured these are the
+# experiment's own ms_files dir and every run. See modules/_shared/run_subset.py.
+from run_subset import run_subset_inputs
+MS_DIR, RAW_FILEPATHS, SAMPLES = run_subset_inputs(
+    config, "search_space", EXPERIMENT_DIR, RUN_DIR, RAW_FILEPATHS, SAMPLES
+)
 # Three tiers of cacheability — see _shared/genome_cache.smk:
 #   HAPID_FGS_DIR    — per-genome (FragGeneScan FAA depends only on a single genome)
 #   HAPID_HMMER_DIR  — per-genome (HMMER tblout depends only on FAA + HMM profiles)
@@ -311,7 +319,7 @@ if config.get("hapid_search_mode", "standard") == "standard":
 
     rule genome_hapid_build_empirical_lib:
         input:
-            raw_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files"),
+            raw_dir = MS_DIR,
             speclib = os.path.join(HAPID_SET_DIR, "marker_gene.predicted.speclib"),
             fasta   = marker_gene_db_path,
             cfg     = os.path.join(RUN_DIR,"config/diann_library_search_base.cfg")
@@ -393,7 +401,7 @@ if config.get("hapid_search_mode", "standard") == "standard":
             empirical_lib = os.path.join(HAPID_OUT_ROOT, "marker_gene_empirical.parquet"),
             fasta = marker_gene_db_path,
             cfg = os.path.join(RUN_DIR,"config/diann_library_search_base.cfg"),
-            raw_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files")
+            raw_dir = MS_DIR
         output:
             os.path.join(HAPID_OUT_ROOT, "marker_gene_profiling_report.parquet")
         params:
@@ -422,6 +430,7 @@ if config.get("hapid_search_mode", "standard") == "standard":
                 --fasta {input.fasta} \
                 --temp {params.tmpdir} \
                 --use-quant \
+                --quant-ori-names \
                 --out {params.out_prefix} \
                 --cut "K*,R*" \
                 --missed-cleavages 1 \
@@ -436,7 +445,7 @@ else:  # infinidia — monolithic
 
     rule genome_hapid_monolithic:
         input:
-            raw_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files"),
+            raw_dir = MS_DIR,
             fasta   = marker_gene_db_path,
             cfg     = os.path.join(RUN_DIR,"config/hapid_infinidia.cfg")
         output:
