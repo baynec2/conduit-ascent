@@ -16,6 +16,14 @@ from diann_staging import (
 RAW_FILEPATHS = list_raw_files(EXPERIMENT_DIR)
 SAMPLES = list_samples(EXPERIMENT_DIR)
 
+# Stage 1 only builds the empirical library, so it may read a subset of the runs
+# (diann_empirical_lib_subset); stages 2 and 3 always search and quantify every
+# run. With no subset configured this is the experiment's ms_files dir.
+from run_subset import run_subset_inputs
+EMPIRICAL_LIB_MS_DIR, _, _ = run_subset_inputs(
+    config, "diann_empirical_lib", EXPERIMENT_DIR, RUN_DIR, RAW_FILEPATHS, SAMPLES
+)
+
 DIANN_OUT = os.path.join(RUN_DIR, "diann_output")
 DIANN_QUANTS = os.path.join(DIANN_OUT, "quant_files")
 #################################################################################
@@ -65,7 +73,7 @@ if config.get("diann_search_mode", "standard") == "standard":
 
     rule run_diann_build_empirical_lib:
         input:
-            raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
+            raw_files_dir = EMPIRICAL_LIB_MS_DIR,
             spectral_library = os.path.join(RUN_DIR,"database_resources/database.predicted.speclib"),
             fasta = os.path.join(RUN_DIR,"database_resources/database.fasta"),
             config_file = os.path.join(RUN_DIR,"config/run_diann.cfg")
@@ -170,6 +178,7 @@ if config.get("diann_search_mode", "standard") == "standard":
             --fasta {input.fasta} \
             --temp {params.tmpdir} \
             --use-quant \
+            --quant-ori-names \
             --out {params.out_prefix} \
             --threads {threads} --verbose 1 >> {log} 2>&1
             rm -rf {params.tmpdir}

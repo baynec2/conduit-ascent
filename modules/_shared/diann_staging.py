@@ -2,19 +2,22 @@
 
 The DIA-NN search modules are split into three stages: build empirical library,
 per-raw search (MBR off, conventional engine), combine via --use-quant. These
-helpers handle (a) enumerating MS files for the per-raw fan-out and (b) bridging
-between Snakemake's canonical {sample}.quant output paths and DIA-NN's
-mangled-path .quant filenames.
+helpers handle (a) enumerating MS files for the per-raw fan-out and (b) staging
+the per-raw {sample}.quant outputs where the combine stage's DIA-NN looks for
+them.
 
-DIA-NN names .quant files by mangling the absolute path of the raw file:
-non-alphanumeric chars become '_', then '.quant' is appended.
+The combine stage passes --quant-ori-names, under which DIA-NN looks for each
+run's .quant as <temp>/<raw basename without extension>.quant — the same name
+the per-raw rules give their output. Without it DIA-NN mangles the raw path *as
+passed* (relative, '/' and '.' -> '_', '-' kept), which is easy to mispredict:
+a mismatch is not an error, DIA-NN just silently re-searches the run.
 
-Verified against baynec2/diann:f5f961d (DIA-NN 2.5.0) on 2026-05-08:
-    /work/raw/sample1.mzML  ->  _work_raw_sample1_mzML.quant
+Verified against DIA-NN 2.5.0 on 2026-10-19: a .quant written without the flag
+is byte-identical to one written with it, and combine reuses it (no "Main
+search") whether --dir is input/ms_files or a directory of links to it.
 """
 import glob
 import os
-import re
 
 _QUANT_SUFFIX = ".quant"
 
@@ -42,17 +45,13 @@ def raw_path_for_sample(experiment_dir, sample):
     )
 
 
-def diann_quant_filename(abs_raw_path):
-    return re.sub(r"[^A-Za-z0-9]", "_", abs_raw_path) + _QUANT_SUFFIX
-
-
 def stage3_symlink_commands(combine_temp_dir, raws, quant_files_dir):
-    """`&&`-joined `ln -sf` chain: stage canonical {sample}.quant files into
-    DIA-NN's expected mangled-path layout in combine_temp_dir for --use-quant."""
+    """`&&`-joined `ln -sf` chain: link each canonical {sample}.quant into
+    combine_temp_dir for --use-quant --quant-ori-names."""
     cmds = []
     for raw in raws:
         sample = os.path.splitext(os.path.basename(raw))[0]
         src = os.path.abspath(os.path.join(quant_files_dir, sample + _QUANT_SUFFIX))
-        dst = os.path.join(combine_temp_dir, diann_quant_filename(os.path.abspath(raw)))
+        dst = os.path.join(combine_temp_dir, sample + _QUANT_SUFFIX)
         cmds.append(f"ln -sf {src} {dst}")
     return " && ".join(cmds) if cmds else "true"

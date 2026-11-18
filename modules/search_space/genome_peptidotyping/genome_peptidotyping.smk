@@ -23,6 +23,14 @@ from diann_staging import (
 RAW_FILEPATHS = list_raw_files(EXPERIMENT_DIR)
 SAMPLES = list_samples(EXPERIMENT_DIR)
 
+# DIA-NN passes here only select organisms, so they may run on a subset of the
+# MS runs (search_space_run_subset); with none configured these are the
+# experiment's own ms_files dir and every run. See modules/_shared/run_subset.py.
+from run_subset import run_subset_inputs
+MS_DIR, RAW_FILEPATHS, SAMPLES = run_subset_inputs(
+    config, "search_space", EXPERIMENT_DIR, RUN_DIR, RAW_FILEPATHS, SAMPLES
+)
+
 # Output directories for genome peptidotyping intermediate files.
 #
 # Three tiers of cacheability — see _shared/genome_cache.smk for the layout:
@@ -404,7 +412,7 @@ if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard":
 
     rule genome_peptidotyping_first_pass_build_empirical_lib:
         input:
-            raw_files_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files"),
+            raw_files_dir = MS_DIR,
             fasta = os.path.join(GP_SET_DIR, "effective_first_pass_database.fasta"),
             spectral_library = os.path.join(GP_SET_DIR, "first_pass_database.predicted.speclib"),
             config_file = os.path.join(RUN_DIR,"config/peptidotyping_standard.cfg")
@@ -473,7 +481,7 @@ if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard":
             empirical_lib = os.path.join(GP_RESOURCE_DIR, "first_pass_empirical.parquet"),
             fasta = os.path.join(GP_SET_DIR, "effective_first_pass_database.fasta"),
             config_file = os.path.join(RUN_DIR,"config/peptidotyping_standard.cfg"),
-            raw_files_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files")
+            raw_files_dir = MS_DIR
         output:
             first_pass_diann_parquet = os.path.join(GP_RESOURCE_DIR, "first_pass_diann.parquet")
         params:
@@ -500,6 +508,7 @@ if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard":
                 --fasta {input.fasta} \
                 --temp {params.tmpdir} \
                 --use-quant \
+                --quant-ori-names \
                 --out {params.out_prefix} \
                 --threads {threads} --verbose 1 >> {log} 2>&1
             rm -rf {params.tmpdir}
@@ -509,7 +518,7 @@ else:  # infinidia — monolithic
 
     rule genome_peptidotyping_first_pass_monolithic:
         input:
-            raw_files_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files"),
+            raw_files_dir = MS_DIR,
             fasta = os.path.join(GP_SET_DIR, "effective_first_pass_database.fasta"),
             config_file = os.path.join(RUN_DIR,"config/peptidotyping_infinidia.cfg")
         output:
@@ -613,7 +622,7 @@ if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard":
 
     rule genome_peptidotyping_second_pass_build_empirical_lib:
         input:
-            raw_files_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files"),
+            raw_files_dir = MS_DIR,
             fasta         = os.path.join(GP_RESOURCE_DIR, "second_pass_database.fasta"),
             spectral_library = os.path.join(GP_RESOURCE_DIR, "second_pass_database.predicted.speclib"),
             config_file = os.path.join(RUN_DIR,"config/peptidotyping_standard.cfg")
@@ -682,7 +691,7 @@ if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard":
             empirical_lib = os.path.join(GP_RESOURCE_DIR, "second_pass_empirical.parquet"),
             fasta = os.path.join(GP_RESOURCE_DIR, "second_pass_database.fasta"),
             config_file = os.path.join(RUN_DIR,"config/peptidotyping_standard.cfg"),
-            raw_files_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files")
+            raw_files_dir = MS_DIR
         output:
             second_pass_diann_parquet = os.path.join(GP_RESOURCE_DIR, "second_pass_diann.parquet")
         params:
@@ -709,6 +718,7 @@ if config.get("genome_peptidotyping_search_mode", "infinidia") == "standard":
                 --fasta {input.fasta} \
                 --temp {params.tmpdir} \
                 --use-quant \
+                --quant-ori-names \
                 --out {params.out_prefix} \
                 --threads {threads} --verbose 1 >> {log} 2>&1
             rm -rf {params.tmpdir}
@@ -718,7 +728,7 @@ else:  # infinidia — monolithic
 
     rule genome_peptidotyping_second_pass_monolithic:
         input:
-            raw_files_dir = os.path.join(EXPERIMENT_DIR, "input/ms_files"),
+            raw_files_dir = MS_DIR,
             fasta         = os.path.join(GP_RESOURCE_DIR, "second_pass_database.fasta"),
             config_file = os.path.join(RUN_DIR,"config/peptidotyping_infinidia.cfg")
         output:
