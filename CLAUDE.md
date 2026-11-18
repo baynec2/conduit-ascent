@@ -108,7 +108,7 @@ Signature: `calc_taxon_fdr(pep, taxon, decoy, peptide = NULL, qvalue_threshold =
 
 ### Container Strategy
 
-All container images are pinned to short-SHA tags in `config/snakemake.yaml` under the `containers:` block. Two CI workflows publish them:
+All container images are pinned **by digest** in `config/snakemake.yaml` under the `containers:` block, with the commit each image was built from in a comment above it. CI publishes short-SHA tags; you pin the digest of the tag you want. Two CI workflows publish them:
 
 - **conduitR** (`baynec2/conduitr`): published by `conduitR/.github/workflows/docker-publish.yml` on every push to `main`/`develop`. Tags emitted: `:latest` (main), `:develop` (develop), and `:<short-sha>` (immutable).
 - **In-repo containers** (diann, bakta, metaphlan, eggnogmapper, umgap, fraggenescan_hmmer): published by `.github/workflows/build-container-images.yml` on push to `main`/`develop` when a `containers/*/Dockerfile` changes. Only the immutable `:<short-sha>` tag is emitted (no rolling tag).
@@ -135,11 +135,49 @@ git -C /home/nanopore-catalyst/conduitR log --oneline --abbrev=7 develop -1
 
 # Verify a tag actually exists on Docker Hub before pinning (replace tool/sha):
 curl -s "https://hub.docker.com/v2/repositories/baynec2/umgap/tags?page_size=25" | python3 -c "import sys,json;print('\n'.join(t['name'] for t in json.load(sys.stdin)['results']))"
+
+# The digest to pin for a tag (the multi-arch index digest), e.g. conduitr at a commit:
+curl -s "https://hub.docker.com/v2/repositories/baynec2/conduitr/tags/<sha>" | python3 -c "import sys,json;print(json.load(sys.stdin)['digest'])"
 ```
 
 Bump any tag in `config/snakemake.yaml` whose SHA differs from the latest CI-published one. (Once things stabilize and Dockerfiles aren't changing, this becomes a rare check.)
 
 If a Dockerfile commit predates the CI workflow being added (`184ad867`, 2026-04-06) and has no SHA-tagged image on Docker Hub — bakta, eggnogmapper, metaphlan, fraggenescan_hmmer at time of writing — either leave the existing manual tag (`:alpha`, `:2.1.12`) or trigger a CI rebuild by making a no-op change to the Dockerfile.
+
+## Versioning and Releases
+
+conduit-ascent uses [Semantic Versioning](https://semver.org/). Before 1.0.0, a minor bump may change config keys or output formats. 1.0.0 is reserved for the manuscript release, when config and outputs become a stability promise.
+
+- `VERSION` holds the release number (no `v` prefix). `CHANGELOG.md` has one entry per release.
+- Releases are cut from `main`, and only released code lands there. Day-to-day work merges into `develop` via PRs.
+- `modules/_shared/workflow_version.py` produces the version a run records, in `manifest.json` (`workflow.version`) and the `conduit` object's provenance. The bare number appears only when HEAD is the clean commit tagged `v<VERSION>`. Otherwise it is `<VERSION>+<sha7>`, with `.dirty` appended when there are uncommitted changes. **Don't bypass this by reading `VERSION` directly**, or development runs will pass for a release.
+
+### Cutting a release
+
+1. On a branch off `develop`: bump `VERSION`, add a `## [X.Y.Z] - YYYY-MM-DD` entry plus its link line at the bottom of `CHANGELOG.md`, and pin any container images that changed (see the pre-flight above). **Re-pin `conduitr` to the image built from the latest conduitR release tag** (`git -C <conduitR> rev-parse --short=7 vA.B.C^{commit}` gives the image tag) — nothing else keeps that pin in step with conduitR, and ascent v0.1.0 shipped two months behind it. PR it into `develop`.
+2. Open a PR `develop` → `main` titled `Release vX.Y.Z`, wait for the `dry-runs` CI, then merge it with a merge commit.
+3. Tag the merge commit on `main` and publish the release, using the changelog entry as the notes:
+
+```bash
+git fetch origin
+git tag -a vX.Y.Z -m "conduit-ascent X.Y.Z" origin/main
+git push origin vX.Y.Z
+awk '/^## \[X.Y.Z\]/{f=1;next} /^(## |\[X.Y.Z\]:)/{f=0} f' CHANGELOG.md > /tmp/notes.md
+gh release create vX.Y.Z --title "conduit-ascent X.Y.Z" --notes-file /tmp/notes.md --verify-tag
+```
+
+The tag must be on the exact merge commit. Runs from any other commit, including later `develop` commits, record `X.Y.Z+<sha>` until the next release.
+
+4. Merge `main` back into `develop` through a PR, so the release merge commit is on both branches:
+
+```bash
+git checkout -b chore/sync-main-into-develop origin/develop
+git merge --no-ff origin/main -m "Merge main into develop after vX.Y.Z"
+git push -u origin chore/sync-main-into-develop
+gh pr create --base develop --title "Merge main into develop after vX.Y.Z" --body "Back-merge after the release."
+```
+
+After the back-merge, `git rev-list --count develop..origin/main` is 0, so a nonzero count means `main` really has something `develop` lacks. If in doubt, compare files with `git diff develop origin/main`.
 
 ## conduitR Package
 

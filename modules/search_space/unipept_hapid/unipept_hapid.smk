@@ -38,6 +38,14 @@ from diann_staging import (
 RAW_FILEPATHS = list_raw_files(EXPERIMENT_DIR)
 SAMPLES = list_samples(EXPERIMENT_DIR)
 
+# DIA-NN passes here only select organisms, so they may run on a subset of the
+# MS runs (search_space_run_subset); with none configured these are the
+# experiment's own ms_files dir and every run. See modules/_shared/run_subset.py.
+from run_subset import run_subset_inputs
+MS_DIR, RAW_FILEPATHS, SAMPLES = run_subset_inputs(
+    config, "search_space", EXPERIMENT_DIR, RUN_DIR, RAW_FILEPATHS, SAMPLES
+)
+
 UH_OUT = os.path.join(RUN_DIR, "database_resources/unipept_hapid")
 UH_QUANTS = os.path.join(UH_OUT, "first_pass_quant_files")
 
@@ -216,7 +224,7 @@ if config.get("unipept_hapid_search_mode", "standard") == "standard":
 
     rule unipept_hapid_build_empirical_lib:
         input:
-            raw_files_dir    = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
+            raw_files_dir    = MS_DIR,
             spectral_library = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping.predicted.speclib"),
             fasta            = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping_db.fasta"),
             config_file      = os.path.join(RUN_DIR,"config/diann_library_search_base.cfg")
@@ -289,7 +297,7 @@ if config.get("unipept_hapid_search_mode", "standard") == "standard":
             empirical_lib = os.path.join(UH_OUT, "hapid_first_pass_empirical.parquet"),
             fasta = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping_db.fasta"),
             config_file = os.path.join(RUN_DIR,"config/diann_library_search_base.cfg"),
-            raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files")
+            raw_files_dir = MS_DIR
         output:
             hapid_diann_parquet = os.path.join(UH_OUT, "hapid_first_pass_diann.parquet")
         params:
@@ -314,6 +322,7 @@ if config.get("unipept_hapid_search_mode", "standard") == "standard":
             --fasta {input.fasta} \
             --temp {params.tmpdir} \
             --use-quant \
+            --quant-ori-names \
             --out {params.out_prefix} \
             --cut "" \
             --missed-cleavages 0 \
@@ -327,7 +336,7 @@ else:  # infinidia — monolithic
 
     rule unipept_hapid_monolithic:
         input:
-            raw_files_dir = os.path.join(EXPERIMENT_DIR,"input/ms_files"),
+            raw_files_dir = MS_DIR,
             fasta         = os.path.join(config["peptidotyping_resource_dir"],"hapid_peptidotyping_db.fasta"),
             config_file   = os.path.join(RUN_DIR,"config/hapid_infinidia.cfg")
         output:

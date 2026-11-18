@@ -31,6 +31,8 @@ Snakemake R scripts source siblings via `snakemake@source("./file_lib.R")`. Pyth
 | `python/test_parse_genome_taxonomy.py` | `build_genome_taxonomy`, `assign_organism_ids`, `filter_to_selected_genomes`, `fill_taxonomy_defaults` | `modules/search_space/genomes/scripts/parse_genome_taxonomy.py` |
 | `python/test_build_taxon_spectrum_mapping.py` | `build_taxon_spectrum_mapping` | `modules/search_space/unipept_hapid/scripts/build_taxon_spectrum_mapping.py` |
 | `python/test_cover_all_spectra_greedy.py` | `greedy_cover` | `modules/search_space/_shared/scripts/coverAllSpectra_greedy.py` |
+| `python/test_diann_staging.py` | `stage3_symlink_commands` | `modules/_shared/diann_staging.py` |
+| `python/test_run_subset.py` | `parse_subset_spec`, `select_run_subset`, `resolve_run_subsets`, `run_subset_inputs` | `modules/_shared/run_subset.py` |
 | `test_awk_pipelines.sh` | FASTA header generation + rank-priority awk pipelines from `unipept_peptidotyping.smk` | `modules/search_space/unipept_peptidotyping/unipept_peptidotyping.smk` |
 
 ### Gaps
